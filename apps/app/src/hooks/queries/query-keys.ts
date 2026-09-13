@@ -1215,7 +1215,7 @@ export function pluginSourceQueryKey(pluginId: string) {
   return [PLUGIN_SOURCE_QUERY_KEY, pluginId] as const;
 }
 
-export function pluginUpdateCheckQueryKey(pluginId: string) {
+export function pluginUpdateCheckQueryKey(pluginId: string | null) {
   return [PLUGIN_UPDATE_CHECK_QUERY_KEY, pluginId] as const;
 }
 

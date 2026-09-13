@@ -186,14 +186,17 @@ export async function checkPluginUpdates(
 }
 
 export function usePluginUpdateCheck(
-  pluginId: string,
+  pluginId: string | null,
   options: { enabled: boolean },
 ) {
   const queryClient = useQueryClient();
   return useQuery({
     queryKey: pluginUpdateCheckQueryKey(pluginId),
     queryFn: async () => {
-      const results = await checkPluginUpdates(fetch, { id: pluginId });
+      const results = await checkPluginUpdates(
+        fetch,
+        pluginId === null ? {} : { id: pluginId },
+      );
       await invalidatePluginList({ queryClient });
       return results;
     },

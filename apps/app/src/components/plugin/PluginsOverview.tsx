@@ -22,7 +22,6 @@ import {
   BrowsePluginsTab,
   pluginCategoryFilterOptions,
 } from "@/components/plugin/management/BrowsePluginsTab";
-import { CheckPluginUpdatesButton } from "@/components/plugin/management/CheckPluginUpdatesButton";
 import { InstalledPluginsTab } from "@/components/plugin/management/InstalledPluginsTab";
 import { PluginAuthorPage } from "@/components/plugin/management/PluginAuthorPage";
 import { PluginCollectionToolbar } from "@/components/plugin/management/PluginCollectionToolbar";
@@ -42,7 +41,10 @@ import {
   type PluginListItem,
 } from "@/hooks/queries/plugin-settings-queries";
 import { usePluginListings } from "@/hooks/queries/plugin-listing-queries";
-import { usePluginCatalogSearch } from "@/hooks/queries/plugin-catalog-queries";
+import {
+  usePluginCatalogSearch,
+  usePluginUpdateCheck,
+} from "@/hooks/queries/plugin-catalog-queries";
 import {
   getPluginDetailRoutePath,
   getRootComposeRoutePath,
@@ -79,6 +81,7 @@ export function PluginsOverview({
   );
   const activeMode =
     mode ?? (searchParams.get("view") === "installed" ? "installed" : "browse");
+  usePluginUpdateCheck(null, { enabled: activeMode === "installed" });
   const authorKey = searchParams.get("author");
   const query = searchParams.get("query") ?? "";
   const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -281,9 +284,6 @@ export function PluginsOverview({
             hasInstallCounts={hasInstallCounts}
             action={installedActions}
             searchPlaceholder="Search installed plugins"
-            additionalControls={
-              plugins.length > 0 ? <CheckPluginUpdatesButton /> : null
-            }
           />
           {listingQuery.isError ? (
             <p className="text-xs text-warning-text" role="status">
