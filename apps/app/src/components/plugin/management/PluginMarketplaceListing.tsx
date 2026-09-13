@@ -82,19 +82,6 @@ export function PluginMarketplaceDetailMetadata({
       <PluginDetailMetadataItem label="Category">
         {entry.category ?? "Not categorized"}
       </PluginDetailMetadataItem>
-      <PluginDetailMetadataItem label="Listed">
-        {entry.publishedAt === undefined ? (
-          "Not provided"
-        ) : (
-          <time dateTime={entry.publishedAt}>
-            {new Date(entry.publishedAt).toLocaleDateString(undefined, {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            })}
-          </time>
-        )}
-      </PluginDetailMetadataItem>
       {children}
       <PluginDetailMetadataItem label="Last updated">
         {entry.updatedAt === undefined ? (
