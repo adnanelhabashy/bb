@@ -156,6 +156,7 @@ export function BrowsePluginsTab({
     <ResourceCollectionViewport scrollId="plugins-browse-results">
       <div className={cn("space-y-7 pb-8", TOOLS_PAGE_BAND_CLASSES)}>
         <div className="flex items-center justify-between gap-3 sm:justify-end">
+          <OpenPluginGuideButton />
           <div className="flex items-stretch">
             <Button
               className="rounded-r-none"
@@ -184,7 +185,6 @@ export function BrowsePluginsTab({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <OpenPluginGuideButton />
         </div>
 
         <BrowseHeroCarousel
