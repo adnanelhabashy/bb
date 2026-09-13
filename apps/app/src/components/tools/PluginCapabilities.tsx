@@ -458,7 +458,7 @@ export function PluginIncludes({ plugin }: { plugin: PluginListItem }) {
     "This plugin isn't running, so its commands, settings, agent tools, app surfaces, and thread integrations can't be listed.";
 
   return (
-    <ResourceDetailIncludesSection label="Includes">
+    <ResourceDetailIncludesSection label="Capabilities">
       <div className="space-y-3">
         <PluginDetailTable>
           {items.map((item) => (
