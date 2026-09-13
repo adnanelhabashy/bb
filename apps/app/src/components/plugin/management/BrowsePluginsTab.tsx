@@ -409,8 +409,15 @@ function BrowseShelf({
         shelf={shelf}
         showCount={showCount}
         action={
-          visible.length < shelf.entries.length ? (
-            <ResourceShelfAction onClick={onExpand}>
+          shelf.entries.length > 3 ? (
+            <ResourceShelfAction
+              onClick={onExpand}
+              className={
+                shelf.entries.length <= SHELF_ENTRY_LIMIT
+                  ? "sm:hidden"
+                  : undefined
+              }
+            >
               View all
               <Icon name="ChevronRight" className="size-3.5" aria-hidden />
             </ResourceShelfAction>
@@ -418,7 +425,10 @@ function BrowseShelf({
         }
       />
       <div data-plugin-shelf>
-        <div data-plugin-shelf-grid className="grid gap-2">
+        <div
+          data-plugin-shelf-grid
+          className="grid gap-2 max-sm:[&>*:nth-child(n+4)]:hidden"
+        >
           {visible.map((entry) => (
             <PluginCatalogCard
               key={`${entry.marketplace}/${entry.entryId}`}
