@@ -10,7 +10,6 @@ import {
   type ReactNode,
 } from "react";
 import { useAtomValue, useStore } from "jotai";
-import { Button } from "@bb/shared-ui/button";
 import { Icon } from "@bb/shared-ui/icon";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@bb/shared-ui/tooltip";
 import { useIsCompactViewport } from "@bb/shared-ui/hooks/use-compact-viewport";
@@ -129,21 +128,16 @@ export function ThreadSearchPaletteMode({
   const activeDescendantId =
     activeIndex < 0 ? undefined : `${optionIdPrefix}-${activeIndex}`;
   const activeRow = result.rows[activeIndex];
-  const splitDisabledReason =
-    splitLayout === null
-      ? "Open a thread first to use split view"
-      : activeRow !== undefined &&
-          findPaneByContent(splitLayout.root, {
-            kind: "thread",
-            projectId: activeRow.projectId,
-            threadId: activeRow.threadId,
-          }) !== null
-        ? "Already open in this workspace"
-        : countPanes(splitLayout.root) >= MAX_PANES
-          ? "Close a split pane first"
-          : null;
   const canSplit =
-    activeRow !== undefined && !isCompact && splitDisabledReason === null;
+    activeRow !== undefined &&
+    !isCompact &&
+    splitLayout !== null &&
+    findPaneByContent(splitLayout.root, {
+      kind: "thread",
+      projectId: activeRow.projectId,
+      threadId: activeRow.threadId,
+    }) === null &&
+    countPanes(splitLayout.root) < MAX_PANES;
   const splitShortcut = isMacKeyboardPlatform(navigator.platform)
     ? "⌘↵"
     : "Ctrl+↵";
@@ -257,41 +251,6 @@ export function ThreadSearchPaletteMode({
   return (
     <PaletteShell
       activeDescendantId={activeDescendantId}
-      accessory={
-        <>
-          {activeRow === undefined || isCompact ? null : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="shrink-0 px-2 text-subtle-foreground aria-disabled:opacity-50"
-                  aria-label="Open in split"
-                  aria-disabled={!canSplit}
-                  aria-keyshortcuts={
-                    canSplit ? "Meta+Enter Control+Enter" : undefined
-                  }
-                  onClick={() => {
-                    if (canSplit) openRow(activeRow, true);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key !== "Escape") return;
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onExit();
-                  }}
-                >
-                  <Icon name="Columns2" aria-hidden />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {splitDisabledReason ?? `Open in split (${splitShortcut})`}
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </>
-      }
       footerKeys={
         canSplit ? [{ keys: [splitShortcut], label: "Open in split" }] : []
       }

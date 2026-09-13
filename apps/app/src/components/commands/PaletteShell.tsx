@@ -29,7 +29,6 @@ interface PaletteModeChipProps {
 
 interface PaletteShellProps {
   activeDescendantId?: string;
-  accessory?: ReactNode;
   children: ReactNode;
   footerKeys: readonly { keys: readonly string[]; label: string }[];
   inputDescription: string;
@@ -47,7 +46,6 @@ interface PaletteShellProps {
 
 export function PaletteShell({
   activeDescendantId,
-  accessory,
   children,
   footerKeys,
   inputDescription,
@@ -109,7 +107,6 @@ export function PaletteShell({
           <span id={inputDescriptionId} className="sr-only">
             {inputDescription}
           </span>
-          {accessory}
         </div>
       </div>
       <div

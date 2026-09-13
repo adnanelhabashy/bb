@@ -550,7 +550,7 @@ describe("CommandPalette", () => {
       "data-tab-pill-close",
     );
     expect(screen.queryByRole("button", { name: "Thread scope" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Open in split" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Open in split" })).toBeNull();
     expect(document.querySelector("[data-palette-footer]")).toBeNull();
     await requestShortcutHints();
     const footer = screen
@@ -735,7 +735,7 @@ describe("CommandPalette", () => {
     },
   );
 
-  it("reveals split guidance on demand and hides it on release, action focus, no matches, and Commands", async () => {
+  it("reveals split guidance on demand and hides it on release, input blur, no matches, and Commands", async () => {
     modeState.activeRecents = [makeThread("selected")];
     renderPalette();
     openThreadSearch();
@@ -749,8 +749,7 @@ describe("CommandPalette", () => {
     fireEvent.keyUp(window, { key: "Control" });
     expect(palette.querySelector("[data-palette-footer]")).toBeNull();
     await requestShortcutHints();
-    const split = screen.getByRole("button", { name: "Open in split" });
-    act(() => split.focus());
+    act(() => screen.getByRole("button", { name: "Return to commands" }).focus());
     expect(palette.querySelector("[data-palette-footer]")).toBeNull();
     act(() => searchField().focus());
     await requestShortcutHints();
@@ -796,7 +795,7 @@ describe("CommandPalette", () => {
     ).toBeNull();
   });
 
-  it("keeps the split action discoverable with keyboard hints disabled", async () => {
+  it("keeps the split shortcut working with keyboard hints disabled", async () => {
     testState.showKeyboardHints = false;
     modeState.activeRecents = [
       makeThread("first"),
@@ -810,10 +809,8 @@ describe("CommandPalette", () => {
     expect(document.querySelector("[data-palette-footer]")).toBeNull();
     fireEvent.keyUp(window, { key: "Control" });
     fireEvent.keyDown(searchField(), { key: "ArrowDown" });
-    const action = screen.getByRole("button", { name: "Open in split" });
-    expectAttribute(action, "aria-disabled", "false");
-    expect(action.closest('[role="listbox"]')).toBeNull();
-    fireEvent.click(action);
+    expect(screen.queryByRole("button", { name: "Open in split" })).toBeNull();
+    fireEvent.keyDown(searchField(), { key: "Enter", ctrlKey: true });
     await waitFor(() =>
       expect(openThreadInSplitMock).toHaveBeenCalledWith(
         expect.objectContaining({ threadId: "second" }),
@@ -824,7 +821,7 @@ describe("CommandPalette", () => {
   });
 
   it.each(["missing workspace", "already open", "pane limit"])(
-    "removes split guidance and disables the action for %s",
+    "removes split guidance for %s",
     async (state) => {
       modeState.activeRecents = [makeThread("selected")];
       const { store } = renderPalette();
@@ -858,21 +855,8 @@ describe("CommandPalette", () => {
         ),
       );
       expect(document.querySelector("[data-palette-footer]")).toBeNull();
-      const action = screen.getByRole("button", { name: "Open in split" });
-      expectAttribute(action, "aria-disabled", "true");
-      fireEvent.click(action);
-      expect(openThreadInSplitMock).not.toHaveBeenCalled();
+      expect(screen.queryByRole("button", { name: "Open in split" })).toBeNull();
       expect(screen.getByRole("combobox")).toBeTruthy();
-      act(() => action.focus());
-      const tooltip = await screen.findByRole("tooltip");
-      expectText(
-        tooltip,
-        state === "missing workspace"
-          ? "Open a thread first"
-          : state === "already open"
-            ? "Already open"
-            : "Close a split pane first",
-      );
     },
   );
 
