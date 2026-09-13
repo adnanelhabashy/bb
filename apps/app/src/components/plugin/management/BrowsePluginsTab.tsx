@@ -409,7 +409,7 @@ function BrowseShelf({
         shelf={shelf}
         showCount={showCount}
         action={
-          shelf.entries.length > 3 ? (
+          shelf.entries.length > 2 ? (
             <ResourceShelfAction
               onClick={onExpand}
               className={
@@ -427,7 +427,7 @@ function BrowseShelf({
       <div data-plugin-shelf>
         <div
           data-plugin-shelf-grid
-          className="grid gap-2 max-sm:[&>*:nth-child(n+4)]:hidden"
+          className="grid gap-2 max-sm:[&>*:nth-child(n+3)]:hidden"
         >
           {visible.map((entry) => (
             <PluginCatalogCard
