@@ -199,7 +199,7 @@ describe("BrowsePluginsTab", () => {
       onOpenPlugin,
     );
 
-    fireEvent.click(await screen.findByRole("link", { name: "BB" }));
+    fireEvent.click(await screen.findByRole("link", { name: "BB Official" }));
     const params = new URLSearchParams(
       screen.getByTestId("location-search").textContent ?? "",
     );
@@ -488,7 +488,7 @@ describe("BrowsePluginsTab", () => {
     expect(onOpenPlugin).not.toHaveBeenCalled();
     expect(onInstall).not.toHaveBeenCalled();
     expect(screen.queryByText("By")).toBeNull();
-    expect(screen.getByRole("link", { name: "BB" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "BB Official" })).toBeTruthy();
     fireEvent.focus(installed);
     expect((await screen.findByRole("tooltip")).textContent).toBe(
       "Included with BB; cannot be uninstalled.",

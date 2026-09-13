@@ -797,7 +797,7 @@ describe("PluginsOverview", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findAllByRole("link", { name: "BB" })).toHaveLength(2);
+    expect(await screen.findAllByRole("link", { name: "BB Official" })).toHaveLength(2);
     expect(
       screen.getAllByRole("img", { name: "BB's GitHub avatar" }),
     ).toHaveLength(2);
