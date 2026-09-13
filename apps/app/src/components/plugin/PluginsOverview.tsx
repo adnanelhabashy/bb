@@ -25,7 +25,6 @@ import {
 import { InstalledPluginsTab } from "@/components/plugin/management/InstalledPluginsTab";
 import { PluginAuthorPage } from "@/components/plugin/management/PluginAuthorPage";
 import { PluginCollectionToolbar } from "@/components/plugin/management/PluginCollectionToolbar";
-import { OpenPluginGuideButton } from "@/components/plugin/management/OpenPluginGuideButton";
 import {
   mergePluginCollection,
   pluginCollectionCategory,
@@ -225,7 +224,6 @@ export function PluginsOverview({
     });
   const installedActions = (
     <span className="flex items-center justify-end gap-1.5">
-      <OpenPluginGuideButton compactWhenNarrow />
       <CreateWithTemplatesButton
         kind="plugin"
         compactWhenNarrow
