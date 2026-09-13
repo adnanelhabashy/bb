@@ -360,14 +360,44 @@ function PluginShelfHeader({
   showCount: boolean;
   action?: ReactNode;
 }) {
+  const collection = shelf.kind === "collection";
+  const categoryIds = [
+    ...new Set(shelf.entries.map((entry) => entry.categoryId)),
+  ];
   return (
     <div className="flex items-start justify-between gap-3">
-      <div className="relative min-w-0 space-y-1 pl-3">
-        <span
-          className="absolute inset-y-0 left-0 w-0.5 rounded-full"
-          style={pluginCatalogCategoryMutedAccentStyle(shelf.categoryId)}
-          aria-hidden
-        />
+      <div
+        className={cn("relative min-w-0 space-y-1", collection ? "pl-6" : "pl-3")}
+      >
+        {collection ? (
+          <span
+            className="absolute left-0 top-0.5 grid size-4 grid-cols-2 gap-0.5"
+            aria-hidden
+          >
+            {[0, 1, 2, 3].map((index) => (
+              <span
+                key={index}
+                className="rounded-xs"
+                style={
+                  shelf.key === "collection:bb-official"
+                    ? {
+                        background:
+                          "color-mix(in oklab, var(--ink) 75%, var(--canvas))",
+                      }
+                    : pluginCatalogCategoryMutedAccentStyle(
+                        categoryIds[index % categoryIds.length],
+                      )
+                }
+              />
+            ))}
+          </span>
+        ) : (
+          <span
+            className="absolute inset-y-0 left-0 w-0.5 rounded-full"
+            style={pluginCatalogCategoryMutedAccentStyle(shelf.categoryId)}
+            aria-hidden
+          />
+        )}
         <h2 className="text-sm font-medium text-foreground">
           {pluginCategoryDisplayName(shelf.categoryId, shelf.label)}
           {showCount ? (
