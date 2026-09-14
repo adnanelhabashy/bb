@@ -40,6 +40,7 @@ import { getPluginBuildToolchain } from "./build-toolchain.js";
 import { createNodeBbSdk, type BbSdk } from "@bb/sdk";
 import { experimental_aiServicesHostContract } from "@get-bb/plugin-sdk/ai-services";
 import {
+  getExperiments,
   getInstalledPlugin,
   listInstalledPlugins,
   prunePluginSchedules,
@@ -100,6 +101,11 @@ import type {
 } from "./plugin-service-internal.js";
 import { createKeyedLock } from "../lib/async-deduper.js";
 import { runEventLoopWork } from "../system/event-loop-work.js";
+import {
+  buildCachedPluginServer,
+  hashPluginServerSource,
+  pluginServerCacheDirectory,
+} from "./plugin-server-cache.js";
 
 const pluginSdkRuntimePath = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -128,11 +134,21 @@ export function pluginSdkAliasFor(runtimePath: string): Record<string, string> {
   };
 }
 
+const runtimeRequire = createRequire(import.meta.url);
 const pluginSdkAlias: Record<string, string> | undefined = existsSync(
   pluginSdkRuntimePath,
 )
   ? pluginSdkAliasFor(pluginSdkRuntimePath)
   : undefined;
+const pluginSdkRuntimeEntry = existsSync(pluginSdkRuntimePath)
+  ? pluginSdkRuntimePath
+  : runtimeRequire.resolve(PLUGIN_SDK_SPECIFIER);
+const pluginRuntimeExternalUrls = new Map(
+  Object.entries({
+    ...pluginSdkAliasFor(pluginSdkRuntimeEntry),
+    "better-sqlite3": runtimeRequire.resolve("better-sqlite3"),
+  }).map(([specifier, path]) => [specifier, pathToFileURL(path).href]),
+);
 
 interface MutableRoot {
   id: number;
@@ -149,6 +165,11 @@ function registerMutableRootHooks(): void {
   if (mutableRootHooks !== null) return;
   mutableRootHooks = registerHooks({
     resolve(specifier, context, nextResolve) {
+      const parent = MUTABLE_ROOT_MARKER.exec(context.parentURL ?? "");
+      const runtimeExternalUrl = pluginRuntimeExternalUrls.get(specifier);
+      if (runtimeExternalUrl !== undefined) {
+        return { url: runtimeExternalUrl, shortCircuit: true };
+      }
       const resolved = nextResolve(specifier, context);
       if (mutableRoots.size === 0) return resolved;
       if (!resolved.url.startsWith("file:")) return resolved;
@@ -161,7 +182,6 @@ function registerMutableRootHooks(): void {
         matchedLength = rootUrl.length;
       }
       if (match === undefined) return resolved;
-      const parent = MUTABLE_ROOT_MARKER.exec(context.parentURL ?? "");
       const epoch =
         parent !== null && Number(parent[1]) === match.id
           ? parent[2]
@@ -301,6 +321,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     deps.serviceRestartBaseMs ?? DEFAULT_SERVICE_RESTART_BASE_MS;
 
   const loaded = new Map<string, LoadedPlugin>();
+  const initializedSourceBuiltinIds = new Set<string>();
   deps.pendingInteractions?.setPluginDirectory({
     isLoaded: (pluginId) => loaded.has(pluginId),
   });
@@ -1020,24 +1041,70 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
   async function resolveServerEntry(
     row: InstalledPluginRow,
     manifest: PluginManifest,
+    legacyJitiPluginLoader: boolean,
   ): Promise<string> {
-    if (
-      row.sourceKind === "path" ||
-      (row.sourceKind === "builtin" &&
-        !isPackagedBuiltinEntry({
-          kind: row.sourceKind,
-          manifest,
+    async function buildSource(): Promise<string> {
+      const sourceDigest = await hashPluginServerSource(row.rootDir);
+      const cacheDir = pluginServerCacheDirectory({
+        dataDir: deps.dataDir,
+        pluginId: row.id,
+        rootDir: mutableRootDir(row.rootDir),
+        sourceDigest,
+        sdkVersion: PLUGIN_SDK_VERSION,
+        bbVersion: deps.appVersion,
+      });
+      return withArtifactLock(cacheDir, async () =>
+        buildCachedPluginServer({
           rootDir: row.rootDir,
-          artifact: "server",
-        }))
+          cacheDir,
+          bbVersion: deps.appVersion,
+          toolchain: () => getPluginBuildToolchain(deps),
+          runtimeImports: {
+            [PLUGIN_SDK_SPECIFIER]: {
+              path: pluginSdkRuntimeEntry,
+              external: true,
+            },
+            [LEGACY_PLUGIN_SDK_SPECIFIER]: {
+              path: pluginSdkRuntimeEntry,
+              external: true,
+            },
+            "better-sqlite3": {
+              path: runtimeRequire.resolve("better-sqlite3"),
+              external: true,
+            },
+          },
+          fallbackResolve: (specifier) => {
+            try {
+              return runtimeRequire.resolve(specifier);
+            } catch {
+              return undefined;
+            }
+          },
+        }),
+      );
+    }
+    if (row.sourceKind === "path") {
+      return legacyJitiPluginLoader ? manifest.serverEntry : buildSource();
+    }
+    if (
+      row.sourceKind === "builtin" &&
+      !isPackagedBuiltinEntry({
+        kind: row.sourceKind,
+        manifest,
+        rootDir: row.rootDir,
+        artifact: "server",
+      })
     ) {
+      if (legacyJitiPluginLoader) return manifest.serverEntry;
+      if (initializedSourceBuiltinIds.has(row.id)) return buildSource();
+      initializedSourceBuiltinIds.add(row.id);
       return manifest.serverEntry;
     }
     const distJsPath = join(row.rootDir, "dist", "server.js");
     try {
       await stat(distJsPath);
     } catch {
-      return manifest.serverEntry;
+      return legacyJitiPluginLoader ? manifest.serverEntry : buildSource();
     }
     let meta: { sdkMajor: number; sdkVersion: string } | null = null;
     try {
@@ -1049,7 +1116,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
       logger.warn(
         `plugin ${row.id}: ignoring prebuilt dist/server.js (built with SDK ${meta?.sdkVersion ?? "unknown"}, running SDK is ${PLUGIN_SDK_VERSION}) — loading from source`,
       );
-      return manifest.serverEntry;
+      return legacyJitiPluginLoader ? manifest.serverEntry : buildSource();
     }
     return distJsPath;
   }
@@ -1574,21 +1641,34 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
       },
     });
     settingsDescriptorsRef.current = handle.settings.descriptors;
-    let rollbackGeneration: (() => void) | undefined;
-    if (row.sourceKind === "path" || row.sourceKind === "builtin") {
-      rollbackGeneration = bumpMutableRootGeneration(row.rootDir);
-      ownedRootUrls.add(mutableRootUrl(mutableRootDir(row.rootDir)));
-    }
+    const rollbackGenerations: Array<() => void> = [];
     try {
-      const jiti = createJiti(import.meta.url, {
-        moduleCache: false,
-        ...(pluginSdkAlias === undefined ? {} : { alias: pluginSdkAlias }),
-      });
-      const mod = (await jiti.import(
-        await resolveServerEntry(row, manifest),
-      )) as {
-        default?: unknown;
-      };
+      const legacyJitiPluginLoader =
+        getExperiments(deps.db).legacyJitiPluginLoader;
+      const serverEntry = await resolveServerEntry(
+        row,
+        manifest,
+        legacyJitiPluginLoader,
+      );
+      if (row.sourceKind === "path" || row.sourceKind === "builtin") {
+        rollbackGenerations.push(bumpMutableRootGeneration(row.rootDir));
+        ownedRootUrls.add(mutableRootUrl(mutableRootDir(row.rootDir)));
+      }
+      let mod: { default?: unknown };
+      if (legacyJitiPluginLoader) {
+        const jiti = createJiti(import.meta.url, {
+          moduleCache: false,
+          ...(pluginSdkAlias === undefined ? {} : { alias: pluginSdkAlias }),
+        });
+        mod = (await jiti.import(serverEntry)) as { default?: unknown };
+      } else {
+        const serverRoot = dirname(serverEntry);
+        rollbackGenerations.push(bumpMutableRootGeneration(serverRoot));
+        ownedRootUrls.add(mutableRootUrl(mutableRootDir(serverRoot)));
+        mod = (await import(pathToFileURL(serverEntry).href)) as {
+          default?: unknown;
+        };
+      }
       const factory = mod.default;
       if (typeof factory !== "function") {
         throw new Error(
@@ -1600,7 +1680,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
         handle.api,
       );
     } catch (error) {
-      rollbackGeneration?.();
+      for (const rollback of rollbackGenerations.reverse()) rollback();
       discardCandidateHandle(handle);
       let message = error instanceof Error ? error.message : String(error);
       if (/ERR_DLOPEN_FAILED|\.node/.test(message)) {
@@ -1619,7 +1699,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
         : message;
     }
     if (hostArtifactProblem !== null) {
-      rollbackGeneration?.();
+      for (const rollback of rollbackGenerations.reverse()) rollback();
       try {
         replaceUnavailableProviderRegistrations(
           row,
