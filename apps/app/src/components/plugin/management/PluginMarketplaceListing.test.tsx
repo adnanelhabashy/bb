@@ -72,9 +72,7 @@ describe("plugin marketplace author links", () => {
     expect(screen.getByText("Listed").parentElement?.textContent).toContain(
       "Jul 9, 2026",
     );
-    expect(
-      screen.getByText("Last updated").parentElement?.textContent,
-    ).toContain("Sep 5, 2026");
+    expect(screen.queryByText("Last updated")).toBeNull();
     expect(
       screen.getByText("Marketplace").parentElement?.textContent,
     ).toContain("BB Community");
@@ -84,7 +82,7 @@ describe("plugin marketplace author links", () => {
         grid?.querySelectorAll("dt") ?? [],
         (label) => label.textContent,
       ),
-    ).toEqual(["Marketplace", "Category", "Listed", "Last updated"]);
+    ).toEqual(["Marketplace", "Category", "Listed"]);
   });
 
   it("does not create an empty Overview for a description-only plugin", () => {

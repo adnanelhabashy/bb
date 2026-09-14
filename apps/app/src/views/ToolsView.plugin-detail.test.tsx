@@ -217,7 +217,7 @@ describe("PluginDetail official catalog lifecycle", () => {
     expect(screenshot.getAttribute("referrerpolicy")).toBe("no-referrer");
     expect(screenshot.getAttribute("loading")).toBe("lazy");
     expect(screen.getByText("Listed")).toBeTruthy();
-    expect(container.textContent).toContain("Last updatedNot provided");
+    expect(container.textContent).not.toContain("Last updated");
   });
 
   it("explains why an incompatible official plugin cannot be installed", () => {
