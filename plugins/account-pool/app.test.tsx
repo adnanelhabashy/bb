@@ -276,6 +276,20 @@ describe("Account Pool settings", () => {
     expect(group?.className).not.toMatch(/(^|\s)hidden(\s|$)/u);
   });
 
+  it("leaves the row without a base grid-cols utility so the sm columns apply", async () => {
+    const slot = render();
+    const row = await slot.findByLabelText("Open person@example.com");
+    expect(row.className).toMatch(/sm:grid-cols-\[minmax\(0,1fr\)_auto\]/u);
+    expect(row.className).not.toMatch(/(^|\s)grid-cols-[^[\s]/u);
+  });
+
+  it("leaves quota slots without a base text alignment so the sm alignment applies", async () => {
+    const slot = render();
+    const value = (await slot.findByText("5H")).parentElement;
+    expect(value?.className).toMatch(/sm:text-right/u);
+    expect(value?.className).not.toMatch(/(^|\s)text-(left|center|right)(\s|$)/u);
+  });
+
   it("renders only the windows a Codex account reports and no Fable slot", async () => {
     const blockingResetAt = Date.now() + 6 * 24 * 60 * 60 * 1_000;
     const slot = render([

@@ -355,7 +355,7 @@ function QuotaValue({
   return (
     <div
       className={cn(
-        "w-16 text-left tabular-nums transition-opacity sm:text-right",
+        "w-16 tabular-nums transition-opacity sm:text-right",
         refreshing && "opacity-50",
       )}
     >
@@ -436,7 +436,7 @@ function AccountRow({
       >
         <button
           type="button"
-          className="grid min-w-0 flex-1 grid-cols-1 items-center gap-y-1.5 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-y-0"
+          className="grid min-w-0 flex-1 items-center gap-y-1.5 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_auto]"
           aria-label={`Open ${account.label}`}
           onClick={onOpen}
         >
@@ -463,7 +463,7 @@ function AccountRow({
               {refreshing ? <span>refreshing usage…</span> : null}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:flex-nowrap sm:gap-1">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             {slots.map((slot) => (
               <QuotaValue
                 key={slot.key}
