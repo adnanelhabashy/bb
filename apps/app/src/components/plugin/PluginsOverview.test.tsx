@@ -518,7 +518,6 @@ describe("PluginsOverview", () => {
     expect(screen.queryByText("Plugin 14")).toBeNull();
   });
 
-
   it("sorts enabled plugins before inactive plugins and published plugins first within enabled", async () => {
     installFetch([
       {

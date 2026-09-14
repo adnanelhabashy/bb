@@ -918,7 +918,9 @@ describe("BB Official plugin detail routing", () => {
       { wrapper: QueryClientWrapper },
     );
 
-    fireEvent.click((await screen.findAllByRole("link", { name: "BB Official" }))[0]!);
+    fireEvent.click(
+      (await screen.findAllByRole("link", { name: "BB Official" }))[0]!,
+    );
     expect(await screen.findByRole("heading", { name: /^BB/u })).toBeTruthy();
     let params = new URLSearchParams(
       screen.getByTestId("route-search").textContent ?? "",
@@ -938,7 +940,9 @@ describe("BB Official plugin detail routing", () => {
     expect(params.getAll("category")).toEqual(["code-and-reviews"]);
     expect(params.get("sort")).toBe("recently-added");
 
-    fireEvent.click((await screen.findAllByRole("link", { name: "BB Official" }))[0]!);
+    fireEvent.click(
+      (await screen.findAllByRole("link", { name: "BB Official" }))[0]!,
+    );
     const card = await screen.findByRole("button", {
       name: "Open GitHub details",
     });
