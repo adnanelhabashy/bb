@@ -402,7 +402,7 @@ describe("BrowsePluginsTab", () => {
     );
   });
 
-  it("shows all five cards in a narrow shelf", async () => {
+  it("keeps five cards in the DOM with a compact-only View all action", async () => {
     const originalWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
@@ -418,7 +418,9 @@ describe("BrowsePluginsTab", () => {
 
     await screen.findByTestId("plugin-browse-shelves");
     expect(cardOrder()).toHaveLength(5);
-    expect(screen.queryByRole("button", { name: "View all" })).toBeNull();
+    expect(screen.getByRole("button", { name: "View all" }).className).toContain(
+      "sm:hidden",
+    );
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       value: originalWidth,

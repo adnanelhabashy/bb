@@ -155,7 +155,7 @@ export function BrowsePluginsTab({
   return (
     <ResourceCollectionViewport scrollId="plugins-browse-results">
       <div className={cn("space-y-7 pb-8", TOOLS_PAGE_BAND_CLASSES)}>
-        <div className="flex flex-col items-end gap-2">
+        <div className="ml-auto flex w-fit flex-col items-center gap-2">
           <div className="flex items-stretch">
             <Button
               className="rounded-r-none"
