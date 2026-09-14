@@ -33,7 +33,7 @@ import {
 import type { AddPluginInitial } from "./AddPluginDialog";
 import { PluginCard, PluginCardAuthor } from "./PluginCard";
 import {
-  PluginBrowseToolbar,
+  PluginCollectionToolbar,
   pluginBrowseSort,
   pluginBrowseSortDirection,
   type PluginBrowseCategoryOption,
@@ -69,7 +69,8 @@ export function BrowsePluginsTab({
   const selectedCategories = searchParams.getAll("category");
   const requestedSort = pluginBrowseSort(searchParams.get("sort"));
   const sortDirection =
-    pluginBrowseSortDirection(searchParams.get("direction")) ?? "desc";
+    pluginBrowseSortDirection(searchParams.get("direction")) ??
+    (requestedSort === "name" ? "asc" : "desc");
   const [heroRequest, setHeroRequest] = useState<{
     nonce: number;
     seed?: string;
@@ -195,7 +196,7 @@ export function BrowsePluginsTab({
           <BrowseArchetypeCards onCreate={openComposer} />
         ) : (
           <section className="space-y-6">
-            <PluginBrowseToolbar
+            <PluginCollectionToolbar
               query={query}
               selectedCategories={selectedCategories}
               categoryOptions={categoryOptions}
@@ -265,7 +266,7 @@ export function BrowsePluginsTab({
 }
 
 export function pluginCategoryFilterOptions(
-  entries: readonly PluginCatalogSearchEntry[],
+  entries: readonly Pick<PluginCatalogSearchEntry, "categoryId" | "category">[],
   selected: readonly string[],
 ): PluginBrowseCategoryOption[] {
   const labels = new Map<string, string>();
