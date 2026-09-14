@@ -1,3 +1,4 @@
+import { Button } from "@bb/shared-ui/button";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Carousel,
@@ -12,7 +13,6 @@ import { cn } from "@bb/shared-ui/lib/utils";
 import {
   ResourceDefinitionSection,
   ResourceDetailOverviewSection,
-  ResourceShelfAction,
 } from "@bb/shared-ui/resource-list";
 import type { PluginCatalogSearchEntry } from "@/hooks/queries/plugin-catalog-queries";
 import { PluginOverviewMarkdown } from "@/components/plugin/management/PluginOverviewMarkdown";
@@ -293,12 +293,17 @@ export function PluginMoreFromAuthorSection({
     <ResourceDefinitionSection
       label="More from this author"
       actions={
-        <ResourceShelfAction asChild>
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="h-auto text-xs font-normal text-muted-foreground"
+        >
           <PluginAuthorLink entry={entry}>
             View all
             <Icon name="ChevronRight" className="size-3" aria-hidden />
           </PluginAuthorLink>
-        </ResourceShelfAction>
+        </Button>
       }
     >
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-3">
