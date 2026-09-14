@@ -554,7 +554,7 @@ function PluginRuntimeStatusAlert({
             ) : null}
             {canReload ? (
               <ResourceActionButton
-                icon="RefreshCw"
+                icon="RotateCcw"
                 label={reloadPending ? "Reloading…" : "Reload"}
                 tooltipLabel={reloadPending ? "Reloading…" : "Reload"}
                 loading={reloadPending}
