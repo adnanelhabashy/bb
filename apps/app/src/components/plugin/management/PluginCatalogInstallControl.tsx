@@ -40,6 +40,7 @@ export function PluginCatalogInstallControl(
             variant={installed ? "ghost" : "outline"}
             size="sm"
             aria-disabled={disabled}
+            disabled={!installed && disabled}
             aria-label={`${installed ? `${displayName} installed` : `Install ${displayName}`}${
               count === undefined ? "" : ` — ${count.accessibleLabel}`
             }`}
