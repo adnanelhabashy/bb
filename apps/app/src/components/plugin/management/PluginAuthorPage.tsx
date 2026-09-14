@@ -140,7 +140,10 @@ export function PluginAuthorPage({
   };
 
   return (
-    <ResourceCollectionViewport scrollId="plugin-author-results">
+    <ResourceCollectionViewport
+      scrollId="plugin-author-results"
+      contentClassName="[&>div]:block!"
+    >
       <div className={cn("space-y-6 pb-8", TOOLS_PAGE_BAND_CLASSES)}>
         <div className="mx-auto w-full max-w-3xl space-y-2">
           <Link
