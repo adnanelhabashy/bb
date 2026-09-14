@@ -816,7 +816,7 @@ describe("PluginsOverview", () => {
     expect(screen.getByText("Inactive Local Plugin")).toBeTruthy();
   });
 
-  it("badges a built-in plugin BB Official and a catalog install by its marketplace", async () => {
+  it("keeps the recorded publisher when the catalog entry belongs to another marketplace", async () => {
     installFetch([
       AUTOMATIONS_PLUGIN,
       {
@@ -828,6 +828,7 @@ describe("PluginsOverview", () => {
         publisherKey: "bb-community",
         publisherLabel: "BB Community",
         catalogEntryId: GITHUB_CATALOG_ENTRY.entryId,
+        catalogMarketplaceName: "bb-community",
         sourceDisplay: "BB Official · GitHub",
       },
     ]);
