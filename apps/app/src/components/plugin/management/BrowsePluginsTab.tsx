@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@bb/shared-ui/dropdown-menu";
 import { Icon } from "@bb/shared-ui/icon";
+import bbLogoUrl from "../../../../../../assets/bb-logo.svg";
 import { cn } from "@bb/shared-ui/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
@@ -361,9 +362,6 @@ function PluginShelfHeader({
   action?: ReactNode;
 }) {
   const collection = shelf.kind === "collection";
-  const categoryIds = [
-    ...new Set(shelf.entries.map((entry) => entry.categoryId)),
-  ];
   return (
     <div className="flex items-start justify-between gap-3">
       <div
@@ -371,25 +369,17 @@ function PluginShelfHeader({
       >
         {collection ? (
           <span
-            className="absolute left-0 top-0.5 grid size-4 grid-cols-2 gap-0.5"
+            className="absolute left-0 top-0.5 size-4 text-foreground"
             aria-hidden
           >
-            {[0, 1, 2, 3].map((index) => (
+            {shelf.key === "collection:bb-official" ? (
               <span
-                key={index}
-                className="rounded-xs"
-                style={
-                  shelf.key === "collection:bb-official"
-                    ? {
-                        background:
-                          "color-mix(in oklab, var(--ink) 75%, var(--canvas))",
-                      }
-                    : pluginCatalogCategoryMutedAccentStyle(
-                        categoryIds[index % categoryIds.length],
-                      )
-                }
+                className="block size-full bg-current"
+                style={{ mask: `url(${bbLogoUrl}) center / contain no-repeat` }}
               />
-            ))}
+            ) : (
+              <Icon name="Sparkles" className="size-4" />
+            )}
           </span>
         ) : (
           <span
