@@ -513,36 +513,39 @@ export function ResourceCreateButton({
   const groups: readonly ResourceCreateTemplateGroup[] = templateGroups ?? [
     { label: "Examples", templates },
   ];
+  const createButton = (
+    <Button
+      aria-label={label}
+      type="button"
+      size="sm"
+      className={cn(
+        "rounded-r-none",
+        compactWhenNarrow && "@max-[36rem]/resource-toolbar:px-2",
+      )}
+      onClick={() => onCreate()}
+    >
+      <Icon name="MessageCirclePlus" className="size-4" aria-hidden />
+      <span
+        className={cn(
+          compactWhenNarrow && "@max-[36rem]/resource-toolbar:hidden",
+        )}
+      >
+        {label}
+      </span>
+    </Button>
+  );
   return (
     <div className="flex shrink-0 items-stretch">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            aria-label={label}
-            type="button"
-            size="sm"
-            className={cn(
-              "rounded-r-none",
-              compactWhenNarrow && "@max-[36rem]/resource-toolbar:px-2",
-            )}
-            onClick={() => onCreate()}
-          >
-            <Icon name="MessageCirclePlus" className="size-4" aria-hidden />
-            <span
-              className={cn(
-                compactWhenNarrow && "@max-[36rem]/resource-toolbar:hidden",
-              )}
-            >
-              {label}
-            </span>
-          </Button>
-        </TooltipTrigger>
-        {compactWhenNarrow ? (
-          <TooltipContent className="@min-[36rem]/resource-toolbar:hidden">
-            {label}
-          </TooltipContent>
-        ) : null}
-      </Tooltip>
+      {compactWhenNarrow ? (
+        <TooltipProvider delayDuration={250}>
+          <Tooltip>
+            <TooltipTrigger asChild>{createButton}</TooltipTrigger>
+            <TooltipContent>{label}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : (
+        createButton
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

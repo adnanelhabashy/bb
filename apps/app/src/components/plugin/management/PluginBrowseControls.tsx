@@ -8,7 +8,12 @@ import {
 } from "react";
 import { Button } from "@bb/shared-ui/button";
 import { Icon, type IconName } from "@bb/shared-ui/icon";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@bb/shared-ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@bb/shared-ui/tooltip";
 import { Input } from "@bb/shared-ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@bb/shared-ui/popover";
 import { cn } from "@bb/shared-ui/lib/utils";
@@ -273,43 +278,45 @@ export function PluginBrowseCategoryFilter({
         if (!nextOpen) setSearch("");
       }}
     >
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              className={cn(
-                "size-8 shrink-0 px-0 text-xs font-normal",
-                (open || value.length > 0) && ENGAGED_CONTROL_CLASS,
-              )}
-              aria-label={`Filter plugins by category: ${accessibleSelectionLabel}`}
-              aria-expanded={open}
-              onPointerDown={() => {
-                keyboardFocusRef.current = false;
-                setShowKeyboardFocus(false);
-              }}
-              onKeyDown={(event) => {
-                if (
-                  event.key === "Enter" ||
-                  event.key === " " ||
-                  event.key === "ArrowDown"
-                ) {
-                  keyboardFocusRef.current = true;
-                  setShowKeyboardFocus(true);
-                }
-              }}
-            >
-              <Icon
-                name="SlidersHorizontal"
-                className="size-3.5 shrink-0"
-                aria-hidden
-              />
-            </Button>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipContent>{`Category: ${accessibleSelectionLabel}`}</TooltipContent>
-      </Tooltip>
+      <TooltipProvider delayDuration={250}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className={cn(
+                  "size-8 shrink-0 px-0 text-xs font-normal",
+                  (open || value.length > 0) && ENGAGED_CONTROL_CLASS,
+                )}
+                aria-label={`Filter plugins by category: ${accessibleSelectionLabel}`}
+                aria-expanded={open}
+                onPointerDown={() => {
+                  keyboardFocusRef.current = false;
+                  setShowKeyboardFocus(false);
+                }}
+                onKeyDown={(event) => {
+                  if (
+                    event.key === "Enter" ||
+                    event.key === " " ||
+                    event.key === "ArrowDown"
+                  ) {
+                    keyboardFocusRef.current = true;
+                    setShowKeyboardFocus(true);
+                  }
+                }}
+              >
+                <Icon
+                  name="SlidersHorizontal"
+                  className="size-3.5 shrink-0"
+                  aria-hidden
+                />
+              </Button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>{`Category: ${accessibleSelectionLabel}`}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <PopoverContent
         align="end"
         mobileTitle="Filter plugins by category"

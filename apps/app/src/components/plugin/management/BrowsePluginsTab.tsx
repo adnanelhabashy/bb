@@ -153,7 +153,10 @@ export function BrowsePluginsTab({
   }, [heroRequest]);
 
   return (
-    <ResourceCollectionViewport scrollId="plugins-browse-results">
+    <ResourceCollectionViewport
+      scrollId="plugins-browse-results"
+      contentClassName="[&>div]:block!"
+    >
       <div className={cn("space-y-7 pb-8", TOOLS_PAGE_BAND_CLASSES)}>
         <div className="ml-auto flex w-fit flex-col items-center gap-2">
           <div className="flex items-stretch">
