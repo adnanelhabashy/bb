@@ -13,7 +13,10 @@ import { invalidatePluginList } from "@/hooks/cache-owners/plugin-cache-owner";
 import type { PluginListItem } from "@/hooks/queries/plugin-settings-queries";
 import { pluginNeedsAttention } from "@/hooks/usePluginAttention";
 import { cn } from "@bb/shared-ui/lib/utils";
-import { getPluginDetailRoutePath } from "@/lib/route-paths";
+import {
+  getPluginDetailRoutePath,
+  isPluginsRoutePath,
+} from "@/lib/route-paths";
 import {
   pluginRowSignal,
   pluginRuntimeStatusPresentation,
@@ -124,6 +127,12 @@ export function InstalledPluginRow({
   const openDetail = (trigger?: HTMLButtonElement) => {
     if (onOpenPlugin !== undefined && trigger !== undefined) {
       onOpenPlugin(plugin.id, trigger);
+      return;
+    }
+    if (!isPluginsRoutePath(location.pathname)) {
+      navigate(
+        getPluginDetailRoutePath({ pluginId: plugin.id, view: "installed" }),
+      );
       return;
     }
     const params = new URLSearchParams(location.search);
