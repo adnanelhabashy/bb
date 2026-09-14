@@ -183,12 +183,12 @@ function ThirdPartySourceDisclosure({
             : "Invalid source. Check the marketplace listing.";
     return (
       <div
-        className="flex items-start gap-3 rounded-md border border-warning/20 bg-warning/5 p-3"
+        className="flex items-center gap-3 rounded-md border border-warning/20 bg-warning/5 p-3"
         role="alert"
       >
         <Icon
           name="AlertTriangle"
-          className="mt-0.5 size-4 shrink-0 text-warning-text"
+          className="size-4 shrink-0 text-warning-text"
           aria-hidden
         />
         <p className="min-w-0 flex-1 text-xs leading-normal text-foreground">
@@ -401,7 +401,7 @@ function AddPluginDialogContent({
           <FullTrustWarning />
         )}
       </div>
-      <DialogFooter>
+      <DialogFooter className="gap-2">
         <Button
           type="button"
           variant="outline"
