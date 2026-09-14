@@ -20,7 +20,6 @@ import { Skeleton } from "@bb/shared-ui/skeleton";
 import { Switch } from "@bb/shared-ui/switch";
 import {
   ResourceDetailConfigurationSection,
-  ResourceDetailOverviewSection,
   ResourceDetailPanel,
   ResourceDetailStack,
 } from "@bb/shared-ui/resource-list";
@@ -603,25 +602,6 @@ function PluginSettingsContent({ plugin }: { plugin: PluginListItem }) {
             <PluginSettingsDetail plugin={plugin} />
           </ResourceDetailConfigurationSection>
         ) : null}
-        <ResourceDetailOverviewSection label="Plugin details">
-          <p className="max-w-none text-sm leading-relaxed text-muted-foreground">
-            Release, capabilities, and health live on{" "}
-            <Link
-              to={getPluginDetailRoutePath({
-                pluginId: plugin.id,
-                view: "installed",
-              })}
-              className="inline-flex items-center gap-0.5 rounded-sm underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              its plugin page
-              <Icon
-                name="ChevronRight"
-                className="size-3.5 no-underline"
-                aria-hidden
-              />
-            </Link>
-          </p>
-        </ResourceDetailOverviewSection>
       </ResourceDetailStack>
     </div>
   );
