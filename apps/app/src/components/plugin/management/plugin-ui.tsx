@@ -65,11 +65,11 @@ function neutral(percent: number): string {
 }
 
 function accentTint(token: string, percent: number): string {
-  return `color-mix(in oklch, var(${token}) ${percent}%, var(--canvas))`;
+  return `color-mix(in oklab, var(${token}) ${percent}%, var(--canvas))`;
 }
 
 function accentInk(token: string, percent: number): string {
-  return `color-mix(in oklch, var(${token}) ${percent}%, var(--ink))`;
+  return `color-mix(in oklab, var(${token}) ${percent}%, var(--ink))`;
 }
 
 function pluginCatalogCategoryAccentToken(
