@@ -378,7 +378,7 @@ function PluginShelfHeader({
                 style={{ mask: `url(${bbLogoUrl}) center / contain no-repeat` }}
               />
             ) : (
-              <Icon name="Sparkles" className="size-4" />
+              <Icon name="News01" className="size-4" />
             )}
           </span>
         ) : (
