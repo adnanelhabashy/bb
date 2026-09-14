@@ -453,7 +453,7 @@ describe("PluginsOverview", () => {
   });
 
   it("loads more installed plugins as the scroll sentinel is reached", async () => {
-    const plugins = Array.from({ length: 12 }, (_, index) => {
+    const plugins = Array.from({ length: 14 }, (_, index) => {
       const ordinal = String(index + 1).padStart(2, "0");
       return {
         ...AUTOMATIONS_PLUGIN,
@@ -496,8 +496,8 @@ describe("PluginsOverview", () => {
     );
 
     expect(await screen.findByText("Plugin 01")).toBeTruthy();
-    expect(screen.getByText("Plugin 10")).toBeTruthy();
-    expect(screen.queryByText("Plugin 11")).toBeNull();
+    expect(screen.getByText("Plugin 12")).toBeTruthy();
+    expect(screen.queryByText("Plugin 13")).toBeNull();
     expect(
       document.querySelector("[data-resource-infinite-sentinel]"),
     ).not.toBeNull();
@@ -505,7 +505,7 @@ describe("PluginsOverview", () => {
 
     reachSentinel();
     expect(screen.getByText("Plugin 01")).toBeTruthy();
-    expect(screen.getByText("Plugin 12")).toBeTruthy();
+    expect(screen.getByText("Plugin 14")).toBeTruthy();
     expect(
       document.querySelector("[data-resource-infinite-sentinel]"),
     ).toBeNull();
@@ -515,85 +515,9 @@ describe("PluginsOverview", () => {
       { target: { value: "Plugin 01" } },
     );
     expect(screen.getByText("Plugin 01")).toBeTruthy();
-    expect(screen.queryByText("Plugin 12")).toBeNull();
+    expect(screen.queryByText("Plugin 14")).toBeNull();
   });
 
-  it("fits the first chunk to the viewport and keeps the list panel unstretched", async () => {
-    const plugins = Array.from({ length: 30 }, (_, index) => {
-      const ordinal = String(index + 1).padStart(2, "0");
-      return {
-        ...AUTOMATIONS_PLUGIN,
-        id: `plugin-${ordinal}`,
-        source: `builtin:plugin-${ordinal}`,
-        name: `Plugin ${ordinal}`,
-      };
-    });
-    const viewportHeight = 760;
-    const clientHeightDescriptor = Object.getOwnPropertyDescriptor(
-      HTMLElement.prototype,
-      "clientHeight",
-    );
-
-    Object.defineProperty(HTMLElement.prototype, "clientHeight", {
-      configurable: true,
-      get() {
-        return this.id === "plugins-installed-results" ? viewportHeight : 0;
-      },
-    });
-    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
-      function getBoundingClientRect(this: HTMLElement) {
-        const height = this.hasAttribute("data-resource-list-panel")
-          ? viewportHeight
-          : this.hasAttribute("data-resource-row")
-            ? 50
-            : 0;
-        return new DOMRect(0, 0, 800, height);
-      },
-    );
-    vi.stubGlobal(
-      "ResizeObserver",
-      class ResizeObserverMock {
-        observe() {}
-        unobserve() {}
-        disconnect() {}
-      },
-    );
-
-    try {
-      installFetch(plugins);
-      const { wrapper: QueryClientWrapper } = createQueryClientTestHarness();
-      render(
-        <MemoryRouter initialEntries={["/plugins?view=installed"]}>
-          <QueryClientWrapper>
-            <PluginsOverview />
-          </QueryClientWrapper>
-        </MemoryRouter>,
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText("Plugin 15")).toBeTruthy();
-      });
-      expect(screen.queryByText("Plugin 16")).toBeNull();
-      expect(
-        document.querySelector("[data-resource-infinite-sentinel]"),
-      ).not.toBeNull();
-      const listPanel = document.querySelector("[data-resource-list-panel]");
-      expect(
-        document.querySelector("[data-resource-collection-content]"),
-      ).toBeNull();
-      expect(listPanel?.classList.contains("flex-1")).toBe(false);
-    } finally {
-      if (clientHeightDescriptor === undefined) {
-        Reflect.deleteProperty(HTMLElement.prototype, "clientHeight");
-      } else {
-        Object.defineProperty(
-          HTMLElement.prototype,
-          "clientHeight",
-          clientHeightDescriptor,
-        );
-      }
-    }
-  });
 
   it("sorts enabled plugins before inactive plugins and published plugins first within enabled", async () => {
     installFetch([

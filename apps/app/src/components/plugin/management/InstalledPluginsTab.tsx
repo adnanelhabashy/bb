@@ -179,7 +179,7 @@ export function InstalledPluginRow({
                 {runtimeStatus.label}
               </span>
               {" · "}
-              {plugin.statusDetail ?? runtimeStatus.condition}
+              <span>{plugin.statusDetail ?? runtimeStatus.condition}</span>
             </span>
           )
         }
