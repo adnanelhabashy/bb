@@ -56,7 +56,7 @@ describe("MarkdownImage", () => {
     const restored = imageElement(second.getByAltText("Screenshot"));
     expect(restored.hasAttribute("src")).toBe(false);
     expect(restored.style.aspectRatio).toBe("780 / 1688");
-    expect(restored.style.width).toContain("780px");
+    expect(restored.style.height).toBe("auto");
     expect(restored.dataset.markdownImageState).toBe("loading");
   });
 
@@ -85,7 +85,8 @@ describe("MarkdownImage", () => {
     const { getByAltText } = render(<MarkdownImage src={source} width="320" height="200" alt="Sized" />);
     const image = imageElement(getByAltText("Sized"));
     expect(image.style.aspectRatio).toBe("320 / 200");
-    expect(image.style.width).toContain("320px");
+    expect(image.getAttribute("width")).toBe("320");
+    expect(image.getAttribute("height")).toBe("200");
     visible(image, true);
     completeImage(image, 900, 600);
     await waitFor(() => expect(readMarkdownImageDimensions(source)).toEqual({ width: 900, height: 600 }));
