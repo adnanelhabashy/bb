@@ -30,6 +30,7 @@ import {
   FILE_LIST_EXCLUDE_NAMES_MAX,
   FILE_LIST_LIMIT_MAX,
   FILE_LIST_QUERY_MAX_LENGTH,
+  flattenPromptInputGroups,
 } from "@bb/domain";
 import { z } from "zod";
 import {
@@ -190,9 +191,13 @@ export const hostDaemonContributedEnvEntrySchema = z
       z.string(),
       z.object({ serverPath: z.string().startsWith("/") }).strict(),
     ]),
-    source: z.object({ plugin: z.string().min(1) }).strict(),
+    source: z.union([
+      z.object({ plugin: z.string().min(1) }).strict(),
+      z
+        .object({ core: z.enum(["machine-git", "machine-environment"]) })
+        .strict(),
+    ]),
     reason: z.string(),
-    secret: z.boolean(),
   })
   .strict();
 export type HostDaemonContributedEnvEntry = z.infer<
@@ -246,16 +251,6 @@ type HostDaemonPromptInput = z.infer<typeof promptInputSchema>;
 interface GroupedPromptInputCommand {
   input: HostDaemonPromptInput[];
   inputGroups?: HostDaemonPromptInput[][];
-}
-
-function flattenPromptInputGroups(
-  inputGroups: readonly HostDaemonPromptInput[][],
-): HostDaemonPromptInput[] {
-  return inputGroups.flatMap((inputGroup, index) =>
-    index === 0
-      ? inputGroup
-      : [{ type: "text" as const, text: "\n\n", mentions: [] }, ...inputGroup],
-  );
 }
 
 function refineGroupedInputMatchesFlatInput(
@@ -360,6 +355,10 @@ export const threadStopCommandSchema = hostDaemonThreadTargetSchema
     intent: threadStopIntentSchema,
   })
   .strict();
+
+const threadStorageDeleteCommandSchema = hostDaemonThreadTargetSchema.extend({
+  type: z.literal("thread.storage.delete"),
+});
 
 const threadGoalClearCommandSchema = hostDaemonThreadTargetSchema
   .extend({
@@ -576,6 +575,8 @@ const projectCloneDefaultPathCommandSchema = z
 const projectCloneCommandSchema = z
   .object({
     type: z.literal("project.clone"),
+    operationId: z.string().min(1),
+    contributedEnv: z.array(hostDaemonContributedEnvEntrySchema).default([]),
     remoteUrl: z.string().min(1),
     projectSlug: z.string().min(1),
     targetPath: z.string().min(1).optional(),
@@ -600,7 +601,8 @@ const MAX_NODE_TIMER_DELAY_MS = 2_147_483_647;
 const environmentHookRunCommandSchema = z
   .object({
     type: z.literal("environment.hook.run"),
-    resumeOnly: z.boolean(),
+    contributedEnv: z.array(hostDaemonContributedEnvEntrySchema).default([]),
+    resumeOnly: z.boolean().default(false),
     operationId: z.string().min(1),
     path: z.string().min(1),
     kind: z.enum(["setup", "teardown"]),
@@ -618,6 +620,7 @@ const environmentHookCancelCommandSchema = z
 const pluginHostCallCommandSchema = z
   .object({
     type: z.literal("plugin.host.call"),
+    contributedEnv: z.array(hostDaemonContributedEnvEntrySchema).default([]),
     pluginId: z.string().min(1),
     generation: z.string().min(1),
     artifact: pluginHostArtifactSchema,
@@ -890,6 +893,7 @@ const unmanagedEnvironmentProvisionCommandSchema =
     .extend({
       path: z.string().min(1),
       setupScriptTimeoutMs: z.number().int().positive().nullable(),
+      contributedEnv: z.array(hostDaemonContributedEnvEntrySchema),
     })
     .strict();
 
@@ -1439,6 +1443,15 @@ export const hostDaemonCommandRegistry = {
   "thread.stop": defineHostDaemonCommandDescriptor({
     type: "thread.stop",
     schema: threadStopCommandSchema,
+    resultSchema: threadStopResultSchema,
+    transport: "settled",
+    retryable: false,
+    flushEventsBeforeResult: true,
+    envLane: null,
+  }),
+  "thread.storage.delete": defineHostDaemonCommandDescriptor({
+    type: "thread.storage.delete",
+    schema: threadStorageDeleteCommandSchema,
     resultSchema: threadStopResultSchema,
     transport: "settled",
     retryable: false,

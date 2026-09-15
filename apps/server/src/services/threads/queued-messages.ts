@@ -5,6 +5,7 @@ import {
   deleteClaimedQueuedThreadMessageBatchInTransaction,
   getQueuedThreadMessage,
   getEnvironment,
+  getHost,
   getThread,
   isOrdinaryTurnEndQueuedMessage,
   isThreadQueueAutoSendPaused,
@@ -14,7 +15,10 @@ import {
   type QueuedThreadMessageGroupClaimPolicy,
   type QueuedThreadMessageGroupEligibility,
 } from "@bb/db";
-import { queuedMessageSystemNoticeSchema } from "@bb/domain";
+import {
+  flattenPromptInputGroups,
+  queuedMessageSystemNoticeSchema,
+} from "@bb/domain";
 import type {
   PromptInput,
   QueuedMessageWaitingOn,
@@ -47,7 +51,6 @@ import {
   buildExecutionOptions,
   prepareTurnSubmitCommandPayload,
 } from "./thread-commands.js";
-import { resolvePluginMentionContextInputs } from "../plugins/plugin-mentions.js";
 import {
   prependDeferredFirstTurnContext,
   requireDeferredFirstTurnContextCurrent,
@@ -65,12 +68,19 @@ import { resolvePermissionEscalation } from "./thread-runtime-config.js";
 import { hasMessageDispatchHooks } from "./dispatch-hooks.js";
 import { attemptDispatch } from "./dispatch-attempt.js";
 import { deliverParentSystemMessage } from "./parent-system-messages.js";
-import { settleQueueRowDispatched } from "./queue-waits.js";
+import {
+  createQueuedMessageAutoSendPausedError,
+  createQueuedMessageClaimLostError,
+  QUEUED_MESSAGE_AUTO_SEND_PAUSED_CODE,
+  QUEUED_MESSAGE_CLAIM_LOST_CODE,
+  settleQueueRowDispatched,
+} from "./queue-waits.js";
 import { recordQueuedMessageDrainFailure } from "./queue-drain-failure.js";
 import {
-  ensureThreadIsWritable,
+  appendPluginMentionContext,
+  captureUserMessageSentTelemetry,
+  ensureThreadQueueIsWritable,
   formatAgentThreadInput,
-  groupedInputForRuntime,
   resolveMessageSenderThreadId,
 } from "./thread-send.js";
 import { recordAcceptedPromptHistoryEntry } from "../prompt-history.js";
@@ -117,7 +127,7 @@ interface SendClaimedQueuedMessageForThreadArgs {
 }
 
 export function createAutomaticQueuedMessageGroupEligibility(
-  deps: Pick<AppDeps, "db">,
+  deps: Pick<AppDeps, "db" | "hub">,
   args: { now: number; thread: Thread },
 ): QueuedThreadMessageGroupEligibility {
   const activeTurnId = getActiveTurnId(deps, args.thread.id);
@@ -132,6 +142,7 @@ export function createAutomaticQueuedMessageGroupEligibility(
         case "time":
           return member.sendAt !== null && member.sendAt <= args.now;
         case "thread-busy":
+        case "stopping":
           return (
             args.thread.status === "idle" || args.thread.status === "pending"
           );
@@ -140,8 +151,21 @@ export function createAutomaticQueuedMessageGroupEligibility(
             args.thread.status === "idle" ||
             (args.thread.status === "active" && activeTurnId !== null)
           );
+        case "host-offline": {
+          const environment =
+            args.thread.environmentId === null
+              ? null
+              : getEnvironment(deps.db, args.thread.environmentId);
+          const host =
+            environment === null ? null : getHost(deps.db, environment.hostId);
+          return (
+            host !== null &&
+            host.destroyedAt === null &&
+            host.phase === "active" &&
+            deps.hub.hasDaemonForHost(host.id)
+          );
+        }
         case "provisioning":
-        case "host-offline":
         case "interaction":
           return false;
       }
@@ -165,7 +189,7 @@ function admitQueuedMessage(
   db: DbQueryConnection,
   thread: Thread,
 ): { providerThreadId: string | null } {
-  ensureThreadIsWritable(thread);
+  ensureThreadQueueIsWritable(thread);
   const providerThreadId = getLastProviderThreadId({ db }, thread.id);
   if (thread.environmentId === null) {
     if (providerThreadId !== null) {
@@ -190,7 +214,7 @@ export async function createQueuedMessageForThread(
   args: CreateQueuedMessageForThreadArgs,
 ): Promise<ThreadQueuedMessage> {
   const { payload, thread } = args;
-  ensureThreadIsWritable(thread);
+  ensureThreadQueueIsWritable(thread);
   await validatePromptAttachmentReferences({
     dataDir: deps.config.dataDir,
     input: payload.input,
@@ -223,7 +247,15 @@ export async function createQueuedMessageForThread(
           // to end, which is exactly `thread-busy`. Naming it rather than
           // leaving the wait null keeps every row on one vocabulary, and the
           // idle drain treats the two identically anyway.
-          waitingOn: { kind: "thread-busy" },
+          //
+          // Queued while the thread is stopping, it is instead a message the
+          // user composed AFTER asking for the stop, so it carries `stopping`
+          // and runs when the stop lands rather than joining the rows the
+          // manual-stop pause holds back.
+          waitingOn:
+            currentThread.status === "stopping"
+              ? { kind: "stopping" }
+              : { kind: "thread-busy" },
           sendAt: null,
           payload: { kind: "inline" },
           systemNotice: null,
@@ -234,13 +266,10 @@ export async function createQueuedMessageForThread(
     );
   deps.hub.notifyThread(thread.id, ["queue-changed"]);
   if (senderThreadId === null && payload.input.length > 0) {
-    deps.telemetry.capture({
-      name: "user_message_sent",
-      properties: {
-        is_child_thread: thread.parentThreadId !== null,
-        message_source: "queued_message",
-        provider: thread.providerId,
-      },
+    captureUserMessageSentTelemetry(deps, {
+      isChildThread: thread.parentThreadId !== null,
+      messageSource: "queued_message",
+      providerId: thread.providerId,
     });
   }
   if (currentThread.status === "idle" && providerThreadId !== null) {
@@ -269,8 +298,6 @@ interface FormatQueuedMessageInputForSenderArgs {
 }
 
 const STALE_QUEUED_MESSAGE_CLAIM_MS = 5 * 60 * 1000;
-const QUEUED_MESSAGE_CLAIM_LOST_CODE = "queued_message_claim_lost";
-const QUEUED_MESSAGE_AUTO_SEND_PAUSED_CODE = "queued_message_auto_send_paused";
 const activeQueuedMessageClaimTokens = new Set<string>();
 
 function respectsManualStopPause(
@@ -379,26 +406,10 @@ function claimQueuedThreadMessageForSend(
   );
 }
 
-function createQueuedMessageClaimLostError(): ApiError {
-  return new ApiError(
-    409,
-    QUEUED_MESSAGE_CLAIM_LOST_CODE,
-    "Queued message claim expired before it could be sent",
-  );
-}
-
 function isQueuedMessageClaimLostError(error: unknown): boolean {
   return (
     error instanceof ApiError &&
     error.body.code === QUEUED_MESSAGE_CLAIM_LOST_CODE
-  );
-}
-
-function createQueuedMessageAutoSendPausedError(): ApiError {
-  return new ApiError(
-    409,
-    QUEUED_MESSAGE_AUTO_SEND_PAUSED_CODE,
-    "Queued message auto-send was paused by a manual stop",
   );
 }
 
@@ -463,16 +474,11 @@ async function sendClaimedQueuedMessageForIdleProviderThread(
       senderThreadId: claimedQueuedMessage.senderThreadId,
     }),
   );
-  let input = groupedInputForRuntime(inputGroups);
-  const pluginMentionContext = await resolvePluginMentionContextInputs(input);
-  if (pluginMentionContext.length > 0) {
-    input = [...input, ...pluginMentionContext];
-    const lastGroup = inputGroups[inputGroups.length - 1]!;
-    inputGroups = [
-      ...inputGroups.slice(0, -1),
-      [...lastGroup, ...pluginMentionContext],
-    ];
-  }
+  let input = flattenPromptInputGroups(inputGroups);
+  ({ input, inputGroups } = await appendPluginMentionContext({
+    input,
+    inputGroups,
+  }));
   const deferredFirstTurnContext = resolveDeferredFirstTurnContext(
     deps.db,
     thread.id,
@@ -677,7 +683,7 @@ async function sendClaimedQueuedMessageForThread(
   const inputGroups = queuedMessages.map(
     (queuedMessage) => queuedMessage.content,
   );
-  const input = groupedInputForRuntime(inputGroups);
+  const input = flattenPromptInputGroups(inputGroups);
   const lead = args.queuedMessages[0]!;
   const outcome = await attemptDispatch(deps, {
     thread: args.thread,
@@ -696,6 +702,7 @@ async function sendClaimedQueuedMessageForThread(
       sendNow: args.sendNow,
     },
     queuePayload: queuedMessage.payload,
+    pluginSubmission: null,
     ...(queuedMessage.payload.kind === "retry"
       ? {
           retryOf: {
@@ -709,11 +716,21 @@ async function sendClaimedQueuedMessageForThread(
     startedOnBehalfOf: null,
     trigger: "auto-dispatch",
   });
-  if (args.sendNow && args.mode !== "steer" && outcome.kind === "queued") {
+  if (
+    args.sendNow &&
+    args.mode !== "steer" &&
+    outcome.kind === "queued" &&
+    outcome.entry.waitingOn?.kind !== "stopping"
+  ) {
     // "Send now" overrides every plugin wait and the row's own schedule, but
     // not a core wait — those guard invariants rather than express a policy.
     // The row is back on the queue with its new reason; say so rather than
     // returning a success the caller would read as "it went".
+    //
+    // `stopping` is the one core wait Send-now does clear, because pressing it
+    // is what clears it: the row leaves the manual-stop pause behind and
+    // dispatches when the stop lands. Refusing would leave the user no way to
+    // express that intent until the stop finished.
     throw new ApiError(
       409,
       "queued_message_still_waiting",
@@ -729,11 +746,13 @@ function describeCoreWait(waitingOn: QueuedMessageWaitingOn | null): string {
     case "provisioning":
       return "the thread's workspace is still being prepared";
     case "host-offline":
-      return `the "${waitingOn.hostName}" host is not connected`;
+      return `the "${waitingOn.hostName}" host is not ready`;
     case "interaction":
       return "the thread is waiting for you to answer a pending interaction";
     case "turn-starting":
       return "the current turn is still starting";
+    case "stopping":
+      return "the thread is still stopping";
     case "plugin":
       return `it is waiting on the "${waitingOn.pluginId}" plugin`;
     case "time":

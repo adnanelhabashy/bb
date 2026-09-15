@@ -321,12 +321,6 @@ export class PendingInteractionLifecycle {
     this.interactionSettledListener = listener;
   }
 
-  listThreadInteractions(threadId: string): PendingInteraction[] {
-    return this.parseListRows(
-      listPendingInteractionsByThread(this.deps.db, { threadId }),
-    );
-  }
-
   listPendingThreadInteractions(threadId: string): PendingInteraction[] {
     return this.parseListRows(
       listPendingInteractionsByThread(this.deps.db, {
@@ -583,6 +577,14 @@ export class PendingInteractionLifecycle {
       throw new ApiError(400, "invalid_request", "Plugin interaction expected");
     }
     if (current.status !== "pending") throw buildResolveConflictError(current);
+    if (!this.pluginWaiters.has(current.id)) {
+      const interrupted = this.cancelPluginInteraction({
+        interactionId: current.id,
+        threadId: current.threadId,
+        reason: "request-aborted",
+      });
+      throw buildResolveConflictError(interrupted);
+    }
     const updated = setPendingInteractionResolved(this.deps.db, {
       id: current.id,
       resolution: JSON.stringify({ kind: "plugin_submitted" }),
@@ -688,22 +690,6 @@ export class PendingInteractionLifecycle {
     return interaction;
   }
 
-  completeResolvingInteraction(
-    args: CompleteResolvingInteractionArgs,
-  ): PendingInteraction | null {
-    const updated = setPendingInteractionResolved(this.deps.db, {
-      id: args.interactionId,
-      resolution: JSON.stringify(args.resolution),
-    });
-    if (!updated) {
-      return null;
-    }
-
-    const interaction = toPendingInteraction(updated);
-    this.settleInteractionTerminalState(interaction);
-    return interaction;
-  }
-
   completeResolvingInteractionInTransaction(
     deps: PendingInteractionTransactionDeps,
     args: CompleteResolvingInteractionArgs,
@@ -718,22 +704,6 @@ export class PendingInteractionLifecycle {
 
     const interaction = toPendingInteraction(updated);
     this.settleInteractionTerminalStateInTransaction(deps, interaction);
-    return interaction;
-  }
-
-  interruptPendingInteraction(
-    args: InterruptPendingInteractionArgs,
-  ): PendingInteraction | null {
-    const updated = setPendingInteractionInterrupted(this.deps.db, {
-      id: args.interactionId,
-      statusReason: args.reason,
-    });
-    if (!updated) {
-      return null;
-    }
-
-    const interaction = toPendingInteraction(updated);
-    this.settleInteractionTerminalState(interaction);
     return interaction;
   }
 
@@ -869,16 +839,12 @@ export class PendingInteractionLifecycle {
       resolution: args.resolution,
     });
     const resolutionJson = JSON.stringify(args.resolution);
-    const updated = this.deps.db.transaction((tx) => {
-      const resolving = setPendingInteractionResolving(tx, {
+    const updated = this.deps.db.transaction((tx) =>
+      setPendingInteractionResolving(tx, {
         id: args.interaction.id,
         resolution: resolutionJson,
-      });
-      if (resolving) {
-        return resolving;
-      }
-      return null;
-    });
+      }),
+    );
 
     if (updated) {
       startLiveHostCommand(

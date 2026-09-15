@@ -18,6 +18,7 @@ import {
   isBackgroundAgentTaskType,
   readTerminalOutputLines,
   type ActiveThinking,
+  type CompletedTurnDisplay,
   type Thread,
   type ThreadEventItemPresentation,
   type ThreadTimelineActivePromptMode,
@@ -33,6 +34,7 @@ import type {
   EventProjectionProvisioningTranscriptEntry,
   EventProjectionToolParsedIntent,
   EventProjectionTurn,
+  EventProjectionTurnMessageDetail,
 } from "./event-projection-types.js";
 import { assertNever } from "./assert-never.js";
 import {
@@ -70,10 +72,8 @@ import { extractThreadTimelineModelFallback } from "./model-fallback-extraction.
 import { extractThreadTimelinePendingTodos } from "./todo-snapshot-extraction.js";
 import { buildTimelineErrorDisplay } from "./error-display.js";
 
-type ThreadTimelineTurnMessageDetail = "summary" | "full";
-
 interface ThreadTimelineFromEventsBaseOptions {
-  contextOnlyToolCallIds?: ReadonlySet<string>;
+  completedTurnDisplay: CompletedTurnDisplay;
   includeDiagnosticOperations: boolean;
   isLatestPage: boolean;
   providerId?: string;
@@ -86,7 +86,7 @@ interface ThreadTimelineFromEventsBaseOptions {
 
 interface ThreadTimelineFromEventsOptions extends ThreadTimelineFromEventsBaseOptions {
   includeNestedRows: boolean;
-  turnMessageDetail: ThreadTimelineTurnMessageDetail;
+  turnMessageDetail: EventProjectionTurnMessageDetail;
 }
 
 interface BuildThreadTimelineFromEventsArgs {
@@ -114,6 +114,7 @@ interface ThreadTimelineSourceSeqRange {
 }
 
 interface BuildThreadTimelineTurnDetailsFromEventsOptions extends ThreadTimelineSourceSeqRange {
+  completedTurnDisplay: CompletedTurnDisplay;
   includeDiagnosticOperations: boolean;
   providerDisplayName?: string;
   threadStatus: Thread["status"];
@@ -140,6 +141,7 @@ type ThreadTimelineTurnDetailsFromEventsResult =
     };
 
 interface BuildTurnRowsArgs {
+  completedTurnDisplay: CompletedTurnDisplay;
   includeNestedRows: boolean;
   rowIdPrefix: string;
   turn: EventProjectionTurn;
@@ -166,6 +168,7 @@ interface BuildTurnSummaryRowArgs {
 }
 
 interface BuildCompletedTurnSummaryRowsArgs {
+  completedTurnDisplay: CompletedTurnDisplay;
   includeNestedRows: boolean;
   rowIdPrefix: string;
   summaryItems: CompletedTurnSummaryItem[];
@@ -174,6 +177,7 @@ interface BuildCompletedTurnSummaryRowsArgs {
 }
 
 interface BuildTimelineRowsOptions {
+  completedTurnDisplay: CompletedTurnDisplay;
   includeNestedRows: boolean;
   rowIdPrefix: string;
   workspaceRoot: string | null;
@@ -759,6 +763,7 @@ function convertMessage(
           completedAt: message.completedAt,
           childRows: filterDelegationChildRows(
             buildTimelineRows(message.childProjection, {
+              completedTurnDisplay: options.completedTurnDisplay,
               includeNestedRows: true,
               rowIdPrefix: `${base.id}:child:`,
               workspaceRoot: options.workspaceRoot,
@@ -1148,6 +1153,7 @@ function buildTurnSummaryRow({
 }
 
 function buildCompletedTurnSummaryRows({
+  completedTurnDisplay,
   includeNestedRows,
   rowIdPrefix,
   summaryItems,
@@ -1155,25 +1161,21 @@ function buildCompletedTurnSummaryRows({
   workspaceRoot,
 }: BuildCompletedTurnSummaryRowsArgs): TimelineRow[] {
   const rows: TimelineRow[] = [];
+  const rowOptions = {
+    completedTurnDisplay,
+    includeNestedRows,
+    rowIdPrefix,
+    workspaceRoot,
+  };
   for (const item of summaryItems) {
     if (item.kind === "ungrouped-message") {
-      rows.push(
-        ...convertMessage(item.message, {
-          includeNestedRows,
-          rowIdPrefix,
-          workspaceRoot,
-        }),
-      );
+      rows.push(...convertMessage(item.message, rowOptions));
       continue;
     }
 
     const sourceRows = includeNestedRows
       ? item.sourceMessages.flatMap((message) =>
-          convertMessage(message, {
-            includeNestedRows,
-            rowIdPrefix,
-            workspaceRoot,
-          }),
+          convertMessage(message, rowOptions),
         )
       : [];
     const turnRow = buildTurnSummaryRow({
@@ -1195,6 +1197,7 @@ function buildCompletedTurnSummaryRows({
 }
 
 function buildTurnRows({
+  completedTurnDisplay,
   includeNestedRows,
   rowIdPrefix,
   turn,
@@ -1203,26 +1206,27 @@ function buildTurnRows({
   const messages = turn.messages ?? [];
   const isCompletedTurn =
     turn.status !== "pending" && turn.completedAt !== null;
+  const rowOptions = {
+    completedTurnDisplay,
+    includeNestedRows,
+    rowIdPrefix,
+    workspaceRoot,
+  };
 
-  if (!isCompletedTurn) {
-    return messages.flatMap((message) =>
-      convertMessage(message, {
-        includeNestedRows,
-        rowIdPrefix,
-        workspaceRoot,
-      }),
-    );
+  if (!isCompletedTurn || completedTurnDisplay === "flat") {
+    return messages.flatMap((message) => convertMessage(message, rowOptions));
   }
 
   const { summaryItems, terminalMessages, trailingMessages } =
     groupCompletedTurnMessages(turn);
   const terminalRows = terminalMessages.flatMap((message) =>
-    convertMessage(message, { includeNestedRows, rowIdPrefix, workspaceRoot }),
+    convertMessage(message, rowOptions),
   );
   const trailingRows = trailingMessages.flatMap((message) =>
-    convertMessage(message, { includeNestedRows, rowIdPrefix, workspaceRoot }),
+    convertMessage(message, rowOptions),
   );
   const summaryRows = buildCompletedTurnSummaryRows({
+    completedTurnDisplay,
     includeNestedRows,
     rowIdPrefix,
     summaryItems,
@@ -1321,7 +1325,6 @@ function buildTimelineRows(
   projection: EventProjection,
   options: BuildTimelineRowsOptions,
 ): TimelineRow[] {
-  const { includeNestedRows } = options;
   const rows: TimelineRow[] = [];
 
   for (const entry of projection.entries) {
@@ -1330,15 +1333,7 @@ function buildTimelineRows(
         appendRows(rows, convertMessage(entry.message, options));
         break;
       case "turn":
-        appendRows(
-          rows,
-          buildTurnRows({
-            turn: entry.turn,
-            includeNestedRows,
-            rowIdPrefix: options.rowIdPrefix,
-            workspaceRoot: options.workspaceRoot,
-          }),
-        );
+        appendRows(rows, buildTurnRows({ ...options, turn: entry.turn }));
         break;
       default:
         assertNever(entry);
@@ -1357,16 +1352,19 @@ export function buildThreadTimelineFromEvents(
   const projectionOptions = {
     acceptedClientRequestContext: args.acceptedClientRequestContext,
     includeDiagnosticOperations: args.options.includeDiagnosticOperations,
-    contextOnlyToolCallIds: args.options.contextOnlyToolCallIds,
     providerDisplayName: args.options.providerDisplayName,
     threadStatus: args.options.threadStatus,
     threadName: args.options.threadName,
-    turnMessageDetail: args.options.turnMessageDetail,
+    turnMessageDetail:
+      args.options.completedTurnDisplay === "flat"
+        ? "full"
+        : args.options.turnMessageDetail,
   } satisfies Parameters<typeof buildEventProjection>[1];
   const projection = buildEventProjection(args.events, projectionOptions);
 
   const rows = [
     ...buildTimelineRows(projection, {
+      completedTurnDisplay: args.options.completedTurnDisplay,
       includeNestedRows: args.options.includeNestedRows,
       rowIdPrefix: ROOT_TIMELINE_ROW_ID_PREFIX,
       workspaceRoot: args.options.workspaceRoot,
@@ -1428,6 +1426,7 @@ export function buildThreadTimelineTurnDetailsFromEvents(
     turnMessageDetail: "full",
   });
   const nestedRows = buildTimelineRows(projection, {
+    completedTurnDisplay: args.options.completedTurnDisplay,
     includeNestedRows: true,
     rowIdPrefix: ROOT_TIMELINE_ROW_ID_PREFIX,
     workspaceRoot: args.options.workspaceRoot,

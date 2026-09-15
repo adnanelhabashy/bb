@@ -145,7 +145,10 @@ describe("plugin service", () => {
         notifySystem: () => {},
       },
       logger,
-      telemetry: { capture: (event) => captured.push(event) },
+      telemetry: {
+        ...createNoopTelemetryService(),
+        capture: (event) => captured.push(event),
+      },
       dataDir: join(workDir, "data"),
       appVersion: "0.9.0",
       bundledPlugins: [],
@@ -154,8 +157,12 @@ describe("plugin service", () => {
   }
 
   afterEach(async () => {
-    await service.stop();
-    await rm(workDir, { recursive: true, force: true });
+    try {
+      await service.stop();
+      await rm(workDir, { recursive: true, force: true });
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 
   it("installs a path plugin, runs its factory, and reports running", async () => {
@@ -1381,7 +1388,6 @@ function seedEnvironmentAtPath(
   },
 ): void {
   const host = upsertHost(db, noopNotifier, {
-    type: "persistent",
     name: "Test host",
   });
   const { project } = createProject(db, noopNotifier, {

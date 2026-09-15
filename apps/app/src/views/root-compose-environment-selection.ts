@@ -3,10 +3,7 @@ import {
   type ProjectSource,
   type ThreadListEntry,
 } from "@bb/domain";
-import type {
-  ProjectBranchesResponse,
-  SystemEnvironmentProvider,
-} from "@bb/server-contract";
+import type { SystemEnvironmentProvider } from "@bb/server-contract";
 import {
   PERSONAL_WORKSPACE_ENVIRONMENT_PROVIDER_ID,
   PROJECT_CHECKOUT_ENVIRONMENT_PROVIDER_ID,
@@ -38,10 +35,26 @@ interface ResolveProjectlessEnvironmentValueArgs {
   reuseThreadOptionsLoading: boolean;
 }
 
-const PROJECT_SOURCE_NOT_GIT_DISABLED_REASON =
-  "New worktrees require a Git repository with at least one commit";
-const PROJECT_SOURCE_NO_COMMITS_DISABLED_REASON =
-  "Project source has no commits. Create an initial commit before creating a worktree";
+interface ResolveHostEnvironmentProviderArgs {
+  currentProvider: SystemEnvironmentProvider | null;
+  providers: readonly SystemEnvironmentProvider[];
+}
+
+export function resolveHostEnvironmentProvider({
+  currentProvider,
+  providers,
+}: ResolveHostEnvironmentProviderArgs): SystemEnvironmentProvider | null {
+  const candidates = providers.filter(
+    (provider) =>
+      provider.machineProviderId === null &&
+      provider.availability?.status !== "unavailable",
+  );
+  return (
+    candidates.find((provider) => provider.id === currentProvider?.id) ??
+    candidates[0] ??
+    (currentProvider?.machineProviderId === null ? currentProvider : null)
+  );
+}
 
 export function buildReuseThreadOptions(
   threads: readonly ThreadListEntry[],
@@ -159,21 +172,6 @@ function resolveProjectlessEnvironmentValue({
     : encodeProviderValue(defaultProvider.id);
 }
 
-export function resolveProjectSourceGitDisabledReason(
-  data: ProjectBranchesResponse | undefined,
-): string | null {
-  switch (data?.checkout.kind) {
-    case "unknown":
-      return PROJECT_SOURCE_NOT_GIT_DISABLED_REASON;
-    case "unborn":
-      return PROJECT_SOURCE_NO_COMMITS_DISABLED_REASON;
-    case "branch":
-    case "detached":
-    case undefined:
-      return null;
-  }
-}
-
 export function resolveRootComposeEffectiveEnvironmentValue({
   environmentSelectionValue,
   environmentProviders,
@@ -237,7 +235,10 @@ export function resolveRootComposeEffectiveEnvironmentValue({
       : fallbackValue;
   }
 
-  if (selectedProvider !== undefined && primaryHostId !== null) {
+  if (
+    selectedProvider !== undefined &&
+    (selectedProvider.machineProviderId !== null || primaryHostId !== null)
+  ) {
     return environmentSelectionValue;
   }
 

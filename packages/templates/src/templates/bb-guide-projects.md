@@ -25,6 +25,7 @@ A project maps to a code repository. All threads belong to a project.
   local CLI machine fallback (normally the primary machine).
 
   bb project show <id>                    Show project details
+    Accepts proj_personal to inspect Personal.
   bb project update <id>                  Update a project
     --name <name>                         New name
 
@@ -48,6 +49,10 @@ Discovery:
   machine selects that machine's project source. Omitting both intentionally
   falls back to the primary machine's project source.
 
+  Personal file access (`paths`, `files`, `content`) requires an explicit
+  --environment <id> belonging to Personal. Personal has no default project
+  source; the selected environment must be ready.
+
 Attachments:
 
   bb project attachment upload <id>       Upload bytes from the CLI machine
@@ -58,8 +63,10 @@ Attachments:
     --client-file <path>                  Destination on this CLI machine
 
   Uploads use multipart bytes and return a server-managed attachment DTO. Pass
-  its relative `path` to thread --file/--image input. Those thread flags never
-  read a client path: absolute values remain paths for the execution host.
+  its relative `path` to thread --file/--image input. Thread --image uploads an
+  absolute path from the CLI machine automatically; relative values remain
+  existing server attachment paths. Thread --file absolute values remain paths
+  for the execution host.
   image/* uploads are limited to 10MB; other files are limited to 25MB.
   image/heic and image/heif uploads are rejected because no renderer or
   provider can decode them; convert them to JPEG or PNG first.

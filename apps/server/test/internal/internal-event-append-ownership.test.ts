@@ -1,5 +1,10 @@
 import { eq } from "drizzle-orm";
-import { events, getThread, listQueuedThreadMessages } from "@bb/db";
+import {
+  events,
+  getThread,
+  listEvents,
+  listQueuedThreadMessages,
+} from "@bb/db";
 import { threadScope, turnScope } from "@bb/domain";
 import {
   groupHostDaemonEvents,
@@ -7,7 +12,7 @@ import {
   type HostDaemonEventEnvelope,
 } from "@bb/host-daemon-contract";
 import { describe, expect, it } from "vitest";
-import { buildThreadTimeline } from "../../src/services/threads/timeline.js";
+import { buildThreadTimelineWithProfile } from "../../src/services/threads/timeline.js";
 import {
   internalAuthHeaders,
   waitForQueuedCommand,
@@ -76,6 +81,65 @@ function setupEventRoute(args: SeedEventRouteArgs = {}) {
 }
 
 describe("internal event append ownership", () => {
+  it("keeps late provisioning output terminal after setup has failed", async () => {
+    const { environment, harness, session, thread } = await setupEventRoute();
+    try {
+      seedEvent(harness.deps, {
+        threadId: thread.id,
+        environmentId: environment.id,
+        sequence: 1,
+        type: "system/thread-provisioning",
+        scope: threadScope(),
+        data: {
+          provisioningId: "tpv-terminal",
+          environmentId: environment.id,
+          status: "failed",
+          entries: [],
+        },
+      });
+
+      const response = await postEventBatch({
+        harness,
+        sessionId: session.id,
+        events: [
+          {
+            threadId: thread.id,
+            event: {
+              type: "system/thread-provisioning",
+              threadId: thread.id,
+              scope: threadScope(),
+              provisioningId: "tpv-terminal",
+              environmentId: environment.id,
+              status: "active",
+              entries: [
+                {
+                  type: "output",
+                  key: "setup-output",
+                  text: "late buffered setup output",
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      expect(response.status).toBe(200);
+      expect(
+        listEvents(harness.db, { threadId: thread.id }).map((row) =>
+          JSON.parse(row.data),
+        ),
+      ).toMatchObject([
+        { status: "failed" },
+        {
+          status: "failed",
+          entries: [{ text: "late buffered setup output" }],
+        },
+      ]);
+    } finally {
+      await harness.cleanup();
+    }
+  });
+
   it("stores thread-scoped ACP context usage for the timeline display", async () => {
     const { harness, session, thread } = await setupEventRoute();
     try {
@@ -102,7 +166,8 @@ describe("internal event append ownership", () => {
 
       expect(response.status).toBe(200);
       expect(
-        buildThreadTimeline(harness.db, thread, {
+        buildThreadTimelineWithProfile(harness.db, thread, {
+          completedTurnDisplay: "collapse",
           eventBudget: 1_000_000,
           includeDiagnosticOperations: true,
           maxInlineOutputChars: null,
@@ -111,7 +176,7 @@ describe("internal event append ownership", () => {
             kind: "latest",
             segmentLimit: Number.MAX_SAFE_INTEGER,
           },
-        }).contextWindowUsage,
+        }).response.contextWindowUsage,
       ).toEqual({
         usedTokens: 24_000,
         modelContextWindow: 128_000,
@@ -1030,13 +1095,14 @@ describe("interaction lifecycle records from the daemon", () => {
           .all()
           .map((row) => row.sequence),
       );
-      const questionRows = buildThreadTimeline(harness.db, thread, {
+      const questionRows = buildThreadTimelineWithProfile(harness.db, thread, {
+        completedTurnDisplay: "collapse",
         eventBudget: 1_000_000,
         includeDiagnosticOperations: true,
         maxInlineOutputChars: null,
         maxSeq,
         page: { kind: "latest", segmentLimit: Number.MAX_SAFE_INTEGER },
-      }).rows.flatMap((row) =>
+      }).response.rows.flatMap((row) =>
         row.kind === "work" && row.workKind === "question" ? [row] : [],
       );
       expect(questionRows).toHaveLength(1);

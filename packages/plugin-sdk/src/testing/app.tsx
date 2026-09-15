@@ -37,7 +37,7 @@ import {
   type PluginNavPanelRegistration,
   type PluginNewThreadPanelActionRegistration,
   type PluginPendingInteractionRegistration,
-  type PluginProviderIconRegistration,
+  type ExperimentalIconRegistration,
   type PluginTimelineRendererRegistration,
   type PluginRealtimeConnectionState,
   type PluginRpcClient,
@@ -54,6 +54,7 @@ import {
   type PluginSidebarThreadsState,
   type PluginSourceCodeRendererRegistration,
   type PluginThreadHeaderActionRegistration,
+  type ExperimentalPluginBrowserToolbarActionRegistration,
   type PluginThreadListRegistration,
   type PluginThreadPanelActionRegistration,
   type PluginRpcContract,
@@ -63,6 +64,7 @@ import {
   type UrlLinkProps,
   type ExperimentalFileLinkProps,
   type ExperimentalFileOpenOptions,
+  type ExperimentalComposerSubmitOptions,
   type ExperimentalAppPanel,
   type ExperimentalFixedTabTargetState,
   type ExperimentalOpenFixedTabOptions,
@@ -73,6 +75,7 @@ import {
   type ExperimentalPermissionModePickerProps,
   type ExperimentalProviderModelPickerProps,
   type PluginEnvironmentProviderInputsRegistration,
+  type PluginMachineProviderInputsRegistration,
   type ThreadChatProps,
   type DiffProps,
   type SourceCodeProps,
@@ -83,6 +86,7 @@ import { normalizePluginThreadRowStatus } from "../internal/composer-customizati
 import { normalizeExperimentalFileOpenOptions } from "../internal/file-navigation-validation.js";
 import {
   collectPluginAppRegistrations,
+  type CollectedPluginProviderIconRegistration,
   type CollectedExperimentalSidebarFooterItem,
 } from "../internal/plugin-app-collector.js";
 
@@ -173,7 +177,7 @@ export interface ComposerLog {
    * has no submit pipeline of its own, so it records the options and clears the
    * draft — enough to assert what a picker scheduled and that it tidied up.
    */
-  submits: Array<{ sendAt: number }>;
+  submits: ExperimentalComposerSubmitOptions[];
 }
 
 interface TestComposerStore {
@@ -847,6 +851,33 @@ const testPluginSdkApp = {
   ThreadChat: TestThreadChat,
   Markdown: TestMarkdown,
   experimental_FileLink: TestFileLink,
+  experimental_Icon: ({ name, fallback, ...props }) => (
+    <span {...props} data-icon={name} data-icon-fallback={fallback} />
+  ),
+  experimental_ProviderIcon: ({
+    providerKind,
+    provider,
+    fallback,
+    ...props
+  }) => (
+    <span
+      {...props}
+      data-provider-kind={providerKind}
+      data-provider-id={provider.id}
+      data-provider-logo={provider.logoUrl ?? undefined}
+      data-provider-glyph={
+        (typeof provider.icon === "string"
+          ? provider.icon
+          : provider.icon?.glyph) ?? undefined
+      }
+      data-provider-tint={
+        provider.strings?.iconTint == null
+          ? undefined
+          : JSON.stringify(provider.strings.iconTint)
+      }
+      data-provider-fallback={fallback}
+    />
+  ),
   UrlLink: TestUrlLink,
   experimental_NewThreadComposer: TestNewThreadComposer,
   experimental_ProviderModelPicker: TestProviderModelPicker,
@@ -958,14 +989,17 @@ export interface CapturedPluginApp {
   experimentalSidebarNavigations: ExperimentalSidebarNavigationRegistration[];
   threadLists: PluginThreadListRegistration[];
   threadHeaderActions: PluginThreadHeaderActionRegistration[];
+  browserToolbarActions: ExperimentalPluginBrowserToolbarActionRegistration[];
   fileOpeners: PluginFileOpenerRegistration[];
   sourceCodeRenderers: PluginSourceCodeRendererRegistration[];
   diffRenderers: PluginDiffRendererRegistration[];
   messageDirectives: PluginMessageDirectiveRegistration[];
   messageActions: PluginMessageActionRegistration[];
-  providerIcons: PluginProviderIconRegistration[];
+  providerIcons: CollectedPluginProviderIconRegistration[];
+  icons: ExperimentalIconRegistration[];
   timelineRenderers: PluginTimelineRendererRegistration[];
   environmentProviderInputs: PluginEnvironmentProviderInputsRegistration[];
+  machineProviderInputs: PluginMachineProviderInputsRegistration[];
   contentScripts: PluginContentScriptRegistration[];
 }
 
@@ -1615,17 +1649,20 @@ export function renderSlot<
       focus() {
         composerLog.focusCount += 1;
       },
-      async experimental_submit({ sendAt }) {
+      async experimental_submit(options) {
         if (!composerOwnership.active) {
           throw new Error("This composer is no longer active.");
         }
         if (composerText.trim() === "") {
           throw new Error("Type a message before scheduling it.");
         }
-        if (!Number.isFinite(sendAt) || sendAt <= Date.now()) {
+        if (
+          options.sendAt !== undefined &&
+          (!Number.isFinite(options.sendAt) || options.sendAt <= Date.now())
+        ) {
           throw new Error("Pick a time in the future.");
         }
-        composerLog.submits.push({ sendAt });
+        composerLog.submits.push(options);
         commitComposerText("");
       },
     },

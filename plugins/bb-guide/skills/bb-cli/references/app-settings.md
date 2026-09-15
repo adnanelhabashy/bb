@@ -18,6 +18,8 @@ every window and client sees the same value.
   orders, the collapsed-id lists, `sidebar.pluginPanelOrder`,
   `sidebar.visiblePluginPanels`, `sidebar.navigationProvider`,
   `sidebar.threadListProvider`).
+- `sidebar.organizationMode` defaults to Custom (`chronological`) when unset;
+  existing server and legacy browser choices are preserved.
 - `bb settings ui list [--json]` prints every key with its value, revision,
   and description; `bb settings ui get <key> [--json]` prints one.
 - `bb settings ui set <key> <value> [--json]` takes a plain string for enum
@@ -100,6 +102,23 @@ every window and client sees the same value.
 - `defaultProviderId` defaults to `null`. Set a provider ID or use `null` to
   clear it.
 
+## Finished turns
+
+- When a turn finishes, bb can collapse its work into one `Worked for` row
+  and leave the final answer visible (`collapse`), or keep every step visible
+  (`flat`). Each provider declares a default: Claude Code is `flat`; every
+  other first-party provider is `collapse`.
+- `bb settings completed-turns [--json]` lists every provider with its current
+  display and whether it comes from your setting or the provider default.
+- `bb settings completed-turns <provider-id> <collapse|flat|default>` sets the
+  display for one provider; `default` removes your setting so the provider
+  default applies again. Settings → Providers has the same switch per
+  provider.
+- The overrides are stored in `providerCompletedTurnDisplay`, a map of provider
+  ID to `collapse` or `flat`. The setting applies to every thread of that
+  provider, including finished turns in existing threads, the conversation
+  outline, and `bb thread log`.
+
 ## Message edits
 
 - Eligible accepted root user messages can be edited without enabling an
@@ -138,3 +157,41 @@ every window and client sees the same value.
 - Enable it with `bb settings experiment timelineWindowing true`.
 - It keeps stable timeline wrappers while mounting only rows near the active
   main or nested detail scrollport.
+
+## Multi-machine picker
+
+- The `multiMachinePicker` experiment defaults to false.
+- Enable it with `bb settings experiment multiMachinePicker true`.
+- Projects with at least three machines use a searchable, target-first
+  environment picker. Machine-only pickers add search when they contain more
+  than five machines.
+
+Machine access: `bb settings general machineServerUrl https://bb.example.com`
+sets the server URL reachable by machines. Set `null` to use BB_EXTERNAL_URL.
+`bb settings general defaultMachineAccess direct` selects direct access;
+`connect` selects bb Cloud; `null` selects the first registered access provider,
+or direct when none is registered. An unpaired provider remains selected and
+reports setup required. `bb settings show --json` includes serverAccess with the
+effective direct URL, its source and provider availability. Availability is refreshed
+on each read, with failed or timed-out checks reported as unavailable. It does
+not acquire a machine grant. These grants carry runtime
+requests, including account-pool traffic, after enrolment.
+
+Automatic machine GitHub credentials are enabled by default. Use
+`bb settings general machineGitCredentialsEnabled false` to stop forwarding the
+server gh credentials to machines; `true` enables them again. In Machines →
+Advanced settings, the automatic GH_TOKEN switch controls the same setting.
+This does not log the server out or suppress an explicit custom GH_TOKEN.
+Changes apply to new turns, setup commands and terminals.
+
+Sidebar footer actions use `sidebar.footerOrder` and `sidebar.hiddenFooterItems`.
+Both are string lists shared across clients. Keys are `builtin:settings`,
+`builtin:report-bug`, or `plugin:<encoded pluginId>/<encoded registrationId>`.
+Right-click Hide moves an action into More; Settings → Appearance → Sidebar footer
+restores visibility and drag-reorders actions. CLI example:
+`bb settings ui set sidebar.hiddenFooterItems '["plugin:provider-usage/usage"]'`.
+Use `bb settings ui reset sidebar.hiddenFooterItems` to show everything again.
+
+Disable anonymous usage telemetry with `bb settings general telemetryEnabled false`
+or Settings → General → Privacy & diagnostics → Share anonymous usage data. This server-wide preference
+applies immediately and persists across restarts. `BB_TELEMETRY=false` overrides it.

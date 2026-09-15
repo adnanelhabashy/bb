@@ -53,7 +53,6 @@ const codexMissingCliModelLoadError = {
 
 const baseEnvironment: NewThreadEnvironmentConfig = {
   value: `host:${HOST_IDS.local}:local`,
-  onChange: noop,
   sources: STORY_PROJECT_SOURCES,
   host: makeHost({ id: HOST_IDS.local }),
   isLocal: true,
@@ -550,7 +549,6 @@ function ProjectlessThreadRow() {
           environment: {
             ...baseEnvironment,
             value: environmentValue,
-            onChange: setEnvironmentValue,
             machines: {
               hosts: projectlessHosts,
               localDaemonHostId: HOST_IDS.local,
@@ -660,32 +658,15 @@ export function Overview() {
         >
           <ProjectlessThreadRow />
         </StoryRow>
-      </StoryCard>
-    </ModelPickerStoryQueryProvider>
-  );
-}
-
-export function UnsupportedCodexCli() {
-  return (
-    <ModelPickerStoryQueryProvider>
-      <StoryCard>
         <StoryRow
-          label="unsupported Codex CLI"
-          hint="Codex is installed but below bb's minimum supported version"
+          label="mobile width"
+          hint="the projectless composer constrained to a 390px viewport"
         >
-          <UnsupportedCodexCliRow />
+          <div className="w-full max-w-[390px]">
+            <ProjectlessThreadRow />
+          </div>
         </StoryRow>
       </StoryCard>
-    </ModelPickerStoryQueryProvider>
-  );
-}
-
-export function Mobile() {
-  return (
-    <ModelPickerStoryQueryProvider>
-      <div className="mx-auto w-full max-w-[390px] p-4">
-        <ProjectlessThreadRow />
-      </div>
     </ModelPickerStoryQueryProvider>
   );
 }

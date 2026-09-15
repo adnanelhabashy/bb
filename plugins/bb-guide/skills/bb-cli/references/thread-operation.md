@@ -94,7 +94,8 @@ hostId, providerId, projectId, parentThreadId, groupBy })`.
 - Use `bb thread search <query> [--limit <1-50>]` for sidebar search. Use
   `history`, `read|unread`, and `section` for organization and recall. The
   `bb thread queue` group contains the queued-message operations. Queue updates
-  use the listed version and accept repeatable `--file` and `--image` options.
+  use the listed version and accept repeatable `--file` and `--image` options;
+  absolute image paths are uploaded from the CLI machine before the update.
 - Use `bb thread show <thread-id>` for status, parent, environment, pull request
   status, and result.
 - Use `bb thread show <thread-id> --git-diff` to review file changes.
@@ -117,6 +118,9 @@ For review or fix pipelines, get the environment ID from
 
 ## Opening Threads And Files In The App
 
+- Reference a BB thread in chat as `@thread:thr_abc123`, substituting its
+  actual ID. BB renders the mention with the correct project-aware link; do not
+  construct `/threads/...` or `/projects/.../threads/...` URLs manually.
 - Use `bb thread open <path>` inside a BB thread to open a Markdown, HTML, or
   other workspace file for the user in the BB IDE's thread panel.
 - Use `bb thread open <thread-id> --split right|down|left|top|replace` to open
@@ -177,3 +181,5 @@ For review or fix pipelines, get the environment ID from
   `bb terminal close <terminal-id>` when the process is no longer needed.
 - `bb terminal restart <terminal-id>` replaces the session with a shell in the
   same scope, size, and title. It does not replay the original launch command.
+
+Clearing a thread's parent with `bb thread update --clear-parent-thread` inherits the former parent's section unless the update explicitly supplies a section. Children released by environment archiving also inherit their former parent's section.

@@ -29,6 +29,36 @@ async function resetPreference(
 }
 
 describe("public ui preferences", () => {
+  it("retains unavailable footer IDs and rejects malformed footer preferences", async () => {
+    await withTestHarness(async (harness) => {
+      for (const key of ["sidebar.footerOrder", "sidebar.hiddenFooterItems"]) {
+        const value = [
+          "plugin:disabled%2Fplugin/item%2Fid",
+          "builtin:settings",
+          "plugin:unknown/item",
+        ];
+        expect(
+          (await putPreference(harness, key, { expectedRevision: 0, value }))
+            .status,
+        ).toBe(200);
+        expect(await readJson(await listPreferences(harness))).toMatchObject({
+          preferences: { [key]: { value, revision: 1 } },
+        });
+        expect(
+          (
+            await putPreference(harness, key, {
+              expectedRevision: 1,
+              value: [12],
+            })
+          ).status,
+        ).toBe(400);
+        expect(
+          await readJson(await resetPreference(harness, key)),
+        ).toMatchObject({ value: [] });
+      }
+    });
+  });
+
   it("adds sort direction without replacing an existing sort field and can reset it", async () => {
     await withTestHarness(async (harness) => {
       expect(
@@ -85,6 +115,39 @@ describe("public ui preferences", () => {
       }
     });
   });
+
+  it("defaults unset organization to Custom without persisting a choice", async () => {
+    await withTestHarness(async (harness) => {
+      expect(await readJson(await listPreferences(harness))).toMatchObject({
+        preferences: {
+          "sidebar.organizationMode": { revision: 0, value: "chronological" },
+        },
+      });
+      expect(
+        harness.db.$client
+          .prepare("SELECT key FROM ui_preferences WHERE key = ?")
+          .get("sidebar.organizationMode"),
+      ).toBeUndefined();
+    });
+  });
+
+  it.each(["project", "machine", "chronological"])(
+    "preserves saved %s organization",
+    async (value) => {
+      await withTestHarness(async (harness) => {
+        harness.db.$client
+          .prepare(
+            "INSERT INTO ui_preferences (key, value_json, revision, updated_at) VALUES (?, ?, 3, 1)",
+          )
+          .run("sidebar.organizationMode", JSON.stringify(value));
+        expect(await readJson(await listPreferences(harness))).toMatchObject({
+          preferences: {
+            "sidebar.organizationMode": { revision: 3, value },
+          },
+        });
+      });
+    },
+  );
 
   it("writes with revision checks, broadcasts, and rejects stale writes", async () => {
     await withTestHarness(async (harness) => {
@@ -204,7 +267,7 @@ describe("public ui preferences", () => {
       };
       expect(listed.preferences["sidebar.organizationMode"]).toEqual({
         revision: 4,
-        value: "project",
+        value: "chronological",
       });
       expect(listed.preferences["sidebar.unknownKey"]).toBeUndefined();
     });

@@ -6,6 +6,9 @@ Read the installed SDK declarations for the exact current signatures.
 
 ## Runtime values
 
+- `experimental_Icon`
+- `experimental_ProviderIcon`
+
 - `definePluginApp`
 - `ThreadChat`
 - `Markdown`
@@ -41,6 +44,11 @@ Read the installed SDK declarations for the exact current signatures.
 
 ## Type exports
 
+- `ExperimentalAppIcons`
+- `ExperimentalIconRegistration`
+- `ExperimentalIconProps`
+- `ExperimentalProviderIconProps`
+
 - `PluginHomepageSectionProps`
 - `PluginSettingsSectionProps`
 - `ExperimentalAppOverlayProps`
@@ -58,6 +66,10 @@ Read the installed SDK declarations for the exact current signatures.
 - `PluginEnvironmentProviderInputsProps`
 - `PluginEnvironmentProviderInputsRegistration` — the registration accepted by
   `app.slots.experimental_environmentProviderInputs`
+- `PluginMachineProviderInputsChange`
+- `PluginMachineProviderInputsProps`
+- `PluginMachineProviderInputsRegistration` — the registration accepted by
+  `app.slots.experimental_machineProviderInputs`
 - `PluginSidebarFooterActionProps`
 - `ExperimentalSidebarFooterDisclosureProps`
 - `ExperimentalSidebarNavigationShortcut`
@@ -68,6 +80,7 @@ Read the installed SDK declarations for the exact current signatures.
 - `ExperimentalSidebarNavigationProps`
 - `PluginThreadListProps`
 - `PluginThreadHeaderActionProps`
+- `ExperimentalPluginBrowserToolbarActionProps`
 - `PluginFileOpenerSource`
 - `PluginFileOpenerProps`
 - `CodeOverflowMode`
@@ -119,6 +132,7 @@ Read the installed SDK declarations for the exact current signatures.
 - `PluginCodeThemeState`
 - `PluginSidebarThreadActions`
 - `PluginThreadHeaderActionRegistration`
+- `ExperimentalPluginBrowserToolbarActionRegistration`
 - `PluginSidebarSplitPane`
 - `PluginSidebarThreadSplit`
 - `PluginThreadListRegistration`
@@ -130,8 +144,12 @@ Read the installed SDK declarations for the exact current signatures.
 - `PluginTargetedPanelActionOpenOptions`
 - `PluginMessageActionContext`
 - `PluginMessageActionRegistration`
-- `PluginCommandPaletteActionContext`
-- `PluginCommandPaletteActionRegistration`
+- `PluginAppCommands`
+- `PluginCommandContext`
+- `PluginCommandPaletteActionContext` (deprecated alias)
+- `PluginCommandShortcut`
+- `PluginCommandRegistration`
+- `PluginCommandPaletteActionRegistration` (deprecated alias)
 - `PluginProviderIconRegistration`
 - `PluginTimelineRowPresentation`
 - `PluginTimelineRowStatus`
@@ -183,6 +201,7 @@ Read the installed SDK declarations for the exact current signatures.
 - `BbNavigate`
 - `PluginSdkApp`
 - `JsonValue`
+- `ReadonlyJsonValue`
 - `PluginRpcCallArgs`
 - `PluginRpcContract`
 - `PluginRpcError`

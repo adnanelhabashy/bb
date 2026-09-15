@@ -1,3 +1,4 @@
+import { useSetPluginEnabled } from "@/components/plugin/useSetPluginEnabled";
 import {
   Suspense,
   useCallback,
@@ -39,7 +40,6 @@ import {
 } from "@/hooks/queries/plugin-catalog-queries";
 import {
   removePlugin,
-  setPluginEnabled,
   usePluginList,
   type PluginListItem,
 } from "@/hooks/queries/plugin-settings-queries";
@@ -156,12 +156,13 @@ function PluginDetailToolView({ pluginId }: { pluginId: string }) {
       (plugin) => pluginIsLocalSource(plugin) && plugin.rootDir !== null,
     ),
   });
+  const setEnabled = useSetPluginEnabled();
   const pluginToggle = useMutation({
     meta: { showErrorToast: false },
     mutationFn: async (plugin: PluginListItem) => {
       const action = plugin.enabled ? "disable" : "enable";
       try {
-        await setPluginEnabled(fetch, plugin.id, !plugin.enabled);
+        await setEnabled(plugin.id, !plugin.enabled);
       } catch {
         throw new Error(`Failed to ${action} plugin`);
       }
@@ -198,9 +199,23 @@ function PluginDetailToolView({ pluginId }: { pluginId: string }) {
   const isLoading = listQuery.isFetching && listQuery.data === undefined;
   const selectedPlugin =
     plugins.find((plugin) => plugin.id === pluginId) ?? null;
+  const selectedCatalogEntryId = selectedPlugin?.catalogEntryId ?? null;
+  const selectedCatalogMarketplaceName =
+    selectedPlugin?.catalogMarketplaceName ?? null;
   const selectedCatalogEntry =
-    catalogQuery.data?.entries.find((entry) => entry.pluginId === pluginId) ??
-    null;
+    selectedPlugin === null
+      ? (catalogQuery.data?.entries.find(
+          (entry) => entry.pluginId === pluginId,
+        ) ?? null)
+      : selectedCatalogEntryId === null ||
+          selectedCatalogMarketplaceName === null
+        ? null
+        : (catalogQuery.data?.entries.find(
+            (entry) =>
+              entry.pluginId === selectedPlugin.id &&
+              entry.entryId === selectedCatalogEntryId &&
+              entry.marketplace === selectedCatalogMarketplaceName,
+          ) ?? null);
   useResourceRouteLabel(
     selectedPlugin?.name ??
       selectedPlugin?.id ??

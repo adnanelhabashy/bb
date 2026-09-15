@@ -473,11 +473,11 @@ describe("PluginNavSidebarItems", () => {
         ).toEqual(expected.map(([label]) => label));
         expect(within(menu).getAllByRole("separator")).toHaveLength(1);
         for (const [label, icon] of expected) {
-          expect(
-            within(menu)
-              .getByRole("menuitem", { name: label })
-              .querySelector(`[data-icon="${icon}"]`),
-          ).not.toBeNull();
+          const iconElement = within(menu)
+            .getByRole("menuitem", { name: label })
+            .querySelector(`[data-icon="${icon}"]`);
+          expect(iconElement).not.toBeNull();
+          expect(iconElement?.hasAttribute("data-icon-root")).toBe(true);
         }
       };
       expectFocusedMenu(dropdownMenu);
@@ -580,7 +580,7 @@ describe("PluginNavSidebarItems", () => {
       title: "Automations",
     },
   ])(
-    "replaces $title with New thread before disabling",
+    "replaces $title with New thread after disabling",
     async ({ pluginId, title }) => {
       let completeDisable: (response: Response) => void = () => {};
       const fetchMock = vi.fn<typeof fetch>(
@@ -618,12 +618,9 @@ describe("PluginNavSidebarItems", () => {
       expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
         `/plugins/${pluginId}/disable`,
       );
-      await waitFor(() =>
-        expect(screen.getByTestId("location-path").textContent).toBe("/"),
+      expect(screen.getByTestId("location-path").textContent).toBe(
+        `/plugins/${pluginId}/main`,
       );
-      expect(store.get(splitLayoutAtom)?.root).toMatchObject({
-        content: { kind: "new-thread" },
-      });
       expect(appToast.success).not.toHaveBeenCalled();
       await act(async () => {
         completeDisable(
@@ -635,6 +632,12 @@ describe("PluginNavSidebarItems", () => {
             },
           ),
         );
+      });
+      await waitFor(() =>
+        expect(screen.getByTestId("location-path").textContent).toBe("/"),
+      );
+      expect(store.get(splitLayoutAtom)?.root).toMatchObject({
+        content: { kind: "new-thread" },
       });
       expect(appToast.success).toHaveBeenCalledWith(`${title} disabled`);
       fireEvent.click(screen.getByRole("button", { name: "History back" }));
@@ -730,7 +733,7 @@ describe("PluginNavSidebarItems", () => {
         },
         focusedPaneId: "github",
       };
-      expect(layoutsAtDisable).toEqual([survivingLayout]);
+      expect(layoutsAtDisable[0]?.root.type).toBe("split");
       expect(store.get(splitLayoutAtom)).toEqual(survivingLayout);
       expect(store.get(maximizedPaneIdAtom)).toBeNull();
       expect(screen.getByTestId("location-path").textContent).toBe(
@@ -1109,6 +1112,13 @@ describe("PluginNavSidebarItems", () => {
       "Search threads",
       "Customize sidebar",
     ]);
+    expect(
+      screen
+        .getByRole("menuitem", { name: "Customize sidebar" })
+        .querySelectorAll(
+          ':scope > [data-icon="FilterHorizontal"][data-icon-root]',
+        ),
+    ).toHaveLength(1);
 
     fireEvent.click(screen.getByRole("menuitem", { name: "Search threads" }));
 

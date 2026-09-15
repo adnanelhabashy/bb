@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 
+import { createStore, Provider } from "jotai";
+import { splitLayoutAtom, maximizedPaneIdAtom } from "@/lib/split-layout/atoms";
 import type { ReactNode } from "react";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -42,6 +45,7 @@ import type { PluginCatalogSearchEntry } from "@/hooks/queries/plugin-catalog-qu
 import { pluginSourceQueryKey } from "@/hooks/queries/query-keys";
 import type { PluginFrontendDiagnostic } from "@/lib/plugin-frontend";
 import {
+  makeInstalledPlugin,
   makePluginListItem,
   makePluginRegistrationSet,
 } from "@/test/fixtures/plugins";
@@ -609,6 +613,168 @@ describe("PluginDetail official catalog lifecycle", () => {
 });
 
 describe("BB Official plugin detail routing", () => {
+  it("uses the installed catalog identity when plugin ids collide", async () => {
+    const firstCatalogEntry = {
+      ...GITHUB_CATALOG_ENTRY,
+      marketplace: "bb-community",
+      marketplaceDisplayName: "BB Community",
+      publisherKey: "bb-community:example",
+      publisherLabel: "BB Community",
+      description: "Description from the first catalog.",
+      repositoryUrl: "https://github.com/example/first-catalog-plugin",
+      author: {
+        name: "First publisher",
+        github: "first-publisher",
+        url: "https://github.com/first-publisher",
+      },
+    };
+    const installedCatalogEntry = {
+      ...GITHUB_CATALOG_ENTRY,
+      marketplace: "partner-catalog",
+      marketplaceDisplayName: "Partner Catalog",
+      publisherKey: "partner-catalog:example",
+      publisherLabel: "Partner Catalog",
+      description: "Description from the installed catalog.",
+      repositoryUrl: "https://github.com/example/installed-catalog-plugin",
+      author: {
+        name: "Installed publisher",
+        github: "installed-publisher",
+        url: "https://github.com/installed-publisher",
+      },
+      installed: true,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url === "/api/v1/plugins") {
+          return new Response(
+            JSON.stringify({
+              enabled: true,
+              plugins: [
+                {
+                  ...GITHUB_PLUGIN,
+                  catalogMarketplaceName: "partner-catalog",
+                  publisherLabel: "Partner Catalog",
+                  iconUrl: null,
+                  screenshots: [],
+                  collections: [],
+                  providerIds: [],
+                  icons: {},
+                  updateState: {},
+                },
+              ],
+            }),
+            { headers: { "content-type": "application/json" } },
+          );
+        }
+        if (url.startsWith("/api/v1/plugin-catalog/search")) {
+          return new Response(
+            JSON.stringify({
+              results: [firstCatalogEntry, installedCatalogEntry],
+              collections: [],
+            }),
+            { headers: { "content-type": "application/json" } },
+          );
+        }
+        return new Response(JSON.stringify({ error: "not found" }), {
+          status: 404,
+          headers: { "content-type": "application/json" },
+        });
+      }),
+    );
+
+    const { wrapper: QueryClientWrapper } = createQueryClientTestHarness();
+    render(
+      <MemoryRouter initialEntries={["/settings/plugins/github"]}>
+        <Routes>
+          <Route path="/settings/plugins/*" element={<RoutedPluginsView />} />
+        </Routes>
+      </MemoryRouter>,
+      { wrapper: QueryClientWrapper },
+    );
+
+    await waitFor(() => {
+      expect(document.querySelector("[data-plugin-summary]")?.textContent).toBe(
+        "Description from the installed catalog.",
+      );
+    });
+  });
+
+  it("uses installed metadata when its catalog entry is unavailable", async () => {
+    const unrelatedCatalogEntry = {
+      ...GITHUB_CATALOG_ENTRY,
+      marketplace: "bb-community",
+      marketplaceDisplayName: "BB Community",
+      publisherKey: "bb-community:example",
+      publisherLabel: "BB Community",
+      description: "Description from an unrelated catalog entry.",
+      repositoryUrl: "https://github.com/example/unrelated-catalog-plugin",
+      author: {
+        name: "Unrelated publisher",
+        github: "unrelated-publisher",
+        url: "https://github.com/unrelated-publisher",
+      },
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url === "/api/v1/plugins") {
+          return new Response(
+            JSON.stringify({
+              enabled: true,
+              plugins: [
+                {
+                  ...GITHUB_PLUGIN,
+                  description: "Description from installed metadata.",
+                  catalogMarketplaceName: "partner-catalog",
+                  publisherLabel: "Partner Catalog",
+                  iconUrl: null,
+                  screenshots: [],
+                  collections: [],
+                  providerIds: [],
+                  icons: {},
+                  updateState: {},
+                },
+              ],
+            }),
+            { headers: { "content-type": "application/json" } },
+          );
+        }
+        if (url.startsWith("/api/v1/plugin-catalog/search")) {
+          return new Response(
+            JSON.stringify({
+              results: [unrelatedCatalogEntry],
+              collections: [],
+            }),
+            { headers: { "content-type": "application/json" } },
+          );
+        }
+        return new Response(JSON.stringify({ error: "not found" }), {
+          status: 404,
+          headers: { "content-type": "application/json" },
+        });
+      }),
+    );
+
+    const { wrapper: QueryClientWrapper } = createQueryClientTestHarness();
+    render(
+      <MemoryRouter initialEntries={["/settings/plugins/github"]}>
+        <Routes>
+          <Route path="/settings/plugins/*" element={<RoutedPluginsView />} />
+        </Routes>
+      </MemoryRouter>,
+      { wrapper: QueryClientWrapper },
+    );
+
+    await waitFor(() => {
+      expect(document.querySelector("[data-plugin-summary]")?.textContent).toBe(
+        "Description from installed metadata.",
+      );
+    });
+  });
+
   it("resolves an uninstalled catalog plugin and opens its install confirmation", async () => {
     vi.stubGlobal(
       "fetch",
@@ -784,6 +950,7 @@ describe("BB Official plugin detail routing", () => {
               plugins: [
                 {
                   ...GITHUB_PLUGIN,
+                  catalogMarketplaceName: "bb-official",
                   iconUrl: null,
                   screenshots: [],
                   collections: [],
@@ -1767,4 +1934,101 @@ describe("PluginDetail capability inventory", () => {
       expect(screen.getByText(label)).toBeTruthy();
     }
   });
+});
+
+describe("detail disable workspace cleanup", () => {
+  it.each([false, true])(
+    "preserves the workspace until disable settles (failure=%s)",
+    async (fails) => {
+      const store = createStore();
+      const layout = {
+        root: {
+          type: "pane" as const,
+          paneId: "github",
+          content: {
+            kind: "plugin-panel" as const,
+            pluginId: "github",
+            panelPath: "main",
+            subPath: "",
+          },
+        },
+        focusedPaneId: "github",
+      };
+      store.set(splitLayoutAtom, layout);
+      store.set(maximizedPaneIdAtom, "github");
+      let complete: ((response: Response) => void) | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.includes("/github/disable"))
+            return new Promise<Response>((resolve) => {
+              complete = resolve;
+            });
+          if (url === "/api/v1/plugins")
+            return Response.json({
+              plugins: [makeInstalledPlugin({ id: "github", name: "GitHub" })],
+            });
+          if (url.includes("plugin-catalog/search"))
+            return Response.json({ results: [], collections: [] });
+          return Response.json({ error: "not found" }, { status: 404 });
+        }),
+      );
+      const { wrapper: QueryClientWrapper } = createQueryClientTestHarness();
+      render(
+        <QueryClientWrapper>
+          <Provider store={store}>
+            <MemoryRouter initialEntries={["/skills", "/plugins/github/main"]}>
+              <TooltipProvider>
+                <PluginDetailPaneView pluginId="github" />
+              </TooltipProvider>
+              <LocationProbe />
+              <HistoryBackButton />
+            </MemoryRouter>
+          </Provider>
+        </QueryClientWrapper>,
+      );
+      fireEvent.click(
+        await screen.findByRole("switch", { name: "Disable GitHub" }),
+      );
+      await waitFor(() =>
+        expect(
+          screen
+            .getByRole("switch", { name: "Disable GitHub" })
+            .hasAttribute("disabled"),
+        ).toBe(true),
+      );
+      await waitFor(() => expect(complete).toBeDefined());
+      expect(store.get(splitLayoutAtom)).toEqual(layout);
+      await act(async () =>
+        complete?.(
+          fails
+            ? Response.json({ error: "denied" }, { status: 500 })
+            : Response.json({
+                ok: true,
+                plugin: makeInstalledPlugin({
+                  id: "github",
+                  enabled: false,
+                  status: "disabled",
+                }),
+              }),
+        ),
+      );
+      if (fails) {
+        expect(store.get(splitLayoutAtom)).toEqual(layout);
+        expect(store.get(maximizedPaneIdAtom)).toBe("github");
+        expect(screen.getByTestId("route-path").textContent).toBe(
+          "/plugins/github/main",
+        );
+      } else {
+        expect(store.get(splitLayoutAtom)?.root).toMatchObject({
+          content: { kind: "new-thread" },
+        });
+        expect(store.get(maximizedPaneIdAtom)).toBeNull();
+        expect(screen.getByTestId("route-path").textContent).toBe("/");
+        fireEvent.click(screen.getByRole("button", { name: "Browser back" }));
+        expect(screen.getByTestId("route-path").textContent).toBe("/skills");
+      }
+    },
+  );
 });

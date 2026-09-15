@@ -47,6 +47,7 @@ import {
 import {
   ensureThreadIsNotAwaitingUserInteraction,
   ensureThreadIsWritable,
+  ensureThreadQueueIsWritable,
   sendThreadMessage,
 } from "../../services/threads/thread-send.js";
 import { acceptThreadSendRequest } from "../../services/threads/thread-send-request.js";
@@ -64,11 +65,7 @@ import {
   toThreadListEntryResponses,
   toThreadResponseFromThread,
 } from "../../services/threads/thread-runtime-display.js";
-import {
-  archiveThreadAndChildren,
-  archiveThreadAndHiddenSourceForks,
-  resolveArchiveThreadEnvironment,
-} from "../../services/threads/thread-archive.js";
+import { archiveThreadAndChildren } from "../../services/threads/thread-archive.js";
 import {
   requireThreadCommandEnvironment,
   requireThreadHostCommandEnvironment,
@@ -265,7 +262,7 @@ export function registerThreadActionRoutes(app: Hono, deps: AppDeps): void {
 
   post(routes.sendQueuedMessage, async (context, payload) => {
     const thread = requirePublicThread(deps.db, context.req.param("id"));
-    ensureThreadIsWritable(thread);
+    ensureThreadQueueIsWritable(thread);
     ensureThreadIsNotAwaitingUserInteraction(deps, thread.id);
     const result = await sendQueuedMessageNow(deps, {
       queuedMessageId: context.req.param("queuedMessageId"),
@@ -277,7 +274,7 @@ export function registerThreadActionRoutes(app: Hono, deps: AppDeps): void {
 
   patch(routes.reorderQueuedMessage, (context, payload) => {
     const thread = requirePublicThread(deps.db, context.req.param("id"));
-    ensureThreadIsWritable(thread);
+    ensureThreadQueueIsWritable(thread);
     return context.json(
       toQueuedMessageOrderResponse(
         reorderQueuedThreadMessage({
@@ -295,7 +292,7 @@ export function registerThreadActionRoutes(app: Hono, deps: AppDeps): void {
 
   patch(routes.setQueuedMessageGroupBoundary, (context, payload) => {
     const thread = requirePublicThread(deps.db, context.req.param("id"));
-    ensureThreadIsWritable(thread);
+    ensureThreadQueueIsWritable(thread);
     return context.json(
       toQueuedMessageGroupBoundaryResponse(
         setQueuedThreadMessageGroupBoundary({
@@ -312,7 +309,7 @@ export function registerThreadActionRoutes(app: Hono, deps: AppDeps): void {
 
   patch(routes.updateQueuedMessage, async (context, payload) => {
     const thread = requirePublicThread(deps.db, context.req.param("id"));
-    ensureThreadIsWritable(thread);
+    ensureThreadQueueIsWritable(thread);
     await validatePromptAttachmentReferences({
       dataDir: deps.config.dataDir,
       input: payload.input,
@@ -535,25 +532,6 @@ export function registerThreadActionRoutes(app: Hono, deps: AppDeps): void {
       }),
     );
     return context.json(buildActivePinnedThreadRootListResponse(deps));
-  });
-
-  post(routes.archive, async (context) => {
-    const thread = requirePublicThread(deps.db, context.req.param("id"));
-    if (thread.archivedAt !== null) {
-      deps.terminalSessions.closeArchivedThreadTerminals({
-        threadId: thread.id,
-      });
-      return context.json({ ok: true });
-    }
-    const environment = resolveArchiveThreadEnvironment(deps, { thread });
-    const archiveResult = archiveThreadAndHiddenSourceForks(deps, {
-      environment,
-      thread,
-    });
-    if (!archiveResult) {
-      throw new ApiError(404, "thread_not_found", "Thread not found");
-    }
-    return context.json({ ok: true });
   });
 
   post(routes.archiveAll, (context) => {

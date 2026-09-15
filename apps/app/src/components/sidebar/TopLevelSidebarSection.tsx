@@ -56,8 +56,11 @@ interface TopLevelSidebarSectionCollapseControl {
 export interface TopLevelSidebarSectionProps {
   label: string;
   children: ReactNode;
+  childrenInset?: boolean;
+  showChildrenWhenCollapsed?: boolean;
   sectionId?: string;
   stickyHeader?: boolean;
+  status?: ReactNode;
   actions?: ReactNode;
   actionsAlwaysVisible?: boolean;
   actionsMobileAlways?: boolean;
@@ -75,8 +78,11 @@ export interface TopLevelSidebarSectionProps {
 export function TopLevelSidebarSection({
   label,
   children,
+  childrenInset = true,
+  showChildrenWhenCollapsed = false,
   sectionId,
   stickyHeader = true,
+  status,
   actions,
   actionsAlwaysVisible = false,
   actionsMobileAlways = false,
@@ -96,6 +102,7 @@ export function TopLevelSidebarSection({
   );
   const pluginStatus = usePluginThreadRowStatusForThreads(collapsedThreads);
   const showCollapsedActivity =
+    !status &&
     collapseControl?.isCollapsed === true &&
     (collapsedSplitIndicator.miniMap !== null ||
       collapsedActivity !== undefined ||
@@ -171,6 +178,7 @@ export function TopLevelSidebarSection({
       <SidebarStickyTier
         ref={dragBindings?.setActivatorNodeRef}
         tier="label"
+        style={childrenInset ? undefined : { marginBottom: 0 }}
         className={cn(
           SIDEBAR_HOVER_ACTIONS_ROW_CLASS,
           CHROME_SECTION_LABEL_CLASS,
@@ -220,12 +228,16 @@ export function TopLevelSidebarSection({
             </button>
           ) : null}
         </span>
-        {actions || collapsedActivityIndicator ? (
+        {status || actions || collapsedActivityIndicator ? (
           <span
             data-sidebar-trailing-controls=""
-            className="relative z-20 inline-flex h-7 shrink-0 items-center max-md:pointer-coarse:h-9"
-            onClick={actions ? stopActionsClick : undefined}
+            className={cn(
+              "relative z-20 inline-flex h-7 shrink-0 items-center max-md:pointer-coarse:h-9",
+              SIDEBAR_HOVER_ACTIONS_GAP_CLASS,
+            )}
+            onClick={status || actions ? stopActionsClick : undefined}
           >
+            {status}
             {collapsedActivityIndicator}
             {actions ? (
               <span
@@ -241,6 +253,8 @@ export function TopLevelSidebarSection({
                   "inline-flex shrink-0 items-center",
                   SIDEBAR_HOVER_ACTIONS_GAP_CLASS,
                   !actionsAlwaysVisible && SIDEBAR_HOVER_ACTIONS_CLASS,
+                  collapseControl?.isCollapsed &&
+                    "max-md:pointer-coarse:hidden",
                 )}
               >
                 {actions}
@@ -249,8 +263,9 @@ export function TopLevelSidebarSection({
           </span>
         ) : null}
       </SidebarStickyTier>
-      {collapseControl?.isCollapsed || children == null ? null : (
-        <div className="mt-1">{children}</div>
+      {(collapseControl?.isCollapsed && !showChildrenWhenCollapsed) ||
+      children == null ? null : (
+        <div className={childrenInset ? "mt-1" : undefined}>{children}</div>
       )}
     </SidebarStickyGroup>
   );

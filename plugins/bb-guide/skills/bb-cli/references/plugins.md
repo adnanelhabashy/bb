@@ -71,7 +71,7 @@
   - `bb plugin install <src>` — `<entry-id>@<marketplace>`, an HTTP(S) Git
     repository URL, a local path,
     `git:<url>[@<ref|semver-range>]`, or `npm:<package>[@<version|tag|range>]`
-    (npm on PATH required for `npm:`). Repository URLs and prefixes `path:` /
+    (using BB's shipped npm). Repository URLs and prefixes `path:` /
     `npm:` / `git:` skip catalog resolution. To pin or
     range an npm package, install with `npm:<package>@…`.
     Omit the npm spec to track compatible stable releases; ranges and dist-tags
@@ -95,7 +95,11 @@
     and git sources without a prebuilt app when their imported dependencies
     are already available;
     git/npm packages can also ship a metadata-validated prebuilt `dist/`, and
-    npm packages must. Managed git/npm installs refuse `engines.bb` /
+    npm packages must. Git installs use `--omit=dev`, `--omit=optional`, and
+    `--ignore-scripts`; plugins may keep normal development dependencies in
+    their manifests.
+    npm and Node do not need to be on PATH; Git sources still require `git`.
+    Managed git/npm installs refuse `engines.bb` /
     `engines.bbPluginSdk` mismatches, manifest vs. artifact identity mismatches,
     and reserved ID mismatches.
     A `git:`/`path:` repository can hold several plugins. Install one with
@@ -212,3 +216,9 @@
   tools and context, host-rendered UI, lifecycle) and the frontend
   `@get-bb/plugin-sdk/app` contract (slots, hooks, UI kit), with working patterns
   and gotchas. `bb guide plugins` has the short walkthrough.
+
+## Inspect plugin RPC
+
+`bb plugin rpc list [plugin-id] [--method <exact-name>] [--json]` lists discoverable methods from running plugins, optionally restricted to one plugin. `bb plugin rpc inspect <plugin-id> [method] [--json]` dumps registration and method descriptions plus input/output JSON Schemas. Copy the relevant schema into your consumer and call the existing plugin RPC endpoint. Discovery is opt-in advertising, not access control; method names may carry versions such as `provider-usage.v1.listResources`.
+
+`bb plugin rpc call <plugin-id> <method> [--input-file <json-path>] [--json]` invokes a method using server-side schema validation. Omitting the input file sends JSON null. Input files avoid putting sensitive values in command arguments.

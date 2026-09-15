@@ -4,6 +4,7 @@ import { createHostProgress } from "bb-environment-provider-host/progress";
 import { worktreeHostContract, worktreeHostSignals } from "./contract.js";
 import { resolveWorktreeBaseBranch } from "./host/base-branch.js";
 import {
+  resolveWorktreeChildPath,
   resolveWorktreesRoot,
   resolveWorktreeAttemptRoot,
   resolveWorktreeTargetPath,
@@ -24,10 +25,10 @@ async function worktreePathsForPathKey(args: {
     return entries
       .filter((entry) => entry.isDirectory())
       .map((entry) =>
-        resolveWorktreeTargetPath({
+        resolveWorktreeChildPath({
           dataDir: args.dataDir,
           pathKey: args.pathKey,
-          sourcePath: entry.name,
+          childName: entry.name,
         }),
       );
   } catch (error) {
@@ -64,13 +65,11 @@ export function createWorktreeHostEntry() {
             branchName: input.branchName,
             baseBranch,
             branchMode: input.branchMode,
-            timeoutMs: input.timeoutMs,
             onProgress: createHostProgress({
               operationId: input.operationId,
               emit: (payload) =>
                 context.experimental_emitSignal("progress", payload),
             }),
-            pruneEmptyParent: true,
             signal: context.signal,
           });
           return { status: "created", path: created.path, baseBranch } as const;
@@ -96,9 +95,6 @@ export function createWorktreeHostEntry() {
             await rm(completionPathForWorktree(path), { force: true });
             await removeWorktree({
               path,
-              timeoutMs: input.timeoutMs,
-              force: true,
-              pruneEmptyParent: true,
               onProgress: createHostProgress({
                 operationId: input.operationId,
                 emit: (payload) =>

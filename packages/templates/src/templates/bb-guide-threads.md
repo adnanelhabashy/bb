@@ -47,7 +47,7 @@ Spawning:
     --visibility <visibility>      visible or hidden; a child inherits its parent by default
     --send-at <when>               Dispatch the first message at an ISO 8601 timestamp or a duration from now (30s, 10m, 2h, 7d)
     --file <path>                  Host-readable absolute or uploaded file path
-    --image <path>                 Host-readable absolute or uploaded image path
+    --image <path>                 Absolute CLI-local or uploaded image path
     --origin-kind <kind>           Create a fork thread
     --source-thread <id>           Source thread for a fork
     --source-seq-end <seq>         Fork after the source turn containing this event sequence
@@ -82,6 +82,16 @@ Spawning:
   unavailable and why. The first-party providers are Project checkout,
   Worktree, and Personal workspace.
 
+Handoff:
+  In the follow-up model picker, Handoff to new thread starts a new-thread
+  draft with a reference to the source thread. Choose any model, including
+  one from the current provider. Exit handoff restores the original execution
+  settings and keeps draft edits, removing the automatic source reference.
+  Closing the picker keeps handoff active; the composer also has Exit handoff.
+  CLI callers can use bb thread spawn with --provider, --model, --environment
+  and --prompt 'Continue from @thread:THREAD_ID ...'. SDK callers use
+  threads.spawn with the corresponding execution, environment and input fields.
+
 Forking:
 
   bb thread fork <source-thread-id> [options]
@@ -96,7 +106,7 @@ Forking:
     --visibility <visibility>      visible (default) or hidden
     --agent-context-seed <text>    Persist agent-only context without a first run
     --file <path>                  Host-readable absolute or uploaded file path
-    --image <path>                 Host-readable absolute or uploaded image path
+    --image <path>                 Absolute CLI-local or uploaded image path
 
   Forks clone the source provider session on the same machine and inherit the
   source conversation in their timeline. --source-seq-end anchors the fork on
@@ -170,6 +180,7 @@ Sections:
 
 Inspecting:
 
+  bb thread context [id]                   Show recorded context usage and available breakdown (--self, --json)
   bb thread show [id]                      Show thread details and pull request status
     --self                                 Target current thread
     --work-status                          Include git working-tree status
@@ -204,6 +215,9 @@ Inspecting:
 
 Opening threads and files in the app:
 
+  In chat, reference a thread as @thread:thr_abc123, substituting its actual ID.
+  BB renders the correct project-aware link; do not construct thread URLs manually.
+
   bb thread open <path>                    Open a file in the current BB thread panel
   bb thread open <thread-id> [path]        Open a thread, optionally with a panel file
     --line <number>                        Line number to focus
@@ -233,7 +247,7 @@ Messaging:
     --plan                                 Send the message as the provider's /plan action
     --send-at <when>                       Dispatch at an ISO 8601 timestamp or a duration from now (30s, 10m, 2h, 7d)
     --file <path>                          Host-readable absolute or uploaded file path
-    --image <path>                         Host-readable absolute or uploaded image path
+    --image <path>                         Absolute CLI-local or uploaded image path
 
   Tell steers by default, delivering the message immediately into the active
   turn. Use --mode queue for non-urgent follow-ups that can wait until the agent
@@ -283,6 +297,10 @@ Ownership:
     --model <model>                        Set the sticky model for the next and later turns
     --reasoning-level <level>              Set the sticky reasoning level (provider-dependent)
     --visibility <visibility>              Set visible or hidden
+
+  Clearing a parent inherits the former parent's section unless --section or
+  --clear-section is also supplied. Children released by environment archiving
+  also inherit their former parent's section.
 
   Model and reasoning updates stay within the thread's current provider. BB
   validates them against that provider's current model catalog, applies them on
@@ -393,3 +411,10 @@ Lifecycle:
 
 Read-only commands require a thread ID or --self where supported.
 Mutating thread lifecycle and messaging commands require an explicit ID or --self.
+
+`bb thread context [id]` reads the latest stored context measurement without
+starting a provider request. Use `--self` for the current thread and `--json` for
+`{ usage: ... }` (`null` when unavailable). Claude Code refreshes the estimated
+breakdown after turns and compaction when its SDK supports context inspection.
+A later aggregate-only measurement replaces any older breakdown. Other providers
+continue to expose their available totals.

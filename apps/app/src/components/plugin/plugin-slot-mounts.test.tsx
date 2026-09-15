@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 
-import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   act,
@@ -75,6 +81,21 @@ import type { PromptDraftState } from "@bb/client-core";
 
 function composerTextEffectValues(storageKey: string | null) {
   return getComposerTextEffects(storageKey).map(({ effect }) => effect);
+}
+
+function RoutedPluginPanelView() {
+  const params = useParams<{
+    pluginId: string;
+    panelPath: string;
+    "*": string;
+  }>();
+  return (
+    <PluginPanelView
+      pluginId={params.pluginId ?? ""}
+      panelPath={params.panelPath ?? ""}
+      subPath={params["*"] ?? ""}
+    />
+  );
 }
 
 afterEach(() => {
@@ -1278,12 +1299,21 @@ describe("useComposer", () => {
     await act(async () => {
       await captured!.experimental_submit({ sendAt });
     });
-    expect(submit).toHaveBeenCalledWith({ sendAt });
+    expect(submit).toHaveBeenCalledWith({ sendAt }, undefined);
+
+    const experimental_data = { kind: "draft" };
+    await act(async () => {
+      await captured!.experimental_submit({ experimental_data });
+    });
+    expect(submit).toHaveBeenLastCalledWith(
+      { experimental_data },
+      { pluginId: "demo", data: experimental_data },
+    );
 
     await expect(
       captured!.experimental_submit({ sendAt: Date.now() - 1 }),
     ).rejects.toThrow(/future/);
-    expect(submit).toHaveBeenCalledTimes(1);
+    expect(submit).toHaveBeenCalledTimes(2);
 
     view.unmount();
     render(
@@ -1292,9 +1322,9 @@ describe("useComposer", () => {
       </MemoryRouter>,
     );
     await expect(captured!.experimental_submit({ sendAt })).rejects.toThrow(
-      /cannot schedule/,
+      /cannot submit/,
     );
-    expect(submit).toHaveBeenCalledTimes(1);
+    expect(submit).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -1352,7 +1382,10 @@ describe("PluginNavSidebarItems + PluginPanelView", () => {
         <PluginNavSidebarItems />
         <Routes>
           <Route path="/" element={<div>home</div>} />
-          <Route path={PLUGIN_PANEL_ROUTE_PATH} element={<PluginPanelView />} />
+          <Route
+            path={PLUGIN_PANEL_ROUTE_PATH}
+            element={<RoutedPluginPanelView />}
+          />
         </Routes>
       </MemoryRouter>,
     );
@@ -1393,7 +1426,7 @@ describe("PluginNavSidebarItems + PluginPanelView", () => {
             element={
               <>
                 <LeavePanel />
-                <PluginPanelView />
+                <RoutedPluginPanelView />
               </>
             }
           />
@@ -1578,7 +1611,10 @@ describe("PluginNavSidebarItems + PluginPanelView", () => {
     render(
       <MemoryRouter initialEntries={["/plugins/ghost/board"]}>
         <Routes>
-          <Route path={PLUGIN_PANEL_ROUTE_PATH} element={<PluginPanelView />} />
+          <Route
+            path={PLUGIN_PANEL_ROUTE_PATH}
+            element={<RoutedPluginPanelView />}
+          />
         </Routes>
       </MemoryRouter>,
     );
@@ -1615,7 +1651,10 @@ describe("plugin panel shared title bar and full-bleed body", () => {
     return render(
       <MemoryRouter initialEntries={[route]}>
         <Routes>
-          <Route path={PLUGIN_PANEL_ROUTE_PATH} element={<PluginPanelView />} />
+          <Route
+            path={PLUGIN_PANEL_ROUTE_PATH}
+            element={<RoutedPluginPanelView />}
+          />
         </Routes>
       </MemoryRouter>,
     );

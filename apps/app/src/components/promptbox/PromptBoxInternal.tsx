@@ -1,5 +1,6 @@
 import type {
   PromptMentionCommandTrigger,
+  PromptMentionResource,
   PromptTextMention,
 } from "@bb/domain";
 import type { ComposerView } from "@get-bb/plugin-sdk";
@@ -28,7 +29,6 @@ import {
   orderCommandSuggestions,
   type ActiveTrigger,
   type CommandMenuState,
-  type ComposerCommandSuggestion,
   type MentionMenuState,
   type OrderedMentionSuggestions,
   type ProviderCommandSuggestion,
@@ -47,7 +47,7 @@ import {
   type VoiceUnsupportedReason,
 } from "@/hooks/voice-input-support";
 import { Button } from "@bb/shared-ui/button";
-import { Icon } from "@bb/shared-ui/icon";
+import { Icon, type IconName } from "@bb/shared-ui/icon";
 import {
   Tooltip,
   TooltipContent,
@@ -127,7 +127,11 @@ import {
   type TypeaheadSuggestion,
 } from "./mentions/MentionMenu";
 import { parsePromptMentionClipboardElement } from "./mentions/prompt-mention-clipboard";
-import { ComposerEditorSlot } from "./ComposerEditorSlot";
+import {
+  blurPromptEditor,
+  ComposerEditorSlot,
+  type ComposerEditorLayout,
+} from "./ComposerEditorSlot";
 import { QueuedEditorTypeaheadLayoutContext } from "./queued-editor-typeahead-layout";
 import {
   isModifierSubmitKeyEvent,
@@ -137,7 +141,7 @@ import {
 const PROMPTBOX_MIN_HEIGHT = 68;
 const PROMPTBOX_SELECTION_REVEAL_MARGIN = 12;
 const COMPACT_PROMPT_ACTION_BUTTON_CLASS =
-  "size-8 p-0 transition-all [&_svg]:size-4";
+  "size-8 p-0 transition-all [&_[data-icon-root]]:size-4";
 const RICH_PASTE_BLOCK_TAGS = new Set([
   "ADDRESS",
   "ARTICLE",
@@ -195,24 +199,26 @@ function hasWhitespaceAfterPosition(
   return nextNode.type.name === "hardBreak";
 }
 
-type PromptBoxEditorLayout = "thread" | "root-compose";
+function mentionPillTrailingText(
+  doc: ProseMirrorNode,
+  position: number,
+): string {
+  return hasWhitespaceAfterPosition(doc, position) ? "" : " ";
+}
 
 const COLLAPSING_GRID_CLASS =
   "grid transition-[grid-template-rows] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none";
 const VOICE_ACTION_TRANSITION_MS = 180;
 type VoiceActionTransition = "entering" | "active" | "exiting";
 
-function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
-}
+export const DEFAULT_COMPOSER_SCOPE = {
+  kind: "new-thread",
+  projectId: null,
+} as const;
 
 function shouldFinishVoiceCompletionTransitionImmediately(): boolean {
   return (
-    prefersReducedMotion() ||
+    getMediaQuerySnapshot(REDUCED_MOTION_QUERY) ||
     (typeof document !== "undefined" && document.visibilityState === "hidden")
   );
 }
@@ -221,6 +227,8 @@ export interface PromptBoxSubmissionConfig {
   isSubmitting?: boolean;
   disabled?: boolean;
   disabledReason?: string;
+  label?: string;
+  icon?: IconName;
   title?: string;
   isRunning?: boolean;
   onStop?: () => void;
@@ -231,8 +239,10 @@ interface PromptSubmitButtonProps {
   canSubmit: boolean;
   className: string;
   disabledReason: string | undefined;
+  icon: IconName | undefined;
   isBusy: boolean;
   isCompact: boolean;
+  label: string | undefined;
   onClick: (event: ReactMouseEvent<HTMLButtonElement>) => void;
   onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   onTouchSubmit: () => void;
@@ -243,8 +253,10 @@ function PromptSubmitButton({
   canSubmit,
   className,
   disabledReason,
+  icon,
   isBusy,
   isCompact,
+  label,
   onClick,
   onPointerDown,
   onTouchSubmit,
@@ -312,12 +324,20 @@ function PromptSubmitButton({
         }
         onClick(event);
       }}
-      className={className}
+      className={cn(
+        className,
+        label !== undefined && !isCompact && "size-auto h-8 gap-1.5 px-2.5",
+      )}
     >
       {isBusy ? (
         <Icon name="Spinner" className="size-4 animate-spin" />
       ) : (
-        <Icon name="CornerDownLeft" className="size-4" />
+        <>
+          <Icon name={icon ?? "CornerDownLeft"} className="size-4" />
+          {label !== undefined && !isCompact ? (
+            <span data-promptbox-submit-label="">{label}</span>
+          ) : null}
+        </>
       )}
     </Button>
   );
@@ -355,7 +375,7 @@ export interface TypeaheadMentionConfig {
 
 export interface TypeaheadCommandConfig {
   trigger: PromptMentionCommandTrigger | null;
-  suggestions: readonly ComposerCommandSuggestion[];
+  suggestions: readonly ProviderCommandSuggestion[];
   isLoading: boolean;
   isError: boolean;
   hasMore: boolean;
@@ -437,10 +457,10 @@ interface PromptBoxInternalProps {
   placeholder?: string;
   autoFocus?: boolean;
   allowSoftKeyboardAutoFocus?: boolean;
-  className?: string;
   textEffects?: readonly ComposerTextEffectSource[];
   onComposerLayoutChange?: (layout: ComposerView["layout"]) => void;
   header?: ReactNode;
+  modeHeader?: ReactNode;
   footerStart?: ReactNode;
   submission?: PromptBoxSubmissionConfig;
   minHeight?: number;
@@ -449,7 +469,7 @@ interface PromptBoxInternalProps {
   attachments?: AttachmentsConfig;
   promptActions?: readonly PromptBoxAction[];
   suppressPluginComposerCustomizations?: boolean;
-  editorLayout?: PromptBoxEditorLayout;
+  editorLayout?: ComposerEditorLayout;
   onCollapse?: () => void;
   compact?: PromptBoxCompactConfig;
   containerCompactPlaceholder?: string;
@@ -1109,11 +1129,6 @@ export function suppressPromptEditorAnchorActivation(event: Event): boolean {
   return true;
 }
 
-function blurPromptEditor(editor: Editor | null | undefined): void {
-  editor?.view.dom.blur();
-  window.getSelection()?.removeAllRanges();
-}
-
 function focusEditorAtEnd(editor: Editor): void {
   const transaction = editor.state.tr
     .setSelection(TextSelection.atEnd(editor.state.doc))
@@ -1160,10 +1175,10 @@ export function PromptBoxInternal({
   placeholder = "Ask anything. @ to mention files, folders, or sections",
   autoFocus = true,
   allowSoftKeyboardAutoFocus = false,
-  className,
   textEffects,
   onComposerLayoutChange,
   header,
+  modeHeader,
   footerStart,
   submission = {},
   minHeight = PROMPTBOX_MIN_HEIGHT,
@@ -1187,6 +1202,8 @@ export function PromptBoxInternal({
     isSubmitting = false,
     disabled: submitDisabled = false,
     disabledReason: submitDisabledReason,
+    label: submitLabel,
+    icon: submitIcon,
     title: submitTitle = "Submit (Enter)",
     isRunning = false,
     onStop,
@@ -1293,7 +1310,6 @@ export function PromptBoxInternal({
   const isVoiceRecording = voice?.state === "recording";
   const isVoiceProcessing = voice?.state === "transcribing";
   const showVoiceActionGroup = isVoiceRecording || isVoiceProcessing;
-  const isVoiceBusy = showVoiceActionGroup;
   const voiceActionState = isVoiceRecording
     ? "recording"
     : isVoiceProcessing
@@ -1337,7 +1353,7 @@ export function PromptBoxInternal({
 
     if (showVoiceActionGroup) {
       setIsVoiceActionPresent(true);
-      if (wasVoiceActionShown || prefersReducedMotion()) {
+      if (wasVoiceActionShown || getMediaQuerySnapshot(REDUCED_MOTION_QUERY)) {
         setVoiceActionTransition("active");
         return;
       }
@@ -1354,7 +1370,7 @@ export function PromptBoxInternal({
       setIsVoiceActionPresent(false);
       return;
     }
-    if (prefersReducedMotion()) {
+    if (getMediaQuerySnapshot(REDUCED_MOTION_QUERY)) {
       setIsVoiceActionPresent(false);
       return;
     }
@@ -1424,10 +1440,7 @@ export function PromptBoxInternal({
   );
   const composerLayout = showCompactLayout ? "compact" : "expanded";
   const localComposerView = usePluginComposerViewModel({
-    scope: pluginComposerHost?.scope ?? {
-      kind: "new-thread",
-      projectId: null,
-    },
+    scope: pluginComposerHost?.scope ?? DEFAULT_COMPOSER_SCOPE,
     layout: composerLayout,
     text: value,
     attachmentCount: attachments.length,
@@ -1854,7 +1867,7 @@ export function PromptBoxInternal({
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
-    const editable = !composerInputLocked && !isVoiceBusy;
+    const editable = !composerInputLocked && !showVoiceActionGroup;
     if (editor.isEditable !== editable) editor.setEditable(editable);
     editor.view.dom.tabIndex = editable ? 0 : -1;
     if (editable) {
@@ -1862,7 +1875,7 @@ export function PromptBoxInternal({
     } else {
       editor.view.dom.setAttribute("aria-readonly", "true");
     }
-  }, [composerInputLocked, editor, isVoiceBusy]);
+  }, [composerInputLocked, editor, showVoiceActionGroup]);
 
   useEffect(() => {
     editorRef.current = editor;
@@ -2150,7 +2163,7 @@ export function PromptBoxInternal({
     activeTrigger.char !== DEFAULT_PLUGIN_MENTION_TRIGGER &&
     activeMentionQuery.length === 0;
   const showTypeaheadMenu =
-    !isVoiceBusy &&
+    !showVoiceActionGroup &&
     activeTrigger !== null &&
     !isCommandTriggerLiteral &&
     !isBareNonDefaultMentionTrigger;
@@ -2233,39 +2246,37 @@ export function PromptBoxInternal({
     [scheduleRevealEditorSelection, syncTriggerState],
   );
 
-  const applyMentionSuggestion = useCallback(
-    (item: PromptMentionSuggestion) => {
-      const currentEditor = editorRef.current;
-      if (!currentEditor || activeTrigger?.kind !== "mention") return;
-
-      const replacement = item.replacement.trim();
-      const serializedText = replacement.startsWith(activeTrigger.char)
-        ? replacement
-        : `${activeTrigger.char}${replacement}`;
-      const resource = promptMentionResourceFromSuggestion(item);
-      const trailingText = hasWhitespaceAfterPosition(
-        currentEditor.state.doc,
-        activeTrigger.to,
-      )
-        ? ""
-        : " ";
+  const insertPromptMentionPill = useCallback(
+    ({
+      editor: targetEditor,
+      range,
+      resource,
+      serializedText,
+      trailingText,
+      dismissedTrigger,
+      clearQuery,
+    }: {
+      editor: Editor;
+      range: { from: number; to: number };
+      resource: PromptMentionResource;
+      serializedText: string;
+      trailingText: string;
+      dismissedTrigger: DismissedTriggerRange | null;
+      clearQuery: () => void;
+    }) => {
       triggerKeyRef.current = "";
-      dismissedTriggerRef.current = {
-        start: activeTrigger.from,
-        end: activeTrigger.from + 2,
-        hasLeftRange: false,
-      };
+      dismissedTriggerRef.current = dismissedTrigger;
       isRestoringAppliedMentionRef.current = true;
       setActiveTrigger(null);
       setSelectedSuggestionKey(null);
-      onMentionQueryChange(null, null);
+      clearQuery();
 
       try {
         skipEditorChangeRef.current = true;
-        currentEditor
+        targetEditor
           .chain()
           .focus()
-          .deleteRange({ from: activeTrigger.from, to: activeTrigger.to })
+          .deleteRange(range)
           .insertContent([
             {
               type: "mention",
@@ -2280,9 +2291,37 @@ export function PromptBoxInternal({
       } finally {
         skipEditorChangeRef.current = false;
       }
-      finishApply(currentEditor);
+      finishApply(targetEditor);
     },
-    [activeTrigger, finishApply, onMentionQueryChange],
+    [finishApply],
+  );
+
+  const applyMentionSuggestion = useCallback(
+    (item: PromptMentionSuggestion) => {
+      const currentEditor = editorRef.current;
+      if (!currentEditor || activeTrigger?.kind !== "mention") return;
+
+      const replacement = item.replacement.trim();
+      insertPromptMentionPill({
+        editor: currentEditor,
+        range: { from: activeTrigger.from, to: activeTrigger.to },
+        resource: promptMentionResourceFromSuggestion(item),
+        serializedText: replacement.startsWith(activeTrigger.char)
+          ? replacement
+          : `${activeTrigger.char}${replacement}`,
+        trailingText: mentionPillTrailingText(
+          currentEditor.state.doc,
+          activeTrigger.to,
+        ),
+        dismissedTrigger: {
+          start: activeTrigger.from,
+          end: activeTrigger.from + 2,
+          hasLeftRange: false,
+        },
+        clearQuery: () => onMentionQueryChange(null, null),
+      });
+    },
+    [activeTrigger, insertPromptMentionPill, onMentionQueryChange],
   );
 
   const applyCommandSuggestion = useCallback(
@@ -2291,54 +2330,31 @@ export function PromptBoxInternal({
       if (!currentEditor || activeTrigger === null) return;
       if (activeTrigger.char !== "/") return;
 
-      const serializedText = `${activeTrigger.char}${item.name}`;
-      const resource = promptCommandResourceFromSuggestion({
-        suggestion: item,
-        trigger: activeTrigger.char,
-      });
-      const trailingText = hasWhitespaceAfterPosition(
+      const trailingText = mentionPillTrailingText(
         currentEditor.state.doc,
         activeTrigger.to,
-      )
-        ? ""
-        : " ";
-      triggerKeyRef.current = "";
-      dismissedTriggerRef.current = {
-        start: activeTrigger.from,
-        end: commandPillDismissedRangeEnd({
-          triggerPosition: activeTrigger.from,
-          trailingText,
+      );
+      insertPromptMentionPill({
+        editor: currentEditor,
+        range: { from: activeTrigger.from, to: activeTrigger.to },
+        resource: promptCommandResourceFromSuggestion({
+          suggestion: item,
+          trigger: activeTrigger.char,
         }),
-        hasLeftRange: false,
-      };
-      isRestoringAppliedMentionRef.current = true;
-      setActiveTrigger(null);
-      setSelectedSuggestionKey(null);
-      onCommandQueryChange(null);
-
-      try {
-        skipEditorChangeRef.current = true;
-        currentEditor
-          .chain()
-          .focus()
-          .deleteRange({ from: activeTrigger.from, to: activeTrigger.to })
-          .insertContent([
-            {
-              type: "mention",
-              attrs: {
-                resource,
-                serializedText,
-              },
-            },
-            ...(trailingText ? [{ type: "text", text: trailingText }] : []),
-          ])
-          .run();
-      } finally {
-        skipEditorChangeRef.current = false;
-      }
-      finishApply(currentEditor);
+        serializedText: `${activeTrigger.char}${item.name}`,
+        trailingText,
+        dismissedTrigger: {
+          start: activeTrigger.from,
+          end: commandPillDismissedRangeEnd({
+            triggerPosition: activeTrigger.from,
+            trailingText,
+          }),
+          hasLeftRange: false,
+        },
+        clearQuery: () => onCommandQueryChange(null),
+      });
     },
-    [activeTrigger, finishApply, onCommandQueryChange],
+    [activeTrigger, insertPromptMentionPill, onCommandQueryChange],
   );
 
   const applyTrigger = useCallback(
@@ -2493,39 +2509,18 @@ export function PromptBoxInternal({
       }
 
       if (commandAction) {
-        triggerKeyRef.current = "";
-        dismissedTriggerRef.current = null;
-        isRestoringAppliedMentionRef.current = true;
-        setActiveTrigger(null);
-        setSelectedSuggestionKey(null);
-        onCommandQueryChange(null);
-
-        try {
-          skipEditorChangeRef.current = true;
-          currentEditor
-            .chain()
-            .focus()
-            .deleteRange({ from: insertionRange.from, to: insertionRange.to })
-            .insertContent([
-              {
-                type: "mention",
-                attrs: {
-                  resource: promptCommandResourceFromSuggestion({
-                    suggestion: commandAction.suggestion,
-                    trigger: commandAction.trigger,
-                  }),
-                  serializedText: commandAction.serializedText,
-                },
-              },
-              ...(commandAction.trailingText
-                ? [{ type: "text", text: commandAction.trailingText }]
-                : []),
-            ])
-            .run();
-        } finally {
-          skipEditorChangeRef.current = false;
-        }
-        finishApply(currentEditor);
+        insertPromptMentionPill({
+          editor: currentEditor,
+          range: { from: insertionRange.from, to: insertionRange.to },
+          resource: promptCommandResourceFromSuggestion({
+            suggestion: commandAction.suggestion,
+            trigger: commandAction.trigger,
+          }),
+          serializedText: commandAction.serializedText,
+          trailingText: commandAction.trailingText,
+          dismissedTrigger: null,
+          clearQuery: () => onCommandQueryChange(null),
+        });
         return;
       }
 
@@ -2543,6 +2538,7 @@ export function PromptBoxInternal({
     [
       finishApply,
       focusAfterPromptAction,
+      insertPromptMentionPill,
       onCommandQueryChange,
       promptActions,
       triggers,
@@ -2585,15 +2581,15 @@ export function PromptBoxInternal({
     !isAttaching &&
     !isSubmitting &&
     !submitDisabled &&
-    !isVoiceBusy;
+    !showVoiceActionGroup;
   const canModifierSubmit =
     onModifierSubmit !== undefined &&
     !isAttaching &&
     !isSubmitting &&
     !submitDisabled &&
-    !isVoiceBusy;
+    !showVoiceActionGroup;
   const showStop = Boolean(
-    isRunning && onStop && !canSubmit && !isAttaching && !isVoiceBusy,
+    isRunning && onStop && !canSubmit && !isAttaching && !showVoiceActionGroup,
   );
   const canStartVoiceInput =
     voice !== undefined && voice.isSupported && !isSubmitting;
@@ -3078,7 +3074,6 @@ export function PromptBoxInternal({
       className={cn(
         "group/promptbox relative w-full rounded-xl border border-border bg-background shadow-lift",
         showCompactLayout && "overflow-hidden",
-        className,
       )}
     >
       <input
@@ -3088,6 +3083,14 @@ export function PromptBoxInternal({
         className="hidden"
         onChange={handleAttachmentInputChange}
       />
+      {modeHeader ? (
+        <div
+          inert={showVoiceActionGroup ? true : undefined}
+          className="px-3 pt-1.5"
+        >
+          {modeHeader}
+        </div>
+      ) : null}
       <div
         data-promptbox-layout=""
         className={cn(COLLAPSING_GRID_CLASS, showCompactLayout && "relative")}
@@ -3378,6 +3381,8 @@ export function PromptBoxInternal({
                     ) : (
                       <PromptSubmitButton
                         canSubmit={canSubmit}
+                        icon={submitIcon}
+                        label={submitLabel}
                         className={cn(
                           showCompactLayout
                             ? COMPACT_PROMPT_ACTION_BUTTON_CLASS

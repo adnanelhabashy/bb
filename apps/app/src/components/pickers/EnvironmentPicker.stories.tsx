@@ -1,5 +1,8 @@
 import type { ProjectSource } from "@bb/domain";
+import type { SystemEnvironmentProvider } from "@bb/server-contract";
+import modalLogoUrl from "../../../../../plugins/environment-modal-sandbox/modal-logo.svg?url";
 import { EnvironmentPickerUI } from "./EnvironmentPicker";
+import { ProjectSelector } from "./ProjectSelector";
 import { StoryCard, StoryRow } from "../../../.ladle/story-card";
 import {
   HOST_IDS,
@@ -190,6 +193,26 @@ const machineSources: readonly ProjectSource[] = [
   makeSource("src_remote", HOST_IDS.remote, "/home/michael/bb"),
 ];
 
+const offlineBuildHost = makeHost({
+  id: "host_build",
+  name: "Build server",
+  status: "disconnected",
+  lastSeenAt: Date.now() - 2 * 60 * 60 * 1000,
+});
+const unconfiguredOfficeHost = makeHost({
+  id: "host_office",
+  name: "Office Mac Studio",
+});
+const contextualMachineHosts = [
+  ...machineHosts,
+  offlineBuildHost,
+  unconfiguredOfficeHost,
+];
+const contextualMachineSources: readonly ProjectSource[] = [
+  ...machineSources,
+  makeSource("src_build", offlineBuildHost.id, "/srv/bb"),
+];
+
 export function MachineMenu() {
   return (
     <StoryCard>
@@ -217,6 +240,62 @@ export function MachineMenu() {
   );
 }
 
+export function OfflineMachine() {
+  return (
+    <StoryCard>
+      <StoryRow
+        label="offline machine"
+        hint="configured for the project but currently disconnected"
+      >
+        <EnvironmentPickerUI
+          value="provider:project-checkout"
+          sources={contextualMachineSources}
+          host={offlineBuildHost}
+          isLocal={false}
+          providers={STORY_ENVIRONMENT_PROVIDERS}
+          selectedProviderHostId={offlineBuildHost.id}
+          onSelectProvider={noop}
+          multiMachinePickerEnabled
+          machines={{
+            hosts: contextualMachineHosts,
+            localDaemonHostId: HOST_IDS.local,
+            primaryHostId: HOST_IDS.local,
+          }}
+          defaultOpen
+          modal={false}
+        />
+      </StoryRow>
+    </StoryCard>
+  );
+}
+
+export function MachineNeedsSetup() {
+  return (
+    <StoryCard>
+      <StoryRow
+        label="machine needs setup"
+        hint="connected, but this project has no source on the machine"
+      >
+        <EnvironmentPickerUI
+          value=""
+          sources={contextualMachineSources}
+          host={unconfiguredOfficeHost}
+          isLocal={false}
+          machines={{
+            hosts: contextualMachineHosts,
+            localDaemonHostId: HOST_IDS.local,
+            primaryHostId: HOST_IDS.local,
+          }}
+          onRequestMachineSetup={noop}
+          multiMachinePickerEnabled
+          defaultOpen
+          modal={false}
+        />
+      </StoryRow>
+    </StoryCard>
+  );
+}
+
 export function ManyMachines() {
   const hosts = Array.from({ length: 12 }, (_, index) =>
     makeHost({ id: `host_scroll_${index}`, name: `Machine ${index + 1}` }),
@@ -231,6 +310,7 @@ export function ManyMachines() {
       isLocal={false}
       providers={STORY_ENVIRONMENT_PROVIDERS}
       onSelectProvider={noop}
+      multiMachinePickerEnabled
       machines={{
         hosts,
         localDaemonHostId: null,
@@ -239,5 +319,63 @@ export function ManyMachines() {
       defaultOpen
       modal={false}
     />
+  );
+}
+
+const modalComposition: SystemEnvironmentProvider = {
+  machineProviderId: "modal-sandbox",
+  id: "modal-composition",
+  displayName: "Modal Sandbox",
+  description: "Create a project checkout in a new Modal sandbox.",
+  icon: "Box",
+  logoUrl: modalLogoUrl,
+  pluginId: "environment-modal-sandbox",
+  acceptsEmptyInputs: true,
+  machineAvailability: {},
+  availability: null,
+  requires: {
+    projectCheckout: false,
+    gitCheckout: false,
+    gitRemote: true,
+    projectless: false,
+  },
+  inputs: null,
+};
+
+export function IconAlignment() {
+  return (
+    <StoryCard>
+      <StoryRow label="Project selector reference">
+        <ProjectSelector
+          projects={[{ id: "proj_demo", name: "bb" }]}
+          value="proj_demo"
+          onChange={noop}
+        />
+      </StoryRow>
+      {[
+        ["Persistent host · checkout", "project-checkout"],
+        ["Persistent host · worktree", "git-worktree"],
+        ["Modal sandbox", modalComposition.id],
+      ].map(([label, providerId]) => (
+        <StoryRow key={providerId} label={label}>
+          <EnvironmentPickerUI
+            value={`provider:${providerId}`}
+            sources={machineSources}
+            host={machineHosts[0] ?? null}
+            isLocal={false}
+            providers={[...STORY_ENVIRONMENT_PROVIDERS, modalComposition]}
+            selectedProviderHostId={HOST_IDS.local}
+            onSelectProvider={noop}
+            machines={{
+              hosts: machineHosts,
+              localDaemonHostId: null,
+              primaryHostId: HOST_IDS.local,
+            }}
+            muted
+            modal={false}
+          />
+        </StoryRow>
+      ))}
+    </StoryCard>
   );
 }
