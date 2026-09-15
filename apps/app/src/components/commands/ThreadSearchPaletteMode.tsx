@@ -382,23 +382,28 @@ function ThreadSearchPaletteRow({
               ranges={primary.highlightRanges}
             />
           </span>
-          {metadata.length === 0 ? null : (
-            <span
-              className={cn(
-                "block min-h-4 truncate text-xs leading-4",
-                PALETTE_FOOTER_LABEL_CLASS,
-              )}
-              data-palette-thread-metadata
-              title={metadata}
-            >
-              {metadata}
-            </span>
-          )}
+          <span
+            className="flex min-h-4 items-center gap-1.5"
+            data-palette-thread-details
+          >
+            <ThreadSearchPaletteStatus row={row} />
+            {metadata.length === 0 ? null : (
+              <span
+                className={cn(
+                  "min-w-0 truncate text-xs leading-4",
+                  PALETTE_FOOTER_LABEL_CLASS,
+                )}
+                data-palette-thread-metadata
+                title={metadata}
+              >
+                {metadata}
+              </span>
+            )}
+          </span>
         </span>
         {splitShortcut === undefined ? null : (
-          <span aria-hidden="true" className="w-12 shrink-0" />
+          <span aria-hidden="true" className="w-36 shrink-0" />
         )}
-        <ThreadSearchPaletteStatus row={row} />
       </div>
       {onSplit === undefined ? null : (
         <Tooltip>
@@ -406,10 +411,11 @@ function ThreadSearchPaletteRow({
             <button
               type="button"
               aria-label="Open in split"
-              className="absolute right-9 top-1/2 inline-flex h-7 w-12 -translate-y-1/2 items-center justify-center gap-0.5 rounded-sm text-xs text-subtle-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+              className="absolute right-2 top-1/2 inline-flex h-7 w-36 -translate-y-1/2 items-center justify-end gap-0.5 rounded-sm px-1 text-xs text-subtle-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
               onFocus={onActivate}
               onClick={onSplit}
             >
+              <span className="mr-1 opacity-70">Open in split</span>
               {(splitShortcut === "⌘↵" ? ["⌘", "↵"] : ["Ctrl", "↵"]).map(
                 (key) => (
                   <kbd

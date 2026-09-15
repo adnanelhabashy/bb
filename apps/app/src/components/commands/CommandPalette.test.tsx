@@ -698,7 +698,8 @@ describe("CommandPalette", () => {
     expect(
       Array.from(splitButton.querySelectorAll("kbd"), (key) => key.textContent),
     ).toEqual(["Ctrl", "↵"]);
-    expectClasses(splitButton, "w-12", "h-7");
+    expectClasses(splitButton, "w-36", "h-7");
+    expectText(splitButton, "Open in split");
     fireEvent.keyUp(window, { key: "Control" });
     expect(palette.querySelector("[data-palette-footer]")).toBeNull();
     await requestShortcutHints();
@@ -933,7 +934,7 @@ describe("CommandPalette", () => {
       expectText(metadata, "Palette project");
       expectClasses(
         metadata,
-        "block",
+        "min-w-0",
         "truncate",
         "text-subtle-foreground",
         "opacity-70",
@@ -1079,7 +1080,11 @@ describe("CommandPalette", () => {
           name: new RegExp(title),
         });
         const status = within(row).getByRole("img", { name: label });
-        expect(row.lastElementChild).toBe(status);
+        const details = row.querySelector("[data-palette-thread-details]");
+        expect(details?.firstElementChild).toBe(status);
+        expect(
+          details?.querySelector("[data-palette-thread-metadata]"),
+        ).not.toBeNull();
         expectClasses(status, "size-4", "shrink-0");
         expect(status.querySelector(`[data-icon="${icon}"]`)).not.toBeNull();
         expect(status.hasAttribute("tabindex")).toBe(false);
