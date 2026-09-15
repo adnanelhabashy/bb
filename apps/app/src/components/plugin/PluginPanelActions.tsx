@@ -264,7 +264,7 @@ function PanelActionTabFrame({
 function usePersistedActionParams(tab: PluginPanelFixedPanelTab) {
   return useMemo(
     () => parsePersistedPluginPanelParams(tab.paramsJson),
-    [tab.paramsJson, tab.fileOpenerOwner],
+    [tab.paramsJson],
   );
 }
 

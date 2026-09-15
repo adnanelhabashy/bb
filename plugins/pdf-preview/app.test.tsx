@@ -29,6 +29,8 @@ describe("PDF file opener", () => {
   const resourceOptions = {
     experimental_resolveFileResource: () => ({
       baseUrl: "/api/v1/file-previews/lease_1",
+      absolutePath: "/thread-storage/thr_1/reports/quarter one.pdf",
+      rootPath: "/thread-storage/thr_1",
       expiresAtMs: Date.now() + 60_000,
       path: "reports/quarter one.pdf",
       target: {

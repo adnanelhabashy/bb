@@ -51,7 +51,10 @@ function BetaThreadList({
   );
 }
 
-function BetaFileOpener({ Original, path, source }: PluginFileOpenerProps) {
+function BetaFileOpener({
+  Original,
+  experimental_file,
+}: PluginFileOpenerProps) {
   const [embedOriginal, setEmbedOriginal] = useState(false);
   const [shouldCrash, setShouldCrash] = useState(false);
   if (shouldCrash) throw new Error("Beta file-opener test crash");
@@ -65,8 +68,10 @@ function BetaFileOpener({ Original, path, source }: PluginFileOpenerProps) {
         onCrash={() => setShouldCrash(true)}
       />
       <div className="border-b border-border px-4 py-2 text-xs text-muted-foreground">
-        <span className="font-mono text-foreground">{path}</span>
-        <span className="ml-2">({source.kind})</span>
+        <span className="font-mono text-foreground">
+          {experimental_file.path}
+        </span>
+        <span className="ml-2">({experimental_file.kind})</span>
       </div>
       {embedOriginal ? (
         <div className="flex min-h-0 flex-1 flex-col">

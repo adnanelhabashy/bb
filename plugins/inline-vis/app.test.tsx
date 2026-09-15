@@ -25,6 +25,8 @@ function resourceFor(
   target: ExperimentalFileReference,
 ): ExperimentalFileResource {
   return {
+    absolutePath: `/workspace/${target.path}`,
+    rootPath: "/workspace",
     baseUrl: "/api/v1/file-previews/lease_1",
     expiresAtMs: Date.now() + 60_000,
     path: target.path,

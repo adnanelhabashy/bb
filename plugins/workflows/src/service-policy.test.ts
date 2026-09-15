@@ -167,7 +167,11 @@ function setup(
           }) as never,
       },
       files: {
-        read: async ({ path }) => {
+        read: async (args) => {
+          const path =
+            "experimental_target" in args
+              ? args.experimental_target.path
+              : args.path;
           const content = files[path];
           if (content === undefined)
             throw new Error(`Missing test file ${path}`);

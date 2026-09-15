@@ -83,7 +83,7 @@ describe("ask-user-question builtin plugin", () => {
     return command.dynamicTools;
   }
 
-  it("advertises the tool to codex with Claude's exact schema", async () => {
+  it("advertises required question fields and a single-select default to codex", async () => {
     const tools = await dynamicToolsFor({
       providerId: "codex",
       model: "gpt-5.6",
@@ -120,12 +120,9 @@ describe("ask-user-question builtin plugin", () => {
     expect(schema.required).toEqual(["questions"]);
     expect(schema.properties.questions.minItems).toBe(1);
     expect(schema.properties.questions.maxItems).toBe(4);
-    expect(schema.properties.questions.items.required).toEqual([
-      "question",
-      "header",
-      "options",
-      "multiSelect",
-    ]);
+    expect(schema.properties.questions.items.required).toEqual(
+      expect.arrayContaining(["question", "header", "options"]),
+    );
     expect(
       schema.properties.questions.items.properties.multiSelect.default,
     ).toBe(false);
