@@ -396,7 +396,7 @@ function ThreadSearchPaletteRow({
           )}
         </span>
         {splitShortcut === undefined ? null : (
-          <span aria-hidden="true" className="w-14 shrink-0" />
+          <span aria-hidden="true" className="w-12 shrink-0" />
         )}
         <ThreadSearchPaletteStatus row={row} />
       </div>
@@ -406,13 +406,20 @@ function ThreadSearchPaletteRow({
             <button
               type="button"
               aria-label="Open in split"
-              className="absolute right-9 top-1/2 inline-flex h-7 w-14 -translate-y-1/2 items-center justify-center rounded-sm text-xs text-subtle-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+              className="absolute right-9 top-1/2 inline-flex h-7 w-12 -translate-y-1/2 items-center justify-center gap-0.5 rounded-sm text-xs text-subtle-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
               onFocus={onActivate}
               onClick={onSplit}
             >
-              <kbd className="font-sans font-normal opacity-70">
-                {splitShortcut}
-              </kbd>
+              {(splitShortcut === "⌘↵" ? ["⌘", "↵"] : ["Ctrl", "↵"]).map(
+                (key) => (
+                  <kbd
+                    key={key}
+                    className="min-w-4 rounded-sm bg-state-hover px-1 py-0.5 text-center font-sans font-normal opacity-70"
+                  >
+                    {key}
+                  </kbd>
+                ),
+              )}
             </button>
           </TooltipTrigger>
           <TooltipContent>Open in split</TooltipContent>

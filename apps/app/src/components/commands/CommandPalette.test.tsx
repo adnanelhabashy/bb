@@ -694,7 +694,11 @@ describe("CommandPalette", () => {
     const palette = screen.getByTestId("command-palette");
     expect(palette.querySelector("[data-palette-footer]")).toBeNull();
     await requestShortcutHints();
-    expectText(screen.getByRole("button", { name: "Open in split" }), "Ctrl+↵");
+    const splitButton = screen.getByRole("button", { name: "Open in split" });
+    expect(
+      Array.from(splitButton.querySelectorAll("kbd"), (key) => key.textContent),
+    ).toEqual(["Ctrl", "↵"]);
+    expectClasses(splitButton, "w-12", "h-7");
     fireEvent.keyUp(window, { key: "Control" });
     expect(palette.querySelector("[data-palette-footer]")).toBeNull();
     await requestShortcutHints();
