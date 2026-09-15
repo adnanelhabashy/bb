@@ -1,5 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { constants, copyFileSync, existsSync, linkSync, rmSync } from "node:fs";
+import {
+  chmodSync,
+  constants,
+  copyFileSync,
+  existsSync,
+  linkSync,
+  rmSync,
+} from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { resolveMigrationsFolder } from "./migrate.js";
 
@@ -25,6 +32,7 @@ export function installFreshDatabase(databasePath: string): boolean {
 
   try {
     copyFileSync(templatePath, temporaryPath, constants.COPYFILE_EXCL);
+    chmodSync(temporaryPath, 0o600);
     try {
       linkSync(temporaryPath, databasePath);
     } catch (error) {

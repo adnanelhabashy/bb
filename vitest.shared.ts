@@ -12,6 +12,7 @@ const ISOLATION_REQUIRING_API = new RegExp(
   [
     String.raw`\bvi\.(mock|doMock|unmock|doUnmock|resetModules|stubGlobal|stubEnv)\(`,
     String.raw`\bprocess\.chdir\(`,
+    String.raw`\bprocess\.umask\(`,
     String.raw`\bprocess\.env(\.[A-Za-z_$][\w$]*|\[[^\]]+\])\s*=[^=]`,
     String.raw`\bdelete\s+process\.env\b`,
     String.raw`\b${GLOBAL_TARGET}\.[A-Za-z_$][\w$.]*\s*=[^=]`,
