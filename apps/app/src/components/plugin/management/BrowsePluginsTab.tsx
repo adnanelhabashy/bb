@@ -245,7 +245,9 @@ export function BrowsePluginsTab({
                   }}
                 >
                   <Icon name="MessageSquarePlus" className="size-3.5" />
-                  Create<span className="hidden sm:inline"> a</span> plugin
+                  <span>
+                    Create<span className="hidden sm:inline"> a</span> plugin
+                  </span>
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
