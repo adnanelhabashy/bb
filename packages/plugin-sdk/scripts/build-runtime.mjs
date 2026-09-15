@@ -31,6 +31,7 @@ const EXTERNALS = {
   "./environment-provider": ZOD_EXTERNALS,
   "./machine-provider": ZOD_EXTERNALS,
   "./internal/host-policy": ZOD_EXTERNALS,
+  "./internal/file-navigation-validation": ZOD_EXTERNALS,
   "./testing": [
     "better-sqlite3",
     "cron-parser",

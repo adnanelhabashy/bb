@@ -96,12 +96,10 @@ describe("root-compose project file routing", () => {
   it("uses a persisted opener host instead of the newly selected context", () => {
     expect(
       resolveRootComposeProjectFileRouting({
-        fileOpenerSource: {
-          kind: "workspace",
-          threadId: null,
-          environmentId: null,
-          projectId: "proj_opened",
-          experimental_hostId: "host_opened",
+        fileOpenerFile: {
+          kind: "host",
+          hostId: "host_opened",
+          path: "/opened/report.pdf",
         },
         selectedEnvironmentId: "env_selected",
         selectedHostId: "host_selected",
@@ -109,25 +107,10 @@ describe("root-compose project file routing", () => {
     ).toEqual({ environmentId: null, hostId: "host_opened" });
   });
 
-  it("keeps primary-host routing when a persisted opener omits a host", () => {
-    expect(
-      resolveRootComposeProjectFileRouting({
-        fileOpenerSource: {
-          kind: "workspace",
-          threadId: null,
-          environmentId: null,
-          projectId: "proj_opened",
-        },
-        selectedEnvironmentId: null,
-        selectedHostId: "host_selected",
-      }),
-    ).toEqual({ environmentId: null, hostId: null });
-  });
-
   it("retains live routing for a native project file tab", () => {
     expect(
       resolveRootComposeProjectFileRouting({
-        fileOpenerSource: null,
+        fileOpenerFile: null,
         selectedEnvironmentId: "env_selected",
         selectedHostId: "host_selected",
       }),

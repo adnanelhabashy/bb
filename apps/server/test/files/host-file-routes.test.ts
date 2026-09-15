@@ -2,7 +2,11 @@ import type { HostDaemonOnlineRpcRequestMessage } from "@bb/host-daemon-contract
 import { describe, expect, it } from "vitest";
 import { registerHostRpcResponder } from "../helpers/host-rpc.js";
 import { readJson } from "../helpers/json.js";
-import { seedHostSession, seedPrimaryHost } from "../helpers/seed.js";
+import {
+  seedHostSession,
+  seedPrimaryHost,
+  seedThreadFixture,
+} from "../helpers/seed.js";
 import { withTestHarness } from "../helpers/test-app.js";
 import { DEFAULT_PATH_LIST_EXCLUDE_NAMES } from "../../src/routes/path-list-policy.js";
 
@@ -178,6 +182,295 @@ describe("host file routes", () => {
           rootPath: "/notes",
         },
       ]);
+    });
+  });
+
+  it("uses the same canonical resolver for reads, writes, directory listings, and previews", async () => {
+    await withTestHarness(async (harness) => {
+      const { host, session, environment, thread } = seedThreadFixture(
+        harness,
+        { environment: { path: "C:\\worktrees\\project" } },
+      );
+      const commands: HostDaemonOnlineRpcRequestMessage["command"][] = [];
+      registerHostRpcResponder(harness, {
+        hostId: host.id,
+        sessionId: session.id,
+        handle: ({ command }) => {
+          commands.push(command);
+          if (command.type === "host.write_file")
+            return {
+              ok: true,
+              result: { outcome: "conflict", currentSha256: "concurrent" },
+            };
+          if (command.type === "host.list_paths")
+            return { ok: true, result: { paths: [], truncated: false } };
+          if (command.type === "host.list_files")
+            return { ok: true, result: { files: [], truncated: false } };
+          return { ok: true, result: READ_RESULT };
+        },
+      });
+      const cases = [
+        {
+          target: {
+            kind: "workspace",
+            environmentId: environment.id,
+            path: "docs/plan.md",
+          },
+          rootPath: "C:\\worktrees\\project",
+          path: "C:\\worktrees\\project\\docs\\plan.md",
+        },
+        {
+          target: { kind: "host", hostId: host.id, path: "/shared/plan.md" },
+          rootPath: "/shared",
+          path: "/shared/plan.md",
+        },
+        {
+          target: {
+            kind: "thread-storage",
+            threadId: thread.id,
+            path: "docs/plan.md",
+          },
+          rootPath: `/tmp/bb-host-data/${host.id}/thread-storage/${thread.id}`,
+          path: `/tmp/bb-host-data/${host.id}/thread-storage/${thread.id}/docs/plan.md`,
+        },
+      ];
+      for (const { target, path, rootPath } of cases) {
+        const read = await harness.app.request(
+          ...postJson("/api/v1/files/read", { experimental_target: target }),
+        );
+        expect(read.status).toBe(200);
+        expect(commands.at(-1)).toEqual({
+          type: "host.read_file",
+          path,
+          rootPath,
+        });
+        const write = await harness.app.request(
+          ...postJson("/api/v1/files/write", {
+            experimental_target: target,
+            content: "edited",
+            expectedSha256: "original",
+          }),
+        );
+        expect(write.status).toBe(200);
+        expect(await readJson(write)).toEqual({
+          outcome: "conflict",
+          currentSha256: "concurrent",
+        });
+        expect(commands.at(-1)).toMatchObject({
+          type: "host.write_file",
+          path,
+          rootPath,
+          expectedSha256: "original",
+        });
+        for (const endpoint of ["list", "paths"]) {
+          const list = await harness.app.request(
+            ...postJson(`/api/v1/files/${endpoint}`, {
+              experimental_target: target,
+              experimental_directory: "root",
+              ...(endpoint === "paths"
+                ? { includeFiles: true, includeDirectories: true }
+                : {}),
+            }),
+          );
+          expect(list.status).toBe(200);
+          expect(commands.at(-1)).toMatchObject({ path: rootPath });
+        }
+        const preview = await harness.app.request(
+          ...postJson("/api/v1/files/resources", { target }),
+        );
+        expect(await readJson(preview)).toMatchObject({
+          absolutePath: path,
+          rootPath,
+        });
+      }
+      const count = commands.length;
+      for (const body of [
+        {
+          experimental_target: {
+            kind: "workspace",
+            environmentId: environment.id,
+            path: "../escape.md",
+          },
+        },
+        {
+          experimental_target: cases[0]?.target,
+          hostId: host.id,
+          path: "/override",
+        },
+      ]) {
+        expect(
+          (await harness.app.request(...postJson("/api/v1/files/read", body)))
+            .status,
+        ).toBe(400);
+      }
+      expect(commands).toHaveLength(count);
+    });
+  });
+
+  it("resolves canonical file references to confined preview leases", async () => {
+    await withTestHarness(async (harness) => {
+      const { host, session, environment, thread } = seedThreadFixture(
+        harness,
+        {
+          environment: { path: "/worktrees/project" },
+        },
+      );
+      const commands: HostDaemonOnlineRpcRequestMessage["command"][] = [];
+      registerHostRpcResponder(harness, {
+        hostId: host.id,
+        sessionId: session.id,
+        handle: (request) => {
+          commands.push(request.command);
+          return {
+            ok: true,
+            result: {
+              path:
+                request.command.type === "host.read_file"
+                  ? request.command.path
+                  : "",
+              content: "# Report",
+              contentEncoding: "utf8",
+              mimeType: "text/markdown",
+              sha256: "c".repeat(64),
+              sizeBytes: 8,
+            },
+          };
+        },
+      });
+
+      const workspaceResponse = await harness.app.request(
+        ...postJson("/api/v1/files/resources", {
+          target: {
+            kind: "workspace",
+            environmentId: environment.id,
+            path: "reports/summary.md",
+          },
+        }),
+      );
+      expect(workspaceResponse.status).toBe(200);
+      const workspace = await readJson(workspaceResponse);
+      expect(workspace).toMatchObject({
+        baseUrl: expect.stringMatching(/^\/api\/v1\/file-previews\//),
+        path: "reports/summary.md",
+        target: {
+          kind: "workspace",
+          environmentId: environment.id,
+          path: "reports/summary.md",
+        },
+        url: expect.stringMatching(/\/reports\/summary\.md$/),
+      });
+      if (
+        typeof workspace !== "object" ||
+        workspace === null ||
+        !("url" in workspace) ||
+        typeof workspace.url !== "string"
+      ) {
+        throw new Error("File resource response missing url");
+      }
+
+      const content = await harness.app.request(workspace.url);
+      expect(content.status).toBe(200);
+      await expect(content.text()).resolves.toBe("# Report");
+
+      const storageResponse = await harness.app.request(
+        ...postJson("/api/v1/files/resources", {
+          target: {
+            kind: "thread-storage",
+            threadId: thread.id,
+            path: "reports/stored.md",
+          },
+        }),
+      );
+      const storage = await readJson(storageResponse);
+      expect(storageResponse.status).toBe(200);
+      expect(storage).toMatchObject({
+        path: "reports/stored.md",
+        target: {
+          kind: "thread-storage",
+          threadId: thread.id,
+          path: "reports/stored.md",
+        },
+      });
+      if (
+        typeof storage !== "object" ||
+        storage === null ||
+        !("url" in storage) ||
+        typeof storage.url !== "string"
+      ) {
+        throw new Error("Storage resource response missing url");
+      }
+      expect((await harness.app.request(storage.url)).status).toBe(200);
+
+      const hostResponse = await harness.app.request(
+        ...postJson("/api/v1/files/resources", {
+          target: {
+            kind: "host",
+            hostId: host.id,
+            path: "/exports/final.pdf",
+          },
+        }),
+      );
+      const hostResource = await readJson(hostResponse);
+      expect(hostResponse.status).toBe(200);
+      expect(hostResource).toMatchObject({
+        path: "final.pdf",
+        target: {
+          kind: "host",
+          hostId: host.id,
+          path: "/exports/final.pdf",
+        },
+      });
+      if (
+        typeof hostResource !== "object" ||
+        hostResource === null ||
+        !("url" in hostResource) ||
+        typeof hostResource.url !== "string"
+      ) {
+        throw new Error("Host resource response missing url");
+      }
+      expect((await harness.app.request(hostResource.url)).status).toBe(200);
+
+      expect(commands).toEqual([
+        {
+          type: "host.read_file",
+          path: "/worktrees/project/reports/summary.md",
+          rootPath: "/worktrees/project",
+        },
+        {
+          type: "host.read_file",
+          path: `/tmp/bb-host-data/${host.id}/thread-storage/${thread.id}/reports/stored.md`,
+          rootPath: `/tmp/bb-host-data/${host.id}/thread-storage/${thread.id}`,
+        },
+        {
+          type: "host.read_file",
+          path: "/exports/final.pdf",
+          rootPath: "/exports",
+        },
+      ]);
+    });
+  });
+
+  it("rejects traversal and invalid absolute resource paths before leasing", async () => {
+    await withTestHarness(async (harness) => {
+      const { environment, host } = seedThreadFixture(harness);
+      for (const target of [
+        {
+          kind: "workspace",
+          environmentId: environment.id,
+          path: "../secret.md",
+        },
+        { kind: "host", hostId: host.id, path: "relative.pdf" },
+        {
+          kind: "host",
+          hostId: host.id,
+          path: "/exports/../secret.pdf",
+        },
+      ]) {
+        const response = await harness.app.request(
+          ...postJson("/api/v1/files/resources", { target }),
+        );
+        expect(response.status).toBe(400);
+      }
     });
   });
 

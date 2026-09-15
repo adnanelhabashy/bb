@@ -133,6 +133,8 @@ import type {
   HostRemovePathResponse,
   CreateFilePreviewRequest,
   CreateFilePreviewResponse,
+  ResolveFileResourceRequest,
+  ResolveFileResourceResponse,
   HostPickFolderRequest,
   HostPickFolderResponse,
   HostPathsExistRequest,
@@ -276,6 +278,7 @@ import {
   closeTerminalRequestSchema,
   copyProjectAttachmentsRequestSchema,
   createFilePreviewRequestSchema,
+  resolveFileResourceRequestSchema,
   createThreadSectionRequestSchema,
   deleteThreadSectionRequestSchema,
   createTerminalRequestSchema,
@@ -648,6 +651,14 @@ export const publicApiRoutes = {
         createFilePreviewRequestSchema,
       ),
       response: jsonResponse<CreateFilePreviewResponse>(),
+    }),
+    resolveResource: defineRoute({
+      path: "/files/resources",
+      method: "post",
+      request: jsonRequest<EmptyInput, ResolveFileResourceRequest>(
+        resolveFileResourceRequestSchema,
+      ),
+      response: jsonResponse<ResolveFileResourceResponse>(),
     }),
   },
 

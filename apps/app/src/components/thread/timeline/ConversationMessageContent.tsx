@@ -75,6 +75,7 @@ import { buildMarkdownMessageLinkRouting } from "@/components/ui/markdown-messag
 
 interface ConversationMessageContentBaseProps {
   attachments: TimelineConversationAttachments | null;
+  environmentId?: string;
   onOpenLocalFileLink?: ThreadTimelineLocalFileLinkHandler;
   onOpenPluginPanel?: MarkdownMessageDirectives["openThreadPanel"];
   pluginActions?: readonly ThreadTimelinePluginMessageAction[];
@@ -177,6 +178,7 @@ interface UserConversationMessageProps {
 interface AssistantConversationMessageProps extends AssistantMessageRowIdentity {
   addToChatAttachments: readonly PromptDraftAttachment[];
   attachmentItems: ConversationAttachmentItems;
+  environmentId?: string;
   pluginActions?: readonly ThreadTimelinePluginMessageAction[];
   onAddToChat?: ThreadTimelineAddToChatHandler;
   onFork?: () => void;
@@ -470,6 +472,7 @@ function UserConversationMessage({
 function AssistantConversationMessage({
   addToChatAttachments,
   attachmentItems,
+  environmentId,
   id,
   onAddToChat,
   onFork,
@@ -548,6 +551,7 @@ function AssistantConversationMessage({
         threadId,
         turnId,
         projectId: projectId ?? null,
+        experimental_environmentId: environmentId ?? null,
       },
       openWorkspaceFile: openDirectiveWorkspaceFile,
       openThreadPanel: onOpenPluginPanel ?? null,
@@ -558,6 +562,7 @@ function AssistantConversationMessage({
     threadId,
     turnId,
     projectId,
+    environmentId,
     openDirectiveWorkspaceFile,
     onOpenPluginPanel,
   ]);
@@ -682,6 +687,7 @@ export function ConversationMessageContent(
     <AssistantConversationMessage
       addToChatAttachments={addToChatAttachments}
       attachmentItems={attachmentItems}
+      environmentId={props.environmentId}
       id={props.id}
       pluginActions={props.pluginActions}
       onAddToChat={props.onAddToChat}

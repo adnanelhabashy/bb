@@ -16,6 +16,8 @@ import type {
 import type {
   CreateExecutionInputSources,
   CreateThreadEnvironmentArgs,
+  FileReference,
+  ResolveFileResourceResponse,
 } from "@bb/server-contract";
 import type { JsonValue } from "./json-value.js";
 import type {
@@ -243,30 +245,10 @@ export interface ExperimentalPluginBrowserToolbarActionProps {
   isCompactViewport: boolean;
 }
 
-/**
- * Where a file being opened by a `fileOpener` lives. `path` semantics follow
- * the source: workspace paths are relative to the environment's worktree,
- * thread-storage paths are relative to the thread's storage root, host paths
- * are absolute on the thread's host.
- */
-export interface PluginFileOpenerSource {
-  kind: "workspace" | "host" | "thread-storage";
-  threadId: string | null;
-  environmentId: string | null;
-  projectId: string | null;
-  /**
-   * Explicit host selected for a project-backed workspace file. Omitted when
-   * the source is resolved by its environment/thread or the primary host.
-   *
-   * @experimental Audit before relying on this as a stable contract.
-   */
-  experimental_hostId?: string;
-}
-
 /** Props passed to a `fileOpener` component (rendered as a panel file tab). */
 export interface PluginFileOpenerProps {
-  path: string;
-  source: PluginFileOpenerSource;
+  /** The complete host-resolvable identity of the file being opened. */
+  experimental_file: ExperimentalFileReference;
   /**
    * One-based, inclusive lines requested by the latest file open, or null when
    * untargeted. BB supplies a new object for each targeted open, including an
@@ -435,6 +417,8 @@ export interface PluginMessageDirectiveMessage {
   threadId: string;
   turnId: string | null;
   projectId: string | null;
+  /** Environment whose workspace contains files referenced by this message. */
+  experimental_environmentId: string | null;
 }
 
 /**
@@ -2387,11 +2371,7 @@ export interface MarkdownProps {
   content: string;
   className?: string;
   /** Resolve local destinations from this document; omission keeps message routing. */
-  experimental_document?: {
-    threadId: string;
-    rootPath: string;
-    target: Exclude<ExperimentalLiveFileTarget, { kind: "host" }>;
-  };
+  experimental_document?: ExperimentalFileResource;
 }
 
 /**
@@ -2408,11 +2388,19 @@ export interface UrlLinkProps extends Omit<
   href: string;
 }
 
-/** A live file whose identity is complete without ambient route context. */
-export type ExperimentalLiveFileTarget =
-  | { kind: "workspace"; environmentId: string; path: string }
-  | { kind: "host"; hostId: string; path: string }
-  | { kind: "thread-storage"; threadId: string; path: string };
+/** A canonical workspace, host, or thread-storage file identity. */
+export type ExperimentalFileReference = FileReference;
+
+/** A short-lived same-origin URL for a host-resolved file. */
+export type ExperimentalFileResource = ResolveFileResourceResponse;
+
+/** Host-backed file URL resolution for plugin app components. */
+export interface ExperimentalFileResources {
+  resolve(
+    target: ExperimentalFileReference,
+    options?: { signal?: AbortSignal },
+  ): Promise<ExperimentalFileResource>;
+}
 
 /** One-based location to reveal after a live file opens. */
 export type ExperimentalFileLocation =
@@ -2421,7 +2409,7 @@ export type ExperimentalFileLocation =
 
 /** Options shared by BB's preview and preferred-external file intents. */
 export interface ExperimentalFileOpenOptions {
-  target: ExperimentalLiveFileTarget;
+  target: ExperimentalFileReference;
   location: ExperimentalFileLocation | null;
 }
 
@@ -2434,7 +2422,7 @@ export interface ExperimentalFileLinkProps extends Omit<
   ComponentPropsWithoutRef<"a">,
   "href" | "target"
 > {
-  target: ExperimentalLiveFileTarget;
+  target: ExperimentalFileReference;
   location?: ExperimentalFileLocation | null;
 }
 
@@ -2557,6 +2545,8 @@ export interface PluginSdkApp {
   useSettings(): PluginSettingsState;
   useBbContext(): BbContext;
   useBbNavigate(): BbNavigate;
+  /** Resolve a typed file identity to a short-lived same-origin resource URL. */
+  experimental_useFileResources(): ExperimentalFileResources;
   /** Select one of this plugin's eligible fixed tabs on the current surface. */
   experimental_useAppPanel(): ExperimentalAppPanel;
   /** Read or clear the owning tab's validated, session-scoped target. */

@@ -262,6 +262,7 @@ type ExpectedEnvironmentsKey =
 
 type ExpectedFilesKey =
   | "createPreview"
+  | "experimental_resolveResource"
   | "list"
   | "listPaths"
   | "mkdir"

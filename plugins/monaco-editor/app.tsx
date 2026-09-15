@@ -55,8 +55,7 @@ function revealLineRange(
 }
 
 function MonacoFileOpener({
-  path,
-  source,
+  experimental_file,
   Original,
   experimental_lineRange,
 }: PluginFileOpenerProps) {
@@ -68,10 +67,14 @@ function MonacoFileOpener({
   const monacoRef = useRef<typeof MonacoNs | null>(null);
   const editorRef = useRef<MonacoNs.editor.IStandaloneCodeEditor | null>(null);
 
-  const navigationRef = useRef({ path, lineRange: experimental_lineRange });
+  const navigationRef = useRef({
+    file: experimental_file,
+    lineRange: experimental_lineRange,
+  });
 
-  const [activePath, setActivePath] = useState(path);
-  useEffect(() => setActivePath(path), [path]);
+  const [activeFile, setActiveFile] = useState(experimental_file);
+  const activePath = activeFile.path;
+  useEffect(() => setActiveFile(experimental_file), [experimental_file]);
 
   const sha256Ref = useRef<string | null>(null);
   const saveStateRef = useRef<SaveState>({ kind: "clean" });
@@ -113,8 +116,7 @@ function MonacoFileOpener({
       setSaveState({ kind: "saving" });
       try {
         const result = await rpc.call("write", {
-          path: activePath,
-          source,
+          file: activeFile,
           content: editor.getValue(),
           expectedSha256,
         });
@@ -131,7 +133,7 @@ function MonacoFileOpener({
         });
       }
     },
-    [activePath, rpc, setSaveState, source],
+    [activeFile, rpc, setSaveState],
   );
 
   const save = useCallback(async () => {
@@ -147,7 +149,7 @@ function MonacoFileOpener({
     if (!editor) return;
     setIsRefreshing(true);
     try {
-      const file = await rpc.call("read", { path: activePath, source });
+      const file = await rpc.call("read", { file: activeFile });
       if (file.kind !== "text") return;
       sha256Ref.current = file.sha256;
       editor.setValue(file.content);
@@ -160,7 +162,7 @@ function MonacoFileOpener({
     } finally {
       setIsRefreshing(false);
     }
-  }, [activePath, rpc, setSaveState, source]);
+  }, [activeFile, rpc, setSaveState]);
 
   const treeRequestedRef = useRef(false);
   useEffect(() => {
@@ -169,7 +171,7 @@ function MonacoFileOpener({
     let cancelled = false;
     setTree((current) => ({ ...current, isLoading: true, error: null }));
     void rpc
-      .call("tree", { source })
+      .call("tree", { file: experimental_file })
       .then((result) => {
         if (cancelled) return;
         setTree({
@@ -195,7 +197,7 @@ function MonacoFileOpener({
     return () => {
       cancelled = true;
     };
-  }, [isFilesOpen, rpc, source]);
+  }, [experimental_file, isFilesOpen, rpc]);
 
   const openFromTree = useCallback(
     (next: string) => {
@@ -204,9 +206,9 @@ function MonacoFileOpener({
         setPendingOpen(next);
         return;
       }
-      setActivePath(next);
+      setActiveFile({ ...experimental_file, path: next });
     },
-    [activePath],
+    [activePath, experimental_file],
   );
 
   const requestRefresh = useCallback(() => {
@@ -230,7 +232,7 @@ function MonacoFileOpener({
       try {
         const [{ baseUrl }, file] = await Promise.all([
           rpc.call("assets"),
-          rpc.call("read", { path: activePath, source }),
+          rpc.call("read", { file: activeFile }),
         ]);
         if (disposed) return;
         if (file.kind === "unsupported") {
@@ -265,7 +267,7 @@ function MonacoFileOpener({
           overflowWidgetsDomNode: overflowWidgetsNode(),
         });
         editorRef.current = editor;
-        if (activePath === navigationRef.current.path) {
+        if (activePath === navigationRef.current.file.path) {
           revealLineRange(editor, navigationRef.current.lineRange);
         }
         const active = {
@@ -303,15 +305,18 @@ function MonacoFileOpener({
       editorRef.current?.dispose();
       editorRef.current = null;
     };
-  }, [activePath, rpc, setSaveState, source]);
+  }, [activeFile, activePath, rpc, setSaveState]);
 
   useEffect(() => {
-    navigationRef.current = { path, lineRange: experimental_lineRange };
+    navigationRef.current = {
+      file: experimental_file,
+      lineRange: experimental_lineRange,
+    };
     const editor = editorRef.current;
-    if (editor !== null && activePath === path) {
+    if (editor !== null && activePath === experimental_file.path) {
       revealLineRange(editor, experimental_lineRange);
     }
-  }, [activePath, path, experimental_lineRange]);
+  }, [activePath, experimental_file, experimental_lineRange]);
 
   useEffect(() => {
     const monaco = monacoRef.current;
@@ -356,7 +361,9 @@ function MonacoFileOpener({
         onOpenConfirm={() => {
           const next = pendingOpen;
           setPendingOpen(null);
-          if (next !== null) setActivePath(next);
+          if (next !== null) {
+            setActiveFile({ ...experimental_file, path: next });
+          }
         }}
         onOverwrite={() => void overwrite()}
         onReload={() => void reloadFromDisk()}

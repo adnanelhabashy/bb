@@ -1,4 +1,8 @@
-import type { MarkdownLinkRouting } from "./markdown-link-routing";
+import type {
+  MarkdownLinkRouting,
+  MarkdownLocalImageRouting,
+  MarkdownLocalFileLinkRouting,
+} from "./markdown-link-routing";
 import {
   getAbsoluteDirname,
   buildAbsoluteFilePath,
@@ -11,6 +15,36 @@ import {
 } from "@/lib/file-content-urls";
 
 const ROUTE_ROOT = "/__bb_markdown_file_root__";
+
+export function buildMarkdownContextRouting({
+  absolutePaths,
+  relativePaths,
+  resolveSrc,
+  onOpenLocalFileLink,
+  onOpenLink,
+}: {
+  absolutePaths: MarkdownLocalImageRouting["absolutePaths"];
+  relativePaths?: MarkdownLocalImageRouting["relativePaths"];
+  resolveSrc?: MarkdownLocalImageRouting["resolveSrc"];
+  onOpenLocalFileLink?: MarkdownLocalFileLinkRouting["onOpenLink"];
+  onOpenLink?: MarkdownLinkRouting["onOpenLink"];
+}): MarkdownLinkRouting {
+  return {
+    ...(onOpenLink === undefined ? {} : { onOpenLink }),
+    ...(resolveSrc === undefined
+      ? {}
+      : { localImage: { absolutePaths, relativePaths, resolveSrc } }),
+    ...(onOpenLocalFileLink === undefined
+      ? {}
+      : {
+          localFile: {
+            absoluteLinks: absolutePaths,
+            relativeLinks: relativePaths,
+            onOpenLink: onOpenLocalFileLink,
+          },
+        }),
+  };
+}
 
 export function buildMarkdownFileImageRouting({
   path,
@@ -37,7 +71,8 @@ export function buildMarkdownFileImageRouting({
   });
   return {
     ...linkRouting,
-    localImage: {
+    ...buildMarkdownContextRouting({
+      onOpenLink: linkRouting?.onOpenLink,
       absolutePaths:
         threadId === null
           ? { kind: "contained", rootPath: root }
@@ -47,15 +82,14 @@ export function buildMarkdownFileImageRouting({
         rootPath: root,
       },
       resolveSrc: (image, sourceKind) => {
-        if (sourceKind === "absolute" && threadId !== null) {
+        if (sourceKind === "absolute" && threadId !== null)
           return buildThreadHostFileContentUrl(threadId, image.path);
-        }
         return resolveRelativeSrc(
           image.path.slice(root === "/" ? 1 : root.length + 1),
           image.path,
         );
       },
-    },
+    }),
   };
 }
 

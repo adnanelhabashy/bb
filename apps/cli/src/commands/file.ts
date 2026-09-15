@@ -1,9 +1,13 @@
+import type { FileReference } from "@bb/server-contract";
 import { Command } from "commander";
 import { action } from "../action.js";
 import { createCliBbSdk } from "../client.js";
 import { confirmDestructiveAction, outputJson } from "./helpers.js";
 
 interface FileTargetOptions {
+  environment?: string;
+  threadStorage?: string;
+  resourceRoot?: boolean;
   host?: string;
   json?: boolean;
   root?: string;
@@ -64,6 +68,42 @@ function commonTarget(opts: FileTargetOptions) {
   };
 }
 
+function referenceTarget(
+  path: string,
+  opts: FileTargetOptions,
+):
+  | { experimental_target: FileReference }
+  | { path: string; hostId?: string; rootPath?: string } {
+  if (opts.environment || opts.threadStorage) {
+    if (opts.host || opts.root || (opts.environment && opts.threadStorage))
+      throw new Error(
+        "Choose one of --environment, --thread-storage, or host/root routing.",
+      );
+    return {
+      experimental_target: opts.environment
+        ? { kind: "workspace", environmentId: opts.environment, path }
+        : { kind: "thread-storage", threadId: opts.threadStorage ?? "", path },
+    };
+  }
+  if (opts.resourceRoot)
+    throw new Error(
+      "--resource-root requires --environment or --thread-storage.",
+    );
+  return { path, ...commonTarget(opts) };
+}
+
+function listTarget(path: string, opts: FileTargetOptions) {
+  const target = referenceTarget(path, opts);
+  return "experimental_target" in target
+    ? {
+        ...target,
+        experimental_directory: opts.resourceRoot
+          ? ("root" as const)
+          : ("self" as const),
+      }
+    : target;
+}
+
 export function registerFileCommands(
   program: Command,
   getUrl: () => string,
@@ -75,14 +115,15 @@ export function registerFileCommands(
   file
     .command("read <path>")
     .description("Read a file")
+    .option("--environment <id>", "Resolve the path in this workspace")
+    .option("--thread-storage <id>", "Resolve the path in this thread storage")
     .option("--host <id>", "Machine ID")
     .option("--root <path>", "Confining root path")
     .option("--json", "Print machine-readable JSON output")
     .action(
       action(async (path: string, opts: FileTargetOptions) => {
         const result = await createCliBbSdk(getUrl()).files.read({
-          path,
-          ...commonTarget(opts),
+          ...referenceTarget(path, opts),
         });
         if (outputJson(opts, result)) return;
         if (result.contentEncoding === "utf8")
@@ -96,6 +137,8 @@ export function registerFileCommands(
     .description("Write a UTF-8 file")
     .option("--content <text>", "File content")
     .option("--stdin", "Read file content from stdin")
+    .option("--environment <id>", "Resolve the path in this workspace")
+    .option("--thread-storage <id>", "Resolve the path in this thread storage")
     .option("--host <id>", "Machine ID")
     .option("--root <path>", "Confining root path")
     .option("--create-parents", "Create missing parent directories")
@@ -111,9 +154,8 @@ export function registerFileCommands(
         }
         const content = opts.stdin ? await readStdin() : (opts.content ?? "");
         const result = await createCliBbSdk(getUrl()).files.write({
-          path,
+          ...referenceTarget(path, opts),
           content,
-          ...commonTarget(opts),
           ...(opts.createParents ? { createParents: true } : {}),
           ...(opts.expectedSha256
             ? { expectedSha256: opts.expectedSha256 }
@@ -138,14 +180,19 @@ export function registerFileCommands(
       "--exclude <names...>",
       "Entry names or root-relative paths (using /) to skip instead of the default set",
     )
+    .option("--environment <id>", "Resolve the path in this workspace")
+    .option("--thread-storage <id>", "Resolve the path in this thread storage")
     .option("--host <id>", "Machine ID")
+    .option(
+      "--resource-root",
+      "List the reference root instead of the path itself",
+    )
     .option("--json", "Print machine-readable JSON output")
     .action(
       action(async (path: string, opts: FileListOptions) => {
         const result = await createCliBbSdk(getUrl()).files.list({
-          path,
+          ...listTarget(path, opts),
           ...listFilterArgs(opts),
-          ...(opts.host ? { hostId: opts.host } : {}),
           ...(opts.query ? { query: opts.query } : {}),
           ...(parseLimit(opts.limit) ? { limit: parseLimit(opts.limit) } : {}),
         });
@@ -166,7 +213,13 @@ export function registerFileCommands(
       "--exclude <names...>",
       "Entry names or root-relative paths (using /) to skip instead of the default set",
     )
+    .option("--environment <id>", "Resolve the path in this workspace")
+    .option("--thread-storage <id>", "Resolve the path in this thread storage")
     .option("--host <id>", "Machine ID")
+    .option(
+      "--resource-root",
+      "List the reference root instead of the path itself",
+    )
     .option("--json", "Print machine-readable JSON output")
     .action(
       action(async (path: string, opts: FileListOptions) => {
@@ -174,11 +227,10 @@ export function registerFileCommands(
         const includeDirectories = opts.directories || !opts.files;
         const limit = parseLimit(opts.limit);
         const result = await createCliBbSdk(getUrl()).files.listPaths({
-          path,
+          ...listTarget(path, opts),
           includeFiles,
           includeDirectories,
           ...listFilterArgs(opts),
-          ...(opts.host ? { hostId: opts.host } : {}),
           ...(opts.query ? { query: opts.query } : {}),
           ...(limit ? { limit } : {}),
         });

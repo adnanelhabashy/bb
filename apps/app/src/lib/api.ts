@@ -2,16 +2,6 @@ import { extractErrorMessage, toRecord } from "@bb/core-ui";
 import type { SystemVoiceTranscriptionResponse } from "@bb/server-contract";
 import { apiClient, toRelativeUrl } from "./api-server";
 import { appSurfaceRequestInit } from "./app-surface";
-import {
-  buildFilePreview,
-  normalizeFilePreviewMimeType,
-  type FilePreview,
-  type FilePreviewTarget,
-} from "@bb/client-core";
-import {
-  buildThreadHostFileContentUrl,
-  buildThreadStorageContentUrl,
-} from "./file-content-urls";
 
 const HTML_DOCUMENT_PATTERN = /<!doctype html|<html[\s>]/i;
 
@@ -123,31 +113,6 @@ export async function request<T>(
   return JSON.parse(text) as T;
 }
 
-async function loadFilePreview(
-  target: FilePreviewTarget,
-  signal?: AbortSignal,
-): Promise<FilePreview> {
-  const response = await requestResponse(
-    fetch(
-      target.url,
-      appSurfaceRequestInit({
-        method: "GET",
-        signal,
-      }),
-    ),
-  );
-  const contentBytes = new Uint8Array(await response.arrayBuffer());
-  return buildFilePreview({
-    contentBytes,
-    mimeType: normalizeFilePreviewMimeType(
-      response.headers.get("content-type"),
-    ),
-    name: target.name,
-    path: target.path,
-    url: target.url,
-  });
-}
-
 async function postMultipart<T>(
   url: URL,
   file: File,
@@ -184,34 +149,5 @@ export async function transcribeVoiceInput(
     file,
     signal,
     trimmedPrompt ? { prompt: trimmedPrompt } : undefined,
-  );
-}
-
-export async function getThreadStorageFilePreview(
-  id: string,
-  path: string,
-  signal?: AbortSignal,
-): Promise<FilePreview> {
-  return loadFilePreview(
-    {
-      path,
-      url: buildThreadStorageContentUrl(id, path),
-    },
-    signal,
-  );
-}
-
-export async function getThreadHostFilePreview(
-  id: string,
-  path: string,
-  signal?: AbortSignal,
-): Promise<FilePreview> {
-  return loadFilePreview(
-    {
-      name: path.split("/").at(-1),
-      path,
-      url: buildThreadHostFileContentUrl(id, path),
-    },
-    signal,
   );
 }

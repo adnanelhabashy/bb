@@ -8,6 +8,6 @@ Open a PDF from a thread and read it in place. The plugin shows the document in 
 
 ## How it works
 
-The plugin claims the `pdf` extension in bb's file opener. It works for files in a thread workspace, files on the host machine, and files in thread storage. bb fetches the file and confirms that the response is a PDF. It then hands the file to the browser viewer inside a frame.
+The plugin claims the `pdf` extension in bb's file opener. It works for files in a thread workspace, files on the host machine, and files in thread storage. It asks bb to resolve the file identity to a short-lived, confined URL, confirms that the response is a PDF, and hands the file to the browser viewer inside a frame.
 
 No account, external service, or separate install is required. The browser or app shell must include a PDF viewer. The bb desktop app includes one.

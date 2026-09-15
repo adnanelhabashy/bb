@@ -35,6 +35,7 @@ import {
   useSettings,
   experimental_useAppPanel,
   experimental_useFixedTabTarget,
+  experimental_useFileResources,
 } from "./plugin-sdk-hooks";
 import {
   useSidebarThreadActions,
@@ -54,6 +55,7 @@ export const pluginSdkAppImplementation = installDeprecatedAliases(
     useBbNavigate,
     experimental_useAppPanel,
     experimental_useFixedTabTarget,
+    experimental_useFileResources,
     useComposer,
     useComposerView,
     useRealtime,
@@ -106,7 +108,7 @@ function PluginMarkdown({
     return experimental_document === undefined
       ? messageRouting
       : buildMarkdownDocumentLinkRouting({
-          document: experimental_document,
+          resource: experimental_document,
           messageRouting,
           openFilePreview: navigation.openFilePreview,
         });

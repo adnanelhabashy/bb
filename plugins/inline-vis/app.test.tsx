@@ -1,18 +1,76 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  loadPluginApp,
+  renderSlot,
+  type RenderSlotOptions,
+} from "@get-bb/plugin-sdk/testing/app";
+import type {
+  ExperimentalFileResource,
+  ExperimentalFileReference,
+} from "@get-bb/plugin-sdk/app";
 
 const app = await loadPluginApp(() => import("./app"));
-
-afterEach(cleanup);
 
 const message = {
   id: "msg_1",
   threadId: "thr_1",
   turnId: "turn_1",
   projectId: "proj_1",
+  experimental_environmentId: "env_1",
 };
+
+function resourceFor(
+  target: ExperimentalFileReference,
+): ExperimentalFileResource {
+  return {
+    baseUrl: "/api/v1/file-previews/lease_1",
+    expiresAtMs: Date.now() + 60_000,
+    path: target.path,
+    target,
+    url: `/api/v1/file-previews/lease_1/${target.path
+      .split("/")
+      .map(encodeURIComponent)
+      .join("/")}`,
+  };
+}
+
+function renderDirective(
+  attributes: Record<string, string>,
+  options: RenderSlotOptions = {},
+  openWorkspaceFile: ((file: string) => boolean) | null = null,
+) {
+  return renderSlot(
+    app.messageDirectives[0]!,
+    {
+      attributes,
+      source: "::inline-vis{}",
+      message,
+      openWorkspaceFile,
+    },
+    {
+      experimental_resolveFileResource: resourceFor,
+      ...options,
+    },
+  );
+}
+
+beforeEach(() => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(
+      new Response("<html><body>ok</body></html>", {
+        headers: { "content-type": "text/html" },
+      }),
+    ),
+  );
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe("inline-vis messageDirective registration", () => {
   it("registers the inline-vis directive", () => {
@@ -22,451 +80,166 @@ describe("inline-vis messageDirective registration", () => {
 });
 
 describe("InlineVisDirective", () => {
-  it("requires a file attribute without calling rpc", async () => {
-    const slot = renderSlot(
-      app.messageDirectives[0]!,
-      {
-        attributes: {},
-        source: "::inline-vis{}",
-        message,
-        openWorkspaceFile: null,
-      },
-      { rpc: {} },
+  it("requires a file attribute without resolving a resource", async () => {
+    const slot = renderDirective({});
+    expect((await slot.findByRole("alert")).textContent).toMatch(
+      /requires a file attribute/i,
     );
-
-    await slot.findByRole("alert");
-    expect(slot.getByText(/requires a file attribute/i)).toBeTruthy();
-    expect(slot.rpcCalls).toEqual([]);
+    expect(slot.experimental_fileResourceCalls).toEqual([]);
   });
 
-  it("shows the rpc validation error for an unknown source", async () => {
-    const slot = renderSlot(
-      app.messageDirectives[0]!,
-      {
-        attributes: { file: "demo.html", source: "project" },
-        source: '::inline-vis{source="project" file="demo.html"}',
-        message,
-        openWorkspaceFile: vi.fn(() => true),
-      },
-      {
-        rpc: {
-          preparePreview: (input) => {
-            expect(input).toEqual({
-              threadId: "thr_1",
-              file: "demo.html",
-              source: "project",
-            });
-            throw new Error(
-              'Invalid option: expected "workspace"|"thread-storage"',
-            );
-          },
-        },
-      },
+  it("rejects unsupported sources and unsafe paths before resolution", async () => {
+    const unknownSource = renderDirective({
+      file: "demo.html",
+      source: "project",
+    });
+    expect((await unknownSource.findByRole("alert")).textContent).toMatch(
+      /source.*workspace or thread-storage/i,
+    );
+    expect(unknownSource.experimental_fileResourceCalls).toEqual([]);
+    cleanup();
+
+    const traversal = renderDirective({ file: "../secret.html" });
+    expect((await traversal.findByRole("alert")).textContent).toMatch(
+      /source-relative/i,
+    );
+    expect(traversal.experimental_fileResourceCalls).toEqual([]);
+  });
+
+  it("resolves a workspace HTML file and renders its leased URL in an opaque-origin sandbox", async () => {
+    const openWorkspaceFile = vi.fn(() => true);
+    const slot = renderDirective(
+      { file: "charts/demo file.html" },
+      {},
+      openWorkspaceFile,
     );
 
-    const alert = await slot.findByRole("alert");
-    expect(alert.textContent).toMatch(
-      /expected "workspace"\|"thread-storage"/i,
-    );
-    expect(slot.container.querySelector("iframe")).toBeNull();
-    expect(slot.rpcCalls).toEqual([
+    const iframe = await waitFor(() => {
+      const element = slot.container.querySelector("iframe");
+      expect(element).toBeTruthy();
+      return element as HTMLIFrameElement;
+    });
+    expect(slot.experimental_fileResourceCalls).toEqual([
       {
-        method: "preparePreview",
-        input: {
-          threadId: "thr_1",
-          file: "demo.html",
-          source: "project",
+        target: {
+          kind: "workspace",
+          environmentId: "env_1",
+          path: "charts/demo file.html",
         },
       },
     ]);
-  });
-
-  it("uses the sidebar worktree route with an opaque-origin script sandbox", async () => {
-    const openWorkspaceFile = vi.fn(() => true);
-    const slot = renderSlot(
-      app.messageDirectives[0]!,
-      {
-        attributes: { file: "charts/demo file.html" },
-        source: '::inline-vis{file="charts/demo file.html"}',
-        message,
-        openWorkspaceFile,
-      },
-      {
-        rpc: {
-          preparePreview: (input) => {
-            expect(input).toEqual({
-              threadId: "thr_1",
-              file: "charts/demo file.html",
-            });
-            return {
-              kind: "html",
-              file: "charts/demo file.html",
-              source: "workspace",
-            };
-          },
-        },
-      },
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/v1/file-previews/lease_1/charts/demo%20file.html",
+      expect.objectContaining({ credentials: "same-origin" }),
     );
-
-    await slot.findByRole("status", {
-      name: "Loading visualization charts/demo file.html",
-    });
-
-    const iframe = await waitFor(() => {
-      const el = slot.container.querySelector("iframe");
-      expect(el).toBeTruthy();
-      return el as HTMLIFrameElement;
-    });
-
+    expect(iframe.getAttribute("src")).toBe(
+      "/api/v1/file-previews/lease_1/charts/demo%20file.html",
+    );
     expect(iframe.getAttribute("sandbox")).toBe("allow-scripts");
     expect(iframe.getAttribute("sandbox")).not.toContain("allow-same-origin");
-    expect(iframe.getAttribute("src")).toBe(
-      "/api/v1/threads/thr_1/worktree/files/charts/demo%20file.html",
-    );
-    expect(iframe.getAttribute("srcdoc")).toBeNull();
     expect(iframe.style.height).toBe("224px");
+
     fireEvent.click(
       slot.getByRole("button", {
         name: "Open charts/demo file.html in sidebar",
       }),
     );
     expect(openWorkspaceFile).toHaveBeenCalledWith("charts/demo file.html");
-    expect(slot.rpcCalls).toEqual([
+  });
+
+  it("resolves thread-storage without a workspace action", async () => {
+    const openWorkspaceFile = vi.fn(() => true);
+    const slot = renderDirective(
+      { source: "thread-storage", file: "reports/result.html" },
+      {},
+      openWorkspaceFile,
+    );
+    await waitFor(() =>
+      expect(slot.container.querySelector("iframe")).toBeTruthy(),
+    );
+    expect(slot.experimental_fileResourceCalls).toEqual([
       {
-        method: "preparePreview",
-        input: {
+        target: {
+          kind: "thread-storage",
           threadId: "thr_1",
-          file: "charts/demo file.html",
+          path: "reports/result.html",
         },
       },
     ]);
-  });
-
-  it("uses the thread-storage route without a workspace action", async () => {
-    const openWorkspaceFile = vi.fn(() => true);
-    const slot = renderSlot(
-      app.messageDirectives[0]!,
-      {
-        attributes: {
-          source: "thread-storage",
-          file: "reports/result file.html",
-        },
-        source:
-          '::inline-vis{source="thread-storage" file="reports/result file.html"}',
-        message,
-        openWorkspaceFile,
-      },
-      {
-        rpc: {
-          preparePreview: (input) => {
-            expect(input).toEqual({
-              threadId: "thr_1",
-              file: "reports/result file.html",
-              source: "thread-storage",
-            });
-            return {
-              kind: "html",
-              file: "reports/result file.html",
-              source: "thread-storage",
-            };
-          },
-        },
-      },
-    );
-
-    const iframe = await waitFor(() => {
-      const el = slot.container.querySelector("iframe");
-      expect(el).toBeTruthy();
-      return el as HTMLIFrameElement;
-    });
-
-    expect(iframe.getAttribute("src")).toBe(
-      "/api/v1/threads/thr_1/thread-storage/files/reports/result%20file.html",
-    );
-    expect(iframe.getAttribute("sandbox")).toBe("allow-scripts");
     expect(
       slot.queryByRole("button", { name: /open .* in sidebar/i }),
     ).toBeNull();
     expect(openWorkspaceFile).not.toHaveBeenCalled();
   });
 
-  it("uses an optional bounded height attribute", async () => {
-    const slot = renderSlot(
-      app.messageDirectives[0]!,
-      {
-        attributes: { file: "demo.html", height: "480" },
-        source: '::inline-vis{file="demo.html" height="480"}',
-        message,
-        openWorkspaceFile: null,
-      },
-      {
-        rpc: {
-          preparePreview: () => ({
-            kind: "html",
-            file: "demo.html",
-            source: "workspace",
-          }),
-        },
-      },
-    );
-
-    const iframe = await waitFor(() => {
-      const el = slot.container.querySelector("iframe");
-      expect(el).toBeTruthy();
-      return el as HTMLIFrameElement;
-    });
-    expect(iframe.style.height).toBe("480px");
-  });
-
-  it("reserves the preview height while loading so the timeline does not jump", async () => {
-    type HtmlPreview = {
-      kind: "html";
-      file: string;
-      source: "workspace" | "thread-storage";
-    };
-    let resolvePreview = (_result: HtmlPreview) => {};
-    const pendingPreview = new Promise<HtmlPreview>((resolve) => {
-      resolvePreview = resolve;
-    });
-    const slot = renderSlot(
-      app.messageDirectives[0]!,
-      {
-        attributes: { file: "demo.html", height: "480" },
-        source: '::inline-vis{file="demo.html" height="480"}',
-        message,
-        openWorkspaceFile: vi.fn(() => true),
-      },
-      {
-        rpc: {
-          preparePreview: () => pendingPreview,
-        },
-      },
-    );
-
-    const loading = await waitFor(() => {
-      const el = slot.container.querySelector('[aria-busy="true"]');
-      if (!(el instanceof HTMLElement)) {
-        throw new Error("Expected the inline visualization loader to render");
-      }
-      return el;
-    });
-    expect(loading.style.height).toBe("480px");
-    expect(
-      slot.getByRole("status", { name: "Loading visualization demo.html" }),
-    ).toBe(loading);
-    const loadingCard = loading.parentElement!;
-    const loadingHeader = loadingCard.firstElementChild!;
-    const loadingHeaderHtml = loadingHeader.outerHTML;
-
-    resolvePreview({ kind: "html", file: "demo.html", source: "workspace" });
-
-    const iframe = await waitFor(() => {
-      const el = slot.container.querySelector("iframe");
-      if (!(el instanceof HTMLIFrameElement)) {
-        throw new Error("Expected the inline visualization iframe to render");
-      }
-      return el;
-    });
-    expect(iframe.style.height).toBe("480px");
-    expect(slot.queryByRole("status")).toBeNull();
-
-    const readyCard = iframe.parentElement!;
-    expect(readyCard.className).toBe(loadingCard.className);
-    const readyHeader = readyCard.firstElementChild!;
-    expect(readyHeader.className).toBe(loadingHeader.className);
-    expect(readyHeader.lastElementChild!.classList.contains("size-5")).toBe(
-      true,
-    );
-    expect(loadingHeaderHtml).toContain("size-5");
-  });
-
-  it("renders a Markdown document with the host renderer and no iframe", async () => {
-    const openWorkspaceFile = vi.fn(() => true);
-    const slot = renderSlot(
-      app.messageDirectives[0]!,
-      {
-        attributes: { file: "reports/notes.md" },
-        source: '::inline-vis{file="reports/notes.md"}',
-        message,
-        openWorkspaceFile,
-      },
-      {
-        rpc: {
-          preparePreview: (input) => {
-            expect(input).toEqual({
-              threadId: "thr_1",
-              file: "reports/notes.md",
-            });
-            return {
-              kind: "markdown",
-              file: "reports/notes.md",
-              source: "workspace",
-              content: "# Notes\n\nReady for review.",
-            };
-          },
-        },
-      },
-    );
-
-    const markdown = await slot.findByTestId("bb-markdown");
-    expect(markdown.textContent).toBe("# Notes\n\nReady for review.");
-    expect(slot.container.querySelector("iframe")).toBeNull();
-    expect(markdown.parentElement?.style.height).toBe("224px");
-    expect(markdown.parentElement?.className).toContain("overflow-auto");
-
-    fireEvent.click(
-      slot.getByRole("button", {
-        name: "Open reports/notes.md in sidebar",
+  it("renders fetched Markdown through the host renderer", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response("# Notes\n\nReady for review.", {
+        headers: { "content-type": "text/markdown" },
       }),
     );
-    expect(openWorkspaceFile).toHaveBeenCalledWith("reports/notes.md");
-  });
-
-  it("renders thread-storage Markdown without a workspace action", async () => {
-    const openWorkspaceFile = vi.fn(() => true);
-    const slot = renderSlot(
-      app.messageDirectives[0]!,
-      {
-        attributes: { source: "thread-storage", file: "reports/notes.md" },
-        source: '::inline-vis{source="thread-storage" file="reports/notes.md"}',
-        message,
-        openWorkspaceFile,
-      },
-      {
-        rpc: {
-          preparePreview: () => ({
-            kind: "markdown",
-            file: "reports/notes.md",
-            source: "thread-storage",
-            content: "# Notes",
-          }),
-        },
-      },
-    );
-
+    const slot = renderDirective({ file: "reports/notes.md", height: "480" });
     const markdown = await slot.findByTestId("bb-markdown");
-    expect(markdown.textContent).toBe("# Notes");
-    expect(slot.container.querySelector("iframe")).toBeNull();
-    expect(
-      slot.queryByRole("button", { name: /open .* in sidebar/i }),
-    ).toBeNull();
-    expect(openWorkspaceFile).not.toHaveBeenCalled();
-  });
-
-  it("uses an optional bounded height for Markdown", async () => {
-    const slot = renderSlot(
-      app.messageDirectives[0]!,
-      {
-        attributes: { file: "notes.md", height: "480" },
-        source: '::inline-vis{file="notes.md" height="480"}',
-        message,
-        openWorkspaceFile: null,
-      },
-      {
-        rpc: {
-          preparePreview: () => ({
-            kind: "markdown",
-            file: "notes.md",
-            source: "workspace",
-            content: "# Notes",
-          }),
-        },
-      },
-    );
-
-    const markdown = await slot.findByTestId("bb-markdown");
+    expect(markdown.textContent).toBe("# Notes\n\nReady for review.");
     expect(markdown.parentElement?.style.height).toBe("480px");
+    expect(slot.container.querySelector("iframe")).toBeNull();
   });
 
-  it("reserves the Markdown preview height while loading", async () => {
-    type MarkdownPreview = {
-      kind: "markdown";
-      file: string;
-      source: "workspace";
-      content: string;
-    };
-    let resolvePreview = (_result: MarkdownPreview) => {};
-    const pendingPreview = new Promise<MarkdownPreview>((resolve) => {
-      resolvePreview = resolve;
+  it("reserves the requested height while resource resolution is pending", async () => {
+    let resolveResource = (_resource: ExperimentalFileResource) => {};
+    const pending = new Promise<ExperimentalFileResource>((resolve) => {
+      resolveResource = resolve;
     });
-    const slot = renderSlot(
-      app.messageDirectives[0]!,
+    const slot = renderDirective(
+      { file: "demo.html", height: "480" },
+      { experimental_resolveFileResource: () => pending },
+      vi.fn(() => true),
+    );
+    const loading = await slot.findByRole("status", {
+      name: "Loading visualization demo.html",
+    });
+    expect((loading as HTMLElement).style.height).toBe("480px");
+    resolveResource(
+      resourceFor({
+        kind: "workspace",
+        environmentId: "env_1",
+        path: "demo.html",
+      }),
+    );
+    const iframe = await waitFor(() => {
+      const element = slot.container.querySelector("iframe");
+      expect(element).toBeTruthy();
+      return element as HTMLIFrameElement;
+    });
+    expect(iframe.style.height).toBe("480px");
+  });
+
+  it("shows resource and content failures", async () => {
+    const resolutionFailure = renderDirective(
+      { file: "missing.html" },
       {
-        attributes: { file: "notes.md", height: "480" },
-        source: '::inline-vis{file="notes.md" height="480"}',
-        message,
-        openWorkspaceFile: vi.fn(() => true),
-      },
-      {
-        rpc: {
-          preparePreview: () => pendingPreview,
+        experimental_resolveFileResource: () => {
+          throw new Error("Workspace is unavailable");
         },
       },
     );
+    expect((await resolutionFailure.findByRole("alert")).textContent).toMatch(
+      /workspace is unavailable/i,
+    );
+    cleanup();
 
-    const loading = await waitFor(() => {
-      const el = slot.container.querySelector('[aria-busy="true"]');
-      if (!(el instanceof HTMLElement)) {
-        throw new Error("Expected the inline visualization loader to render");
-      }
-      return el;
-    });
-    expect(loading.style.height).toBe("480px");
-    const loadingCard = loading.parentElement!;
-
-    resolvePreview({
-      kind: "markdown",
-      file: "notes.md",
-      source: "workspace",
-      content: "# Notes",
-    });
-
-    const markdown = await slot.findByTestId("bb-markdown");
-    const markdownBody = markdown.parentElement!;
-    expect(markdownBody.style.height).toBe("480px");
-    expect(slot.queryByRole("status")).toBeNull();
-    expect(markdownBody.parentElement!.className).toBe(loadingCard.className);
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 404 }));
+    const missing = renderDirective({ file: "missing.html" });
+    expect((await missing.findByRole("alert")).textContent).toMatch(
+      /preview file not found/i,
+    );
   });
 
-  it("rejects an invalid height without calling rpc", async () => {
-    const slot = renderSlot(
-      app.messageDirectives[0]!,
-      {
-        attributes: { file: "demo.html", height: "100vh" },
-        source: '::inline-vis{file="demo.html" height="100vh"}',
-        message,
-        openWorkspaceFile: null,
-      },
-      { rpc: {} },
-    );
-
+  it("rejects out-of-range heights", async () => {
+    const slot = renderDirective({ file: "demo.html", height: "42" });
     expect((await slot.findByRole("alert")).textContent).toMatch(
-      /whole number from 120 to 1200 pixels/i,
+      /120 to 1200/i,
     );
-    expect(slot.container.querySelector("iframe")).toBeNull();
-    expect(slot.rpcCalls).toEqual([]);
-  });
-
-  it("shows an error when rpc fails", async () => {
-    const slot = renderSlot(
-      app.messageDirectives[0]!,
-      {
-        attributes: { file: "missing.html" },
-        source: '::inline-vis{file="missing.html"}',
-        message,
-        openWorkspaceFile: null,
-      },
-      {
-        rpc: {
-          preparePreview: () => {
-            throw new Error("Preview file not found: missing.html");
-          },
-        },
-      },
-    );
-
-    const alert = await slot.findByRole("alert");
-    expect(alert.textContent).toMatch(/Preview file not found: missing\.html/);
-    expect(slot.container.querySelector("iframe")).toBeNull();
+    expect(slot.experimental_fileResourceCalls).toEqual([]);
   });
 });

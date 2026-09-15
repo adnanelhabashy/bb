@@ -23,6 +23,7 @@ import type {
   ExperimentalAppPanel,
   ExperimentalComposerSubmitOptions,
   ExperimentalFixedTabTargetState,
+  ExperimentalFileResources,
   ExperimentalPluginFixedTabReference,
   JsonValue,
 } from "@get-bb/plugin-sdk";
@@ -76,6 +77,7 @@ type FetchLike = (
 ) => Promise<Pick<Response, "ok" | "status" | "json">>;
 
 const legacySetThreadRowStatus = (_status: unknown): void => {};
+
 export function isAutomationEditRoutePath(pathname: string): boolean {
   return (
     matchPath({ path: AUTOMATION_EDIT_ROUTE_PATH, end: true }, pathname) !==
@@ -444,8 +446,21 @@ function useExperimentalFixedTabTarget<Target extends JsonValue>(
   };
 }
 
+function useExperimentalFileResources(): ExperimentalFileResources {
+  const resolve = useCallback<ExperimentalFileResources["resolve"]>(
+    (target, options) =>
+      sdk.files.experimental_resolveResource({
+        target,
+        signal: options?.signal,
+      }),
+    [],
+  );
+  return useMemo(() => ({ resolve }), [resolve]);
+}
+
 export {
   useExperimentalAppPanel as experimental_useAppPanel,
+  useExperimentalFileResources as experimental_useFileResources,
   useExperimentalFixedTabTarget as experimental_useFixedTabTarget,
 };
 

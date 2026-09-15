@@ -27,6 +27,7 @@ const {
   experimental_PermissionModePicker: PermissionModePicker,
   experimental_useAppPanel,
   experimental_useFixedTabTarget,
+  experimental_useFileResources,
   ThreadChat,
   useBbNavigate,
   useComposer,
@@ -277,6 +278,27 @@ function FileNavigationProbe() {
         Open file externally
       </button>
     </div>
+  );
+}
+
+function FileResourceProbe() {
+  const resources = experimental_useFileResources();
+  const [url, setUrl] = useState("");
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void resources
+          .resolve({
+            kind: "workspace",
+            environmentId: "env_42",
+            path: "reports/demo.html",
+          })
+          .then((resource) => setUrl(resource.url));
+      }}
+    >
+      {url || "Resolve file"}
+    </button>
   );
 }
 
@@ -1497,6 +1519,37 @@ describe("renderSlot", () => {
     ]);
   });
 
+  it("validates and records file resource resolution", async () => {
+    const slot = renderSlot(
+      { component: FileResourceProbe },
+      {},
+      {
+        experimental_resolveFileResource: (target) => ({
+          absolutePath: `/workspace/${target.path}`,
+          rootPath: "/workspace",
+          baseUrl: "/api/v1/file-previews/lease_1",
+          expiresAtMs: 123,
+          path: target.path,
+          target,
+          url: "/api/v1/file-previews/lease_1/reports/demo.html",
+        }),
+      },
+    );
+    fireEvent.click(slot.getByRole("button", { name: "Resolve file" }));
+    await slot.findByRole("button", {
+      name: "/api/v1/file-previews/lease_1/reports/demo.html",
+    });
+    expect(slot.inspection.experimental_fileResourceCalls).toEqual([
+      {
+        target: {
+          kind: "workspace",
+          environmentId: "env_42",
+          path: "reports/demo.html",
+        },
+      },
+    ]);
+  });
+
   it("records fixed-tab opens and retains target state until the owner clears it", () => {
     const slot = renderSlot(
       { component: FixedTabProbe },
@@ -1588,6 +1641,7 @@ describe("renderSlot", () => {
         threadId: "thr_1",
         turnId: "turn_1",
         projectId: "proj_1",
+        experimental_environmentId: null,
       },
       openWorkspaceFile: null,
     });

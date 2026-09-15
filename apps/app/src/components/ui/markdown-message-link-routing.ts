@@ -1,7 +1,5 @@
-import type {
-  MarkdownLinkRouting,
-  MarkdownLocalFileLinkRouting,
-} from "./markdown-link-routing.js";
+import { buildMarkdownContextRouting } from "./markdown-file-image-routing";
+import type { MarkdownLinkRouting } from "./markdown-link-routing.js";
 import type { MarkdownPreviewLinkHandler } from "./markdown-link.js";
 import type { MarkdownPreviewLocalFileLinkHandler } from "./markdown-local-file-link.js";
 import { buildThreadHostFileContentUrl } from "@/lib/file-content-urls";
@@ -27,36 +25,17 @@ export function buildMarkdownMessageLinkRouting({
     return undefined;
   }
 
-  const routing: MarkdownLinkRouting = {};
-  if (onOpenLink !== undefined) {
-    routing.onOpenLink = onOpenLink;
-  }
-  if (threadId !== undefined) {
-    routing.localImage = {
-      absolutePaths: { kind: "trusted-host" },
-      resolveSrc: ({ path }) => buildThreadHostFileContentUrl(threadId, path),
-      ...(workspaceRootPath === undefined
-        ? {}
-        : {
-            relativePaths: {
-              baseDir: workspaceRootPath,
-              rootPath: workspaceRootPath,
-            },
-          }),
-    };
-  }
-  if (onOpenLocalFileLink !== undefined) {
-    const localFile: MarkdownLocalFileLinkRouting = {
-      absoluteLinks: { kind: "trusted-host" },
-      onOpenLink: onOpenLocalFileLink,
-    };
-    if (workspaceRootPath !== undefined) {
-      localFile.relativeLinks = {
-        baseDir: workspaceRootPath,
-        rootPath: workspaceRootPath,
-      };
-    }
-    routing.localFile = localFile;
-  }
-  return routing;
+  return buildMarkdownContextRouting({
+    absolutePaths: { kind: "trusted-host" },
+    relativePaths:
+      workspaceRootPath === undefined
+        ? undefined
+        : { baseDir: workspaceRootPath, rootPath: workspaceRootPath },
+    onOpenLink,
+    onOpenLocalFileLink,
+    resolveSrc:
+      threadId === undefined
+        ? undefined
+        : ({ path }) => buildThreadHostFileContentUrl(threadId, path),
+  });
 }

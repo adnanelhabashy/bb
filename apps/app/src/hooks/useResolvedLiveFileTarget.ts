@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { ExperimentalLiveFileTarget } from "@get-bb/plugin-sdk";
+import type { ExperimentalFileReference } from "@get-bb/plugin-sdk";
 import type { OpenInTargetContext } from "@bb/host-daemon-contract";
 import { useEnvironment } from "@/hooks/queries/environment-queries";
 import { useThreadStorageLocation } from "@/hooks/queries/thread-queries";
@@ -26,7 +26,7 @@ function buildAbsoluteHostPath(rootPath: string, relativePath: string): string {
 }
 
 export function useResolvedLiveFileTarget(
-  target: ExperimentalLiveFileTarget | null,
+  target: ExperimentalFileReference | null,
   options: { enabled: boolean },
 ): ResolvedLiveFileTarget {
   const storageThreadId =

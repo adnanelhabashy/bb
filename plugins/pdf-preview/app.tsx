@@ -1,37 +1,30 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   definePluginApp,
+  experimental_useFileResources,
   type PluginFileOpenerProps,
 } from "@get-bb/plugin-sdk/app";
-import { loadPdfBlob, resolvePdfReadTarget } from "./pdf-source.js";
+import { loadPdfBlob } from "./pdf-source.js";
 
 type PreviewState =
   | { status: "loading" }
   | { status: "ready"; frameLoaded: boolean; url: string }
   | { status: "error"; message: string };
 
-function PdfFileOpener({ path, source, Original }: PluginFileOpenerProps) {
+function PdfFileOpener({ experimental_file, Original }: PluginFileOpenerProps) {
+  const fileResources = experimental_useFileResources();
   const [reloadNonce, setReloadNonce] = useState(0);
   const [state, setState] = useState<PreviewState>({ status: "loading" });
-  const target = useMemo(
-    () => resolvePdfReadTarget(path, source),
-    [
-      path,
-      source.environmentId,
-      source.kind,
-      source.projectId,
-      source.threadId,
-    ],
-  );
+  const path = experimental_file.path;
 
   useEffect(() => {
-    if (target === null) return;
-
     const controller = new AbortController();
     let objectUrl: string | null = null;
     setState({ status: "loading" });
 
-    void loadPdfBlob(target, controller.signal)
+    void fileResources
+      .resolve(experimental_file, { signal: controller.signal })
+      .then((resource) => loadPdfBlob(resource.url, controller.signal))
       .then((blob) => {
         if (controller.signal.aborted) return;
         objectUrl = URL.createObjectURL(blob);
@@ -49,9 +42,7 @@ function PdfFileOpener({ path, source, Original }: PluginFileOpenerProps) {
       controller.abort();
       if (objectUrl !== null) URL.revokeObjectURL(objectUrl);
     };
-  }, [reloadNonce, target]);
-
-  if (target === null) return <Original />;
+  }, [experimental_file, fileResources, reloadNonce]);
 
   if (state.status === "error") {
     return (

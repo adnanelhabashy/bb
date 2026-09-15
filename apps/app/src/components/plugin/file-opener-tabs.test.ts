@@ -6,7 +6,9 @@ import {
   buildFileOpenerPanelTab,
   createFileOpenerOriginalTab,
   createFileOpenerTabForRequest,
+  legacyFileOpenerProps,
   parseFileOpenerParams,
+  resolveFileOpenerParams,
 } from "./file-opener-tabs";
 
 const MARKDOWN_OPENER = {
@@ -55,6 +57,7 @@ describe("createFileOpenerTabForRequest thread-tabs contract", () => {
     "produces a %s tab the thread-tabs contract accepts",
     (_label, request) => {
       const tab = createFileOpenerTabForRequest({
+        environmentHostId: "host_docs",
         fileOpeners: [MARKDOWN_OPENER],
         preference: {},
         projectId: null,
@@ -68,7 +71,7 @@ describe("createFileOpenerTabForRequest thread-tabs contract", () => {
     },
   );
 
-  it("keeps a projectless workspace opener tab contract-valid", () => {
+  it("keeps the native preview when a workspace has no canonical location", () => {
     const tab = createFileOpenerTabForRequest({
       fileOpeners: [MARKDOWN_OPENER],
       preference: {},
@@ -86,13 +89,7 @@ describe("createFileOpenerTabForRequest thread-tabs contract", () => {
       threadId: null,
     });
 
-    expect(tab?.fileOpenerOwner).toMatchObject({
-      environmentId: null,
-      kind: "workspace-file-preview",
-      projectId: null,
-      threadId: null,
-    });
-    expect(() => threadTabsSchema.parse([tab])).not.toThrow();
+    expect(tab).toBeNull();
   });
 
   it("preserves the selected host for a project-backed opener", () => {
@@ -100,6 +97,7 @@ describe("createFileOpenerTabForRequest thread-tabs contract", () => {
       fileOpeners: [MARKDOWN_OPENER],
       preference: {},
       projectHostId: "host_remote",
+      projectRootPath: "/remote/project",
       projectId: "proj_1",
       request: {
         kind: "workspace-file-preview",
@@ -114,28 +112,70 @@ describe("createFileOpenerTabForRequest thread-tabs contract", () => {
       threadId: null,
     });
 
-    const params = parseFileOpenerParams(tab?.paramsJson ?? null);
-    expect(params?.source).toMatchObject({
-      kind: "workspace",
-      projectId: "proj_1",
-      experimental_hostId: "host_remote",
+    const params = parseFileOpenerParams(
+      tab?.paramsJson ?? null,
+      tab?.fileOpenerOwner,
+    );
+    expect(params?.experimental_file).toEqual({
+      kind: "host",
+      hostId: "host_remote",
+      path: "/remote/project/docs/readme.md",
     });
     expect(() => threadTabsSchema.parse([tab])).not.toThrow();
   });
 });
 
 describe("createFileOpenerOriginalTab", () => {
-  it("uses persisted workspace routing while retaining owner presentation", () => {
+  it("recognizes persisted legacy params while reconstructing from the owner", () => {
+    const openerTab = {
+      ...buildFileOpenerPanelTab(
+        MARKDOWN_OPENER,
+        {
+          experimental_file: {
+            kind: "workspace" as const,
+            environmentId: "env_1",
+            path: "docs/readme.md",
+          },
+        },
+        {
+          environmentId: "env_1",
+          kind: "workspace-file-preview" as const,
+          projectId: null,
+          tab: {
+            lineRange: null,
+            path: "docs/readme.md",
+            source: { kind: "working-tree" as const },
+            statusLabel: null,
+          },
+          threadId: "thr_1",
+        },
+      ),
+      paramsJson: JSON.stringify({
+        path: "docs/readme.md",
+        source: {
+          kind: "workspace",
+          environmentId: "env_1",
+          projectId: null,
+          threadId: "thr_1",
+        },
+      }),
+    };
+
+    expect(createFileOpenerOriginalTab(openerTab)).toMatchObject({
+      environmentId: "env_1",
+      kind: "workspace-file-preview",
+      path: "docs/readme.md",
+    });
+  });
+
+  it("uses the canonical reference to reconstruct the native workspace preview", () => {
     const openerTab = buildFileOpenerPanelTab(
       MARKDOWN_OPENER,
       {
-        path: "persisted/readme.md",
-        source: {
+        experimental_file: {
           kind: "workspace",
-          environmentId: null,
-          experimental_hostId: "host_opened",
-          projectId: "proj_opened",
-          threadId: null,
+          environmentId: "env_opened",
+          path: "persisted/readme.md",
         },
       },
       {
@@ -153,26 +193,23 @@ describe("createFileOpenerOriginalTab", () => {
     );
 
     expect(createFileOpenerOriginalTab(openerTab)).toMatchObject({
-      environmentId: null,
+      environmentId: "env_opened",
       kind: "workspace-file-preview",
       lineRange: { endLineNumber: 12, startLineNumber: 8 },
       path: "persisted/readme.md",
-      projectId: "proj_opened",
+      projectId: null,
       source: { kind: "working-tree" },
     });
   });
 
-  it("uses persisted host routing instead of stale owner identity", () => {
+  it("uses the canonical reference to reconstruct the native host preview", () => {
     const openerTab = buildFileOpenerPanelTab(
       MARKDOWN_OPENER,
       {
-        path: "/persisted/notes.md",
-        source: {
+        experimental_file: {
           kind: "host",
-          environmentId: null,
-          experimental_hostId: "host_opened",
-          projectId: null,
-          threadId: null,
+          hostId: "host_opened",
+          path: "/persisted/notes.md",
         },
       },
       {
@@ -197,16 +234,14 @@ describe("createFileOpenerOriginalTab", () => {
     });
   });
 
-  it("uses persisted thread-storage routing instead of stale owner identity", () => {
+  it("uses the canonical reference to reconstruct the native thread-storage preview", () => {
     const openerTab = buildFileOpenerPanelTab(
       MARKDOWN_OPENER,
       {
-        path: "persisted/plan.md",
-        source: {
+        experimental_file: {
           kind: "thread-storage",
-          environmentId: "env_opened",
-          projectId: null,
           threadId: "thr_opened",
+          path: "persisted/plan.md",
         },
       },
       {
@@ -218,11 +253,210 @@ describe("createFileOpenerOriginalTab", () => {
     );
 
     expect(createFileOpenerOriginalTab(openerTab)).toMatchObject({
-      environmentId: "env_opened",
+      environmentId: null,
       isPinned: false,
       kind: "thread-storage-file-preview",
       path: "persisted/plan.md",
       threadId: "thr_opened",
     });
+  });
+});
+
+describe("legacy file opener compatibility", () => {
+  it("resolves legacy persisted params through each trusted owner location", () => {
+    const legacyParams = (kind: "workspace" | "host" | "thread-storage") =>
+      JSON.stringify({
+        path: kind === "host" ? "/vault/file.md" : "docs/file.md",
+        source: {
+          kind,
+          environmentId: kind === "thread-storage" ? null : "env_1",
+          projectId: null,
+          threadId: "thr_1",
+        },
+      });
+
+    expect(
+      resolveFileOpenerParams({
+        owner: {
+          environmentId: "env_1",
+          kind: "workspace-file-preview",
+          projectId: null,
+          tab: {
+            lineRange: null,
+            path: "docs/file.md",
+            source: { kind: "working-tree" },
+            statusLabel: null,
+          },
+          threadId: "thr_1",
+        },
+        paramsJson: legacyParams("workspace"),
+      }),
+    ).toEqual({
+      experimental_file: {
+        kind: "workspace",
+        environmentId: "env_1",
+        path: "docs/file.md",
+      },
+    });
+    expect(
+      resolveFileOpenerParams({
+        environmentHostId: "host_1",
+        owner: {
+          environmentId: "env_1",
+          hostId: null,
+          kind: "host-file-preview",
+          tab: { lineRange: null, path: "/vault/file.md" },
+          threadId: "thr_1",
+        },
+        paramsJson: legacyParams("host"),
+      }),
+    ).toEqual({
+      experimental_file: {
+        kind: "host",
+        hostId: "host_1",
+        path: "/vault/file.md",
+      },
+    });
+    expect(
+      resolveFileOpenerParams({
+        owner: {
+          environmentId: null,
+          kind: "thread-storage-file-preview",
+          tab: { lineRange: null, path: "docs/file.md" },
+          threadId: "thr_1",
+        },
+        paramsJson: legacyParams("thread-storage"),
+      }),
+    ).toEqual({
+      experimental_file: {
+        kind: "thread-storage",
+        threadId: "thr_1",
+        path: "docs/file.md",
+      },
+    });
+  });
+
+  it("resolves project-backed legacy workspace tabs to an absolute host file", () => {
+    const owner = {
+      environmentId: null,
+      kind: "workspace-file-preview" as const,
+      projectId: "proj_1",
+      tab: {
+        lineRange: null,
+        path: "docs/file.md",
+        source: { kind: "working-tree" as const },
+        statusLabel: null,
+      },
+      threadId: null,
+    };
+    const resolved = resolveFileOpenerParams({
+      owner,
+      paramsJson: JSON.stringify({
+        path: "docs/file.md",
+        source: {
+          kind: "workspace",
+          environmentId: null,
+          experimental_hostId: "host_1",
+          projectId: "proj_1",
+          threadId: null,
+        },
+      }),
+      projectHostId: "host_1",
+      projectRootPath: "/workspace/project",
+    });
+
+    expect(resolved).toEqual({
+      experimental_file: {
+        kind: "host",
+        hostId: "host_1",
+        path: "/workspace/project/docs/file.md",
+      },
+    });
+    expect(legacyFileOpenerProps(owner, resolved!.experimental_file)).toEqual({
+      path: "docs/file.md",
+      source: {
+        kind: "workspace",
+        environmentId: null,
+        experimental_hostId: "host_1",
+        projectId: "proj_1",
+        threadId: null,
+      },
+    });
+  });
+
+  it("rejects a legacy source kind that disagrees with its trusted owner", () => {
+    expect(
+      resolveFileOpenerParams({
+        owner: {
+          environmentId: "env_1",
+          kind: "workspace-file-preview",
+          projectId: null,
+          tab: {
+            lineRange: null,
+            path: "docs/file.md",
+            source: { kind: "working-tree" },
+            statusLabel: null,
+          },
+          threadId: "thr_1",
+        },
+        paramsJson: JSON.stringify({
+          path: "docs/file.md",
+          source: {
+            kind: "host",
+            environmentId: "env_1",
+            projectId: null,
+            threadId: "thr_1",
+          },
+        }),
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("canonical opener persistence", () => {
+  it("normalizes old duplicated identity and keeps distinct file tabs", () => {
+    const owner = {
+      kind: "workspace-file-preview" as const,
+      environmentId: "env_old",
+      projectId: null,
+      threadId: "thread_old",
+      tab: {
+        path: "stale.md",
+        lineRange: null,
+        source: { kind: "working-tree" as const },
+        statusLabel: null,
+      },
+    };
+    const file = {
+      kind: "workspace" as const,
+      environmentId: "env_actual",
+      path: "actual.md",
+    };
+    const first = buildFileOpenerPanelTab(
+      MARKDOWN_OPENER,
+      { experimental_file: file },
+      owner,
+    );
+    const second = buildFileOpenerPanelTab(
+      MARKDOWN_OPENER,
+      { experimental_file: { ...file, path: "second.md" } },
+      owner,
+    );
+    expect(first.id).not.toBe(second.id);
+    const parsed = threadTabsSchema.parse([
+      {
+        ...first,
+        fileOpenerOwner: owner,
+        paramsJson: JSON.stringify({ experimental_file: file }),
+      },
+    ]);
+    expect(parsed[0]).toMatchObject({
+      paramsJson: null,
+      fileOpenerOwner: { kind: "file-preview", file, tab: { lineRange: null } },
+    });
+    const serialized = JSON.stringify(parsed);
+    expect(serialized).not.toContain("stale.md");
+    expect(serialized).not.toContain("env_old");
+    expect(threadTabsSchema.parse(JSON.parse(serialized))).toEqual(parsed);
   });
 });

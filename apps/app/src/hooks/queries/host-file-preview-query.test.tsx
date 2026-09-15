@@ -3,12 +3,11 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
-import { hostFilePreviewQueryKey } from "./query-keys";
 import { HEAVY_PAYLOAD_GC_TIME_MS } from "./query-policies";
 import { useHostFilePreview } from "./host-file-preview-query";
 
 const filesSdk = vi.hoisted(() => ({
-  createPreview: vi.fn(),
+  experimental_resolveResource: vi.fn(),
   read: vi.fn(),
 }));
 
@@ -24,9 +23,9 @@ afterEach(() => {
 
 describe("useHostFilePreview", () => {
   it("uses a successful preview lease for media without reading or retaining file bytes", async () => {
-    filesSdk.createPreview.mockResolvedValue({
-      baseUrl: "/api/v1/file-previews/lease-1",
+    filesSdk.experimental_resolveResource.mockResolvedValue({
       expiresAtMs: Date.now() + 60_000,
+      url: "/api/v1/file-previews/lease-1/diagram.png",
     });
     filesSdk.read.mockResolvedValue({
       path: "/tmp/diagram.png",
@@ -45,9 +44,16 @@ describe("useHostFilePreview", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(filesSdk.createPreview).toHaveBeenCalledTimes(1);
+    expect(filesSdk.experimental_resolveResource).toHaveBeenCalledWith({
+      target: {
+        kind: "host",
+        hostId: "host-1",
+        path: "/tmp/diagram.png",
+      },
+      signal: expect.any(AbortSignal),
+    });
     expect(filesSdk.read).not.toHaveBeenCalled();
-    expect(result.current.data).toEqual({
+    expect(result.current.data).toMatchObject({
       kind: "image",
       mimeType: "image/png",
       name: "diagram.png",
@@ -56,15 +62,18 @@ describe("useHostFilePreview", () => {
     });
     expect(
       queryClient.getQueryCache().find({
-        queryKey: hostFilePreviewQueryKey("host-1", "/tmp/diagram.png"),
+        queryKey: [
+          "live-file-preview",
+          { kind: "host", hostId: "host-1", path: "/tmp/diagram.png" },
+        ],
       })?.gcTime,
     ).toBe(HEAVY_PAYLOAD_GC_TIME_MS);
   });
 
   it("keeps HTML source bytes while avoiding a base64 fallback after a lease succeeds", async () => {
-    filesSdk.createPreview.mockResolvedValue({
-      baseUrl: "/api/v1/file-previews/lease-2",
+    filesSdk.experimental_resolveResource.mockResolvedValue({
       expiresAtMs: Date.now() + 60_000,
+      url: "/api/v1/file-previews/lease-2/report.html",
     });
     filesSdk.read.mockResolvedValue({
       path: "/tmp/report.html",
@@ -84,11 +93,11 @@ describe("useHostFilePreview", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(filesSdk.createPreview).toHaveBeenCalledTimes(1);
+    expect(filesSdk.experimental_resolveResource).toHaveBeenCalledTimes(1);
     expect(filesSdk.read).toHaveBeenCalledTimes(1);
-    expect(filesSdk.createPreview.mock.invocationCallOrder[0]).toBeLessThan(
-      filesSdk.read.mock.invocationCallOrder[0]!,
-    );
+    expect(
+      filesSdk.experimental_resolveResource.mock.invocationCallOrder[0],
+    ).toBeLessThan(filesSdk.read.mock.invocationCallOrder[0]!);
     expect(encodeSpy).not.toHaveBeenCalled();
     expect(result.current.data).toMatchObject({
       kind: "text",
@@ -98,9 +107,9 @@ describe("useHostFilePreview", () => {
   });
 
   it("keeps ambiguous TypeScript paths on the source-preview path", async () => {
-    filesSdk.createPreview.mockResolvedValue({
-      baseUrl: "/api/v1/file-previews/lease-3",
+    filesSdk.experimental_resolveResource.mockResolvedValue({
       expiresAtMs: Date.now() + 60_000,
+      url: "/api/v1/file-previews/lease-3/example.ts",
     });
     filesSdk.read.mockResolvedValue({
       path: "/tmp/example.ts",
@@ -127,7 +136,9 @@ describe("useHostFilePreview", () => {
   });
 
   it("reads and builds a data URL only after preview lease creation fails", async () => {
-    filesSdk.createPreview.mockRejectedValue(new Error("host unavailable"));
+    filesSdk.experimental_resolveResource.mockRejectedValue(
+      new Error("host unavailable"),
+    );
     filesSdk.read.mockResolvedValue({
       path: "/tmp/diagram.png",
       content: "iVBORw0KGgo=",
@@ -145,9 +156,9 @@ describe("useHostFilePreview", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(filesSdk.createPreview.mock.invocationCallOrder[0]).toBeLessThan(
-      filesSdk.read.mock.invocationCallOrder[0]!,
-    );
+    expect(
+      filesSdk.experimental_resolveResource.mock.invocationCallOrder[0],
+    ).toBeLessThan(filesSdk.read.mock.invocationCallOrder[0]!);
     expect(result.current.data).toMatchObject({
       kind: "image",
       url: "data:image/png;base64,iVBORw0KGgo=",
@@ -156,9 +167,9 @@ describe("useHostFilePreview", () => {
 
   it("aborts an active read and releases the heavy cache entry when disabled", async () => {
     let readSignal: AbortSignal | undefined;
-    filesSdk.createPreview.mockResolvedValue({
-      baseUrl: "/api/v1/file-previews/lease-4",
+    filesSdk.experimental_resolveResource.mockResolvedValue({
       expiresAtMs: Date.now() + 60_000,
+      url: "/api/v1/file-previews/lease-4/example.txt",
     });
     filesSdk.read.mockImplementation(
       ({ signal }: { signal: AbortSignal }) =>
@@ -176,7 +187,10 @@ describe("useHostFilePreview", () => {
 
     await waitFor(() => expect(filesSdk.read).toHaveBeenCalledTimes(1));
     const activeQuery = queryClient.getQueryCache().find({
-      queryKey: hostFilePreviewQueryKey("host-1", "/tmp/example.txt"),
+      queryKey: [
+        "live-file-preview",
+        { kind: "host", hostId: "host-1", path: "/tmp/example.txt" },
+      ],
     });
     expect(activeQuery).toBeDefined();
 
@@ -190,7 +204,10 @@ describe("useHostFilePreview", () => {
     });
     expect(
       queryClient.getQueryCache().find({
-        queryKey: hostFilePreviewQueryKey("host-1", "/tmp/example.txt"),
+        queryKey: [
+          "live-file-preview",
+          { kind: "host", hostId: "host-1", path: "/tmp/example.txt" },
+        ],
       }),
     ).toBeUndefined();
   });

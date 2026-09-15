@@ -16,7 +16,6 @@ import {
   type PluginMessageDirectiveProps,
   type PluginNavPanelProps,
   type PluginThreadPanelProps,
-  type ExperimentalLiveFileTarget,
 } from "@get-bb/plugin-sdk/app";
 import type { docsRpcContract } from "./server.js";
 import { isRecord, parseMarkdownDocument } from "./markdown-document.js";
@@ -1041,51 +1040,10 @@ function NotePane({
   );
 }
 
-function DocsFileOpener({ path: filePath, source }: PluginFileOpenerProps) {
+function DocsFileOpener({ experimental_file }: PluginFileOpenerProps) {
   const rpc = useRpc<typeof docsRpcContract>();
   const navigate = useBbNavigate();
-  const liveFileTarget = useMemo<ExperimentalLiveFileTarget | null>(() => {
-    switch (source.kind) {
-      case "workspace":
-        return source.environmentId === null
-          ? null
-          : {
-              kind: source.kind,
-              environmentId: source.environmentId,
-              path: filePath,
-            };
-      case "host":
-        return source.experimental_hostId === undefined
-          ? null
-          : {
-              kind: source.kind,
-              hostId: source.experimental_hostId,
-              path: filePath,
-            };
-      case "thread-storage":
-        return source.threadId === null
-          ? null
-          : { kind: source.kind, threadId: source.threadId, path: filePath };
-    }
-  }, [filePath, source]);
-  const openerSource = useMemo(
-    () => ({
-      kind: source.kind,
-      threadId: source.threadId,
-      environmentId: source.environmentId,
-      projectId: source.projectId,
-      ...(source.experimental_hostId === undefined
-        ? {}
-        : { experimental_hostId: source.experimental_hostId }),
-    }),
-    [
-      source.environmentId,
-      source.experimental_hostId,
-      source.kind,
-      source.projectId,
-      source.threadId,
-    ],
-  );
+  const filePath = experimental_file.path;
   const [state, setState] = useState<
     | { content: string; lease: PreviewLease; previewPath: string }
     | { error: string }
@@ -1106,7 +1064,7 @@ function DocsFileOpener({ path: filePath, source }: PluginFileOpenerProps) {
     setConflict(false);
     setSaveError(null);
     void rpc
-      .call("openFile", { source: openerSource, path: filePath })
+      .call("openFile", { file: experimental_file })
       .then(({ file, preview, previewPath }) => {
         if (!active) return;
         markdownRef.current = file.content;
@@ -1124,7 +1082,7 @@ function DocsFileOpener({ path: filePath, source }: PluginFileOpenerProps) {
     return () => {
       active = false;
     };
-  }, [filePath, openerSource, reloadNonce, rpc]);
+  }, [experimental_file, reloadNonce, rpc]);
 
   const save = useCallback(
     async (force = false) => {
@@ -1138,8 +1096,7 @@ function DocsFileOpener({ path: filePath, source }: PluginFileOpenerProps) {
       const content = markdownRef.current;
       try {
         const result = await rpc.call("saveOpenedFile", {
-          source: openerSource,
-          path: filePath,
+          file: experimental_file,
           content,
           ...(!force && shaRef.current
             ? { expectedSha256: shaRef.current }
@@ -1158,7 +1115,7 @@ function DocsFileOpener({ path: filePath, source }: PluginFileOpenerProps) {
         savingRef.current = false;
       }
     },
-    [filePath, openerSource, rpc],
+    [experimental_file, rpc],
   );
 
   const scheduleSave = useCallback(() => {
@@ -1185,28 +1142,29 @@ function DocsFileOpener({ path: filePath, source }: PluginFileOpenerProps) {
   }
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      {liveFileTarget === null ? null : (
-        <div className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-xs">
-          <FileLink className="min-w-0 flex-1 truncate" target={liveFileTarget}>
-            {filePath}
-          </FileLink>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="size-7 shrink-0"
-            aria-label="Open file externally"
-            onClick={() =>
-              navigate.experimental_openFileExternally({
-                target: liveFileTarget,
-                location: null,
-              })
-            }
-          >
-            <HugeiconsIcon icon={ArrowUpRight01Icon} className="size-4" />
-          </Button>
-        </div>
-      )}
+      <div className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-xs">
+        <FileLink
+          className="min-w-0 flex-1 truncate"
+          target={experimental_file}
+        >
+          {filePath}
+        </FileLink>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="size-7 shrink-0"
+          aria-label="Open file externally"
+          onClick={() =>
+            navigate.experimental_openFileExternally({
+              target: experimental_file,
+              location: null,
+            })
+          }
+        >
+          <HugeiconsIcon icon={ArrowUpRight01Icon} className="size-4" />
+        </Button>
+      </div>
       {conflict ? (
         <div className="flex items-center gap-2 border-b border-border bg-muted px-4 py-2 text-xs">
           Changed on disk.

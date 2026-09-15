@@ -9,7 +9,6 @@ import type {
   ThreadWithIncludesResponse,
 } from "@bb/server-contract";
 import { COMPACT_VIEWPORT_QUERY } from "@bb/shared-ui/hooks/use-compact-viewport";
-import * as api from "@/lib/api";
 import { sdk } from "@/lib/sdk";
 import { makeThreadListEntry } from "@bb/test-helpers/domain-fixtures";
 import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
@@ -17,7 +16,6 @@ import { ARCHIVED_THREADS_PAGE_SIZE } from "./archived-threads-page-size";
 import {
   sidebarNavigationQueryKey,
   threadDetailBootstrapQueryKey,
-  threadHostFilePreviewQueryKey,
   threadPendingInteractionsQueryKey,
   threadQueuedMessagesQueryKey,
   threadQueryKey,
@@ -31,7 +29,6 @@ import {
   useChildThreads,
   useThread,
   useThreadDetailBootstrap,
-  useThreadHostFilePreview,
   useThreadMentionCandidates,
   useThreadPendingInteractions,
   useThreadQueuedMessages,
@@ -51,7 +48,6 @@ vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
   return {
     ...actual,
-    getThreadHostFilePreview: vi.fn(),
   };
 });
 
@@ -152,13 +148,6 @@ beforeEach(() => {
       },
     }),
   );
-  vi.mocked(api.getThreadHostFilePreview).mockResolvedValue({
-    kind: "text",
-    path: "/tmp/log.txt",
-    url: "/api/v1/threads/thread-1/host-files/content?path=%2Ftmp%2Flog.txt",
-    mimeType: "text/plain",
-    content: "preview",
-  });
 });
 
 describe("useThreadDetailBootstrap", () => {
@@ -513,36 +502,6 @@ describe("useThreadPendingInteractions", () => {
     await waitFor(() => {
       expect(sdk.threads.interactions.list).toHaveBeenCalledTimes(2);
     });
-  });
-});
-
-describe("useThreadHostFilePreview", () => {
-  it("refetches stale host file previews on focus and reconnect", async () => {
-    const { queryClient, wrapper } = createQueryClientTestHarness();
-
-    renderHook(
-      () => useThreadHostFilePreview("thread-1", "env-1", "/tmp/log.txt"),
-      { wrapper },
-    );
-
-    await waitFor(() => {
-      expect(api.getThreadHostFilePreview).toHaveBeenCalledTimes(1);
-    });
-
-    const query = queryClient.getQueryCache().find({
-      queryKey: threadHostFilePreviewQueryKey(
-        "thread-1",
-        "env-1",
-        "/tmp/log.txt",
-      ),
-    });
-
-    expect(query?.options).toEqual(
-      expect.objectContaining({
-        refetchOnReconnect: true,
-        refetchOnWindowFocus: true,
-      }),
-    );
   });
 });
 

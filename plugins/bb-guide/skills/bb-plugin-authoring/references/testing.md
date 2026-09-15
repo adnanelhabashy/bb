@@ -184,10 +184,16 @@ await slot.behavior.setComposerScope(
 );
 slot.inspection.rpcCalls;
 slot.inspection.navigateCalls;
+slot.inspection.experimental_fileResourceCalls;
 slot.inspection.composer; // text, visuals, quotes, mentions, and focus activity
 slot.lifecycle.unmount();
 await contentScripts.lifecycle.dispose();
 ```
+
+Pass `experimental_resolveFileResource(target)` in the `renderSlot` options
+when a component calls `experimental_useFileResources`. TypeScript checks the
+plugin call, the harness records the reference before invoking that resolver,
+and the real server validates runtime input with the shared schema.
 
 `loadPluginApp` validates registrations with the host's own rules (slot id
 patterns, settingsSection optional title, navPanel path,

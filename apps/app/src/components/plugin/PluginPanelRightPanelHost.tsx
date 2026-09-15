@@ -53,7 +53,10 @@ import {
   type SecondaryFileFixedPanelTab,
   type TerminalFixedPanelTab,
 } from "@/lib/fixed-panel-tabs-state";
-import { createFileOpenerOriginalTab } from "./file-opener-tabs";
+import {
+  createFileOpenerOriginalTab,
+  resolveFileOpenerParams,
+} from "./file-opener-tabs";
 import { activateSecondaryPanelTabInState } from "@bb/client-core";
 import {
   useCloseTerminal,
@@ -928,10 +931,18 @@ export function PluginPanelRightPanelHost({
           );
         case "plugin-panel": {
           const originalTab = createFileOpenerOriginalTab(tab);
+          const fileOpenerFile =
+            tab.fileOpenerOwner === undefined
+              ? undefined
+              : resolveFileOpenerParams({
+                  owner: tab.fileOpenerOwner,
+                  paramsJson: tab.paramsJson,
+                })?.experimental_file;
           return (
             <PluginPanelTabContent
               tab={tab}
               context={{ kind: "new-thread", projectId: null }}
+              fileOpenerFile={fileOpenerFile}
               fileOpenerOriginal={
                 originalTab === null ? undefined : renderTabContent(originalTab)
               }

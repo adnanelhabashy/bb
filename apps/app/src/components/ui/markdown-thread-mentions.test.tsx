@@ -156,6 +156,7 @@ const ACTIVE_MESSAGE_DIRECTIVES: MarkdownMessageDirectives = {
     threadId: "thr_parent",
     turnId: "turn_thread_mention",
     projectId: "proj_demo",
+    experimental_environmentId: null,
   },
   openWorkspaceFile: null,
   openThreadPanel: null,

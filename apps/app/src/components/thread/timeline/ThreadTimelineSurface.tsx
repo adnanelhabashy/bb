@@ -41,6 +41,7 @@ export interface ThreadTimelineSurfaceProps {
   activeThinking: ActiveThinking | null;
   canSpawnChild?: boolean;
   contextBoundarySeq: number | null;
+  environmentId?: string;
   threadOriginKind?: ThreadOriginKind | null;
   hasOlderTimelineRows?: boolean;
   hostConnectionNotice?: HostConnectionNotice | null;
@@ -143,6 +144,7 @@ export function ThreadTimelineSurface({
   activeThinking,
   canSpawnChild,
   contextBoundarySeq,
+  environmentId,
   threadOriginKind = null,
   hasOlderTimelineRows = false,
   hostConnectionNotice,
@@ -227,6 +229,7 @@ export function ThreadTimelineSurface({
         ) : timelineRowsWithPendingStop.length > 0 ? (
           <ThreadTimelineRows
             canSpawnChild={canSpawnChild}
+            environmentId={environmentId}
             threadOriginKind={threadOriginKind}
             onForkMessage={onForkMessage}
             onEditMessage={onEditMessage}

@@ -50,7 +50,7 @@ Read the installed declarations for exact current signatures.
 - `ExperimentalHostWatchOptions`
 - `ExperimentalHostWatchSubscription`
 - `ExperimentalHostWorkerLease`
-- `ExperimentalLiveFileTarget`
+- `ExperimentalFileReference`
 - `ExperimentalOpenFixedTabOptions`
 - `ExperimentalPermissionModePickerProps`
 - `ExperimentalPluginFixedTabReference`
@@ -149,7 +149,6 @@ Read the installed declarations for exact current signatures.
 - `PluginEvents`
 - `PluginFileOpenerProps`
 - `PluginFileOpenerRegistration`
-- `PluginFileOpenerSource`
 - `PluginFixedTabDeclaration`
 - `PluginFixedTabRegistration`
 - `PluginHomepageSectionProps`

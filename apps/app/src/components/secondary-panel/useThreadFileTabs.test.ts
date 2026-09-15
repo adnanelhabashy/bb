@@ -687,13 +687,10 @@ describe("useThreadFileTabs active owners", () => {
     const openerTab = buildFileOpenerPanelTab(
       { id: "pdf", pluginId: "pdf-preview" },
       {
-        path: "reports/quarterly.pdf",
-        source: {
-          kind: "workspace",
-          threadId: null,
-          environmentId: null,
-          projectId: "proj_opened",
-          experimental_hostId: "host_opened",
+        experimental_file: {
+          kind: "host",
+          hostId: "host_opened",
+          path: "/opened/reports/quarterly.pdf",
         },
       },
       {
@@ -736,8 +733,8 @@ describe("useThreadFileTabs active owners", () => {
       }),
     );
 
-    expect(result.current.activeWorkspaceFilePath).toBe(
-      "reports/quarterly.pdf",
+    expect(result.current.activeHostFilePath).toBe(
+      "/opened/reports/quarterly.pdf",
     );
   });
 
@@ -1013,17 +1010,17 @@ describe("useThreadFileTabs file opener diversion", () => {
       actionId: "file-opener:editor",
       title: "todo.md",
     });
-    const params = JSON.parse(firstTab.paramsJson ?? "null") as {
-      path: string;
-      source: { kind: string; environmentId: string | null };
-    };
-    expect(params.path).toBe("notes/todo.md");
-    expect(params.source).toMatchObject({
-      kind: "workspace",
-      environmentId: "env_1",
+    expect(firstTab.paramsJson).toBeNull();
+    expect(firstTab.fileOpenerOwner).toMatchObject({
+      kind: "file-preview",
+      file: {
+        kind: "workspace",
+        environmentId: "env_1",
+        path: "notes/todo.md",
+      },
     });
     expect(firstTab.fileOpenerOwner).toMatchObject({
-      kind: "workspace-file-preview",
+      kind: "file-preview",
       tab: {
         lineRange: { startLineNumber: 7, endLineNumber: 9 },
       },
@@ -1090,6 +1087,7 @@ describe("useThreadFileTabs file opener diversion", () => {
         panelStateId: "opener-owner-context",
         syncThreadId: "thr_owner",
         environmentId: "env_1",
+        environmentHostId: "host_1",
         storageFiles: undefined,
         terminalSessions: undefined,
       }),
@@ -1107,14 +1105,9 @@ describe("useThreadFileTabs file opener diversion", () => {
     expect(
       requirePluginPanelTab(result.current.activeTab).fileOpenerOwner,
     ).toEqual({
-      kind: "host-file-preview",
-      environmentId: "env_1",
-      hostId: null,
-      tab: {
-        lineRange: { startLineNumber: 11, endLineNumber: 12 },
-        path: "/tmp/readme.md",
-      },
-      threadId: "thr_owner",
+      kind: "file-preview",
+      file: { kind: "host", hostId: "host_1", path: "/tmp/readme.md" },
+      tab: { lineRange: { startLineNumber: 11, endLineNumber: 12 } },
     });
     expect(result.current.activeHostFilePath).toBe("/tmp/readme.md");
     expect(result.current.activeHostFileLineRange).toEqual({
@@ -1133,13 +1126,13 @@ describe("useThreadFileTabs file opener diversion", () => {
     );
     const storageOpenerTab = requirePluginPanelTab(result.current.activeTab);
     expect(storageOpenerTab.fileOpenerOwner).toEqual({
-      kind: "thread-storage-file-preview",
-      environmentId: "env_1",
-      tab: {
-        lineRange: { startLineNumber: 2, endLineNumber: 5 },
+      kind: "file-preview",
+      file: {
+        kind: "thread-storage",
+        threadId: "thr_owner",
         path: "artifacts/report.md",
       },
-      threadId: "thr_owner",
+      tab: { lineRange: { startLineNumber: 2, endLineNumber: 5 } },
     });
     expect(result.current.activeStorageFilePath).toBe("artifacts/report.md");
     expect(storageOpenerTab.fileOpenerOwner?.tab.lineRange).toEqual({
@@ -1215,14 +1208,14 @@ describe("useThreadFileTabs file opener diversion", () => {
       actionId: "file-opener:editor",
       title: "todo.md",
     });
-    const params = JSON.parse(pluginTab.paramsJson ?? "null") as {
-      path: string;
-      source: { kind: string; environmentId: string | null };
-    };
-    expect(params.path).toBe("notes/todo.md");
-    expect(params.source).toMatchObject({
-      kind: "workspace",
-      environmentId: "env_1",
+    expect(pluginTab.paramsJson).toBeNull();
+    expect(pluginTab.fileOpenerOwner).toMatchObject({
+      kind: "file-preview",
+      file: {
+        kind: "workspace",
+        environmentId: "env_1",
+        path: "notes/todo.md",
+      },
     });
     expect(result.current.activeTab?.kind).toBe("plugin-panel");
     expect(
@@ -1259,10 +1252,12 @@ describe("useThreadFileTabs file opener diversion", () => {
       actionId: "file-opener:editor",
       title: "notes.md",
       fileOpenerOwner: {
-        kind: "thread-storage-file-preview",
-        environmentId: "env_1",
-        threadId: "thr_storage_search",
-        tab: { path: "artifacts/notes.md" },
+        kind: "file-preview",
+        file: {
+          kind: "thread-storage",
+          threadId: "thr_storage_search",
+          path: "artifacts/notes.md",
+        },
       },
     });
     expect(result.current.activeTab?.kind).toBe("plugin-panel");

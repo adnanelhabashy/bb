@@ -2,11 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import plugin from "./server";
 
-const source = {
-  kind: "thread-storage",
+const file = {
+  kind: "thread-storage" as const,
   threadId: "thread-editor-test",
-  environmentId: "environment-editor-test",
-  projectId: null,
+  path: "notes/document.txt",
 };
 const storageRootPath = "/remote-storage/thread-editor-test";
 const hostId = "remote-editor-host";
@@ -29,7 +28,20 @@ async function setup() {
     sdk: {
       system: { config: () => ({ dataDir: "/server-data" }) },
       threads: { storageLocation },
-      files: { read, listPaths, write },
+      files: {
+        read,
+        listPaths,
+        write,
+        experimental_resolveResource: () => ({
+          target: file,
+          absolutePath: `${storageRootPath}/${file.path}`,
+          rootPath: storageRootPath,
+          path: file.path,
+          baseUrl: "/preview",
+          url: `/preview/${file.path}`,
+          expiresAtMs: Date.now() + 60_000,
+        }),
+      },
     },
   });
   await plugin(bb);
@@ -40,15 +52,12 @@ describe("thread storage host routing", () => {
   it("reads from the thread's storage host and root", async () => {
     const { harness, read, storageLocation } = await setup();
     const result = await harness.callRpc("read", {
-      source,
-      path: "notes/document.txt",
+      file,
     });
     expect(read).toHaveBeenCalledWith({
-      hostId,
-      rootPath: storageRootPath,
-      path: `${storageRootPath}/notes/document.txt`,
+      experimental_target: file,
     });
-    expect(storageLocation).toHaveBeenCalledWith({ threadId: source.threadId });
+    expect(storageLocation).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       kind: "text",
       content: "saved text",
@@ -58,10 +67,10 @@ describe("thread storage host routing", () => {
 
   it("lists the thread's storage host and root", async () => {
     const { harness, listPaths } = await setup();
-    const result = await harness.callRpc("tree", { source });
+    const result = await harness.callRpc("tree", { file });
     expect(listPaths).toHaveBeenCalledWith({
-      hostId,
-      path: storageRootPath,
+      experimental_target: file,
+      experimental_directory: "root",
       includeFiles: true,
       includeDirectories: true,
       includeHidden: true,
@@ -77,15 +86,12 @@ describe("thread storage host routing", () => {
   it("saves to the thread's storage host with the expected version", async () => {
     const { harness, write } = await setup();
     const result = await harness.callRpc("write", {
-      source,
-      path: "notes/document.txt",
+      file,
       content: "edited text",
       expectedSha256: "original",
     });
     expect(write).toHaveBeenCalledWith({
-      hostId,
-      rootPath: storageRootPath,
-      path: `${storageRootPath}/notes/document.txt`,
+      experimental_target: file,
       content: "edited text",
       contentEncoding: "utf8",
       expectedSha256: "original",

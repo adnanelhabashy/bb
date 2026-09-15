@@ -5,28 +5,51 @@ import {
   FILE_LIST_LIMIT_MAX,
 } from "@bb/domain";
 import type { HostDaemonOnlineRpcResultByType } from "@bb/host-daemon-contract";
+import { fileReferenceSchema, type FileReference } from "./file-reference.js";
 
-export const hostFileReadRequestSchema = z
-  .object({
-    hostId: z.string().min(1).optional(),
-    path: z.string().min(1),
-    rootPath: z.string().min(1).optional(),
-  })
-  .strict();
+export { fileReferenceSchema } from "./file-reference.js";
+export type { FileReference } from "./file-reference.js";
+
+export const hostFileReadRequestSchema = z.union([
+  z
+    .object({
+      hostId: z.string().min(1).optional(),
+      path: z.string().min(1),
+      rootPath: z.string().min(1).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      experimental_target: fileReferenceSchema,
+    })
+    .strict(),
+]);
 export type HostFileReadRequest = z.infer<typeof hostFileReadRequestSchema>;
 
-export const hostFileWriteRequestSchema = z
-  .object({
-    hostId: z.string().min(1).optional(),
-    path: z.string().min(1),
-    rootPath: z.string().min(1).optional(),
-    content: z.string(),
-    contentEncoding: z.enum(["utf8", "base64"]).optional(),
-    createParents: z.boolean().optional(),
-    expectedSha256: z.string().nullable().optional(),
-    mode: z.number().int().min(0).max(0o777).optional(),
-  })
-  .strict();
+export const hostFileWriteRequestSchema = z.union([
+  z
+    .object({
+      hostId: z.string().min(1).optional(),
+      path: z.string().min(1),
+      rootPath: z.string().min(1).optional(),
+      content: z.string(),
+      contentEncoding: z.enum(["utf8", "base64"]).optional(),
+      createParents: z.boolean().optional(),
+      expectedSha256: z.string().nullable().optional(),
+      mode: z.number().int().min(0).max(0o777).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      experimental_target: fileReferenceSchema,
+      content: z.string(),
+      contentEncoding: z.enum(["utf8", "base64"]).optional(),
+      createParents: z.boolean().optional(),
+      expectedSha256: z.string().nullable().optional(),
+      mode: z.number().int().min(0).max(0o777).optional(),
+    })
+    .strict(),
+]);
 export type HostFileWriteRequest = z.infer<typeof hostFileWriteRequestSchema>;
 
 const fileListExcludeNamesRequestSchema = z
@@ -34,30 +57,56 @@ const fileListExcludeNamesRequestSchema = z
   .max(FILE_LIST_EXCLUDE_NAMES_MAX)
   .optional();
 
-export const hostFileListRequestSchema = z
-  .object({
-    hostId: z.string().min(1).optional(),
-    path: z.string().min(1),
-    query: z.string().optional(),
-    limit: z.number().int().positive().max(FILE_LIST_LIMIT_MAX).optional(),
-    includeHidden: z.boolean().optional(),
-    excludeNames: fileListExcludeNamesRequestSchema,
-  })
-  .strict();
+export const hostFileListRequestSchema = z.union([
+  z
+    .object({
+      hostId: z.string().min(1).optional(),
+      path: z.string().min(1),
+      query: z.string().optional(),
+      limit: z.number().int().positive().max(FILE_LIST_LIMIT_MAX).optional(),
+      includeHidden: z.boolean().optional(),
+      excludeNames: fileListExcludeNamesRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      experimental_target: fileReferenceSchema,
+      experimental_directory: z.enum(["self", "root"]),
+      query: z.string().optional(),
+      limit: z.number().int().positive().max(FILE_LIST_LIMIT_MAX).optional(),
+      includeHidden: z.boolean().optional(),
+      excludeNames: fileListExcludeNamesRequestSchema,
+    })
+    .strict(),
+]);
 export type HostFileListRequest = z.infer<typeof hostFileListRequestSchema>;
 
-export const hostPathListRequestSchema = z
-  .object({
-    hostId: z.string().min(1).optional(),
-    path: z.string().min(1),
-    query: z.string().optional(),
-    limit: z.number().int().positive().max(FILE_LIST_LIMIT_MAX).optional(),
-    includeFiles: z.boolean(),
-    includeDirectories: z.boolean(),
-    includeHidden: z.boolean().optional(),
-    excludeNames: fileListExcludeNamesRequestSchema,
-  })
-  .strict();
+export const hostPathListRequestSchema = z.union([
+  z
+    .object({
+      hostId: z.string().min(1).optional(),
+      path: z.string().min(1),
+      query: z.string().optional(),
+      limit: z.number().int().positive().max(FILE_LIST_LIMIT_MAX).optional(),
+      includeFiles: z.boolean(),
+      includeDirectories: z.boolean(),
+      includeHidden: z.boolean().optional(),
+      excludeNames: fileListExcludeNamesRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      experimental_target: fileReferenceSchema,
+      experimental_directory: z.enum(["self", "root"]),
+      query: z.string().optional(),
+      limit: z.number().int().positive().max(FILE_LIST_LIMIT_MAX).optional(),
+      includeFiles: z.boolean(),
+      includeDirectories: z.boolean(),
+      includeHidden: z.boolean().optional(),
+      excludeNames: fileListExcludeNamesRequestSchema,
+    })
+    .strict(),
+]);
 export type HostPathListRequest = z.infer<typeof hostPathListRequestSchema>;
 
 export const hostMkdirRequestSchema = z
@@ -103,6 +152,24 @@ export type CreateFilePreviewRequest = z.infer<
 export interface CreateFilePreviewResponse {
   baseUrl: string;
   expiresAtMs: number;
+}
+
+export const resolveFileResourceRequestSchema = z
+  .object({ target: fileReferenceSchema })
+  .strict();
+
+export type ResolveFileResourceRequest = z.infer<
+  typeof resolveFileResourceRequestSchema
+>;
+
+export interface ResolveFileResourceResponse {
+  absolutePath: string;
+  rootPath: string;
+  baseUrl: string;
+  expiresAtMs: number;
+  path: string;
+  target: FileReference;
+  url: string;
 }
 
 export type HostFileReadResponse = Exclude<

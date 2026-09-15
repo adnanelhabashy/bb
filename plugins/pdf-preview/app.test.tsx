@@ -5,11 +5,10 @@ import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 
 const app = await loadPluginApp(() => import("./app"));
 
-const source = {
+const file = {
   kind: "thread-storage" as const,
   threadId: "thr_1",
-  environmentId: "env_1",
-  projectId: null,
+  path: "reports/quarter one.pdf",
 };
 
 beforeEach(() => {
@@ -27,6 +26,20 @@ afterEach(() => {
 });
 
 describe("PDF file opener", () => {
+  const resourceOptions = {
+    experimental_resolveFileResource: () => ({
+      baseUrl: "/api/v1/file-previews/lease_1",
+      expiresAtMs: Date.now() + 60_000,
+      path: "reports/quarter one.pdf",
+      target: {
+        kind: "thread-storage" as const,
+        threadId: "thr_1",
+        path: "reports/quarter one.pdf",
+      },
+      url: "/api/v1/file-previews/lease_1/reports/quarter%20one.pdf",
+    }),
+  };
+
   it("registers for PDF files", () => {
     expect(app.fileOpeners).toHaveLength(1);
     expect(app.fileOpeners[0]).toMatchObject({
@@ -42,11 +55,14 @@ describe("PDF file opener", () => {
         headers: { "content-type": "application/pdf" },
       }),
     );
-    const slot = renderSlot(app.fileOpeners[0]!, {
-      path: "reports/quarter one.pdf",
-      source,
-      Original: () => <div>Built-in preview</div>,
-    });
+    const slot = renderSlot(
+      app.fileOpeners[0]!,
+      {
+        experimental_file: file,
+        Original: () => <div>Built-in preview</div>,
+      },
+      resourceOptions,
+    );
 
     const frame = await waitFor(() => {
       const element = slot.container.querySelector("iframe");
@@ -55,7 +71,7 @@ describe("PDF file opener", () => {
     });
 
     expect(fetch).toHaveBeenCalledWith(
-      "/api/v1/threads/thr_1/thread-storage/files/reports/quarter%20one.pdf",
+      "/api/v1/file-previews/lease_1/reports/quarter%20one.pdf",
       expect.objectContaining({ credentials: "same-origin" }),
     );
     expect(frame.getAttribute("src")).toBe("blob:pdf-preview");
@@ -79,11 +95,25 @@ describe("PDF file opener", () => {
         headers: { "content-type": "text/html" },
       }),
     );
-    const slot = renderSlot(app.fileOpeners[0]!, {
-      path: "spoofed.pdf",
-      source,
-      Original: () => null,
-    });
+    const slot = renderSlot(
+      app.fileOpeners[0]!,
+      {
+        experimental_file: { ...file, path: "spoofed.pdf" },
+        Original: () => null,
+      },
+      {
+        experimental_resolveFileResource: () => ({
+          ...resourceOptions.experimental_resolveFileResource(),
+          path: "spoofed.pdf",
+          target: {
+            kind: "thread-storage",
+            threadId: "thr_1",
+            path: "spoofed.pdf",
+          },
+          url: "/api/v1/file-previews/lease_1/spoofed.pdf",
+        }),
+      },
+    );
 
     expect((await slot.findByRole("alert")).textContent).toMatch(
       /response was not a PDF/i,

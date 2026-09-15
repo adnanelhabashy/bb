@@ -10,9 +10,18 @@ import {
 import { buildFileOpenerPanelTab } from "@/components/plugin/file-opener-tabs";
 import { RootComposePanelTabContent } from "./RootComposePanelTabContent";
 
+const pluginPanelFileOpenerFiles = vi.hoisted(() => vi.fn());
+
 vi.mock("@/components/secondary-panel/lazySecondaryPanelComponents", () => ({
   LazyFilePreview: () => null,
   LazyHostFilePreviewTabContent: () => null,
+  LazyHostScopedFilePreviewTabContent: ({
+    activePath,
+    hostId,
+  }: {
+    activePath: string;
+    hostId: string;
+  }) => <div data-testid={`host-${activePath}`} data-host-id={hostId} />,
   LazyNewTabPage: () => null,
   LazyProjectFilePreviewTabContent: ({
     activePath,
@@ -52,10 +61,15 @@ vi.mock("@/components/secondary-panel/lazySecondaryPanelComponents", () => ({
 
 vi.mock("@/components/plugin/PluginPanelActions", () => ({
   PluginPanelTabContent: ({
+    fileOpenerFile,
     fileOpenerOriginal,
   }: {
+    fileOpenerFile?: unknown;
     fileOpenerOriginal?: ReactNode;
-  }) => fileOpenerOriginal ?? null,
+  }) => {
+    pluginPanelFileOpenerFiles(fileOpenerFile);
+    return fileOpenerOriginal ?? null;
+  },
 }));
 
 vi.mock("@/hooks/queries/environment-queries", () => ({
@@ -122,7 +136,10 @@ const baseProps = {
   },
 } satisfies Omit<PanelContentProps, "pane" | "tab">;
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  pluginPanelFileOpenerFiles.mockClear();
+});
 
 describe("RootComposePanelTabContent", () => {
   it("renders each visible split pane from its own file tab model", () => {
@@ -205,22 +222,19 @@ describe("RootComposePanelTabContent", () => {
     const tab = buildFileOpenerPanelTab(
       { id: "markdown", pluginId: "docs" },
       {
-        path: "persisted/readme.md",
-        source: {
-          kind: "workspace",
-          environmentId: null,
-          experimental_hostId: "host-opened",
-          projectId: "project-opened",
-          threadId: null,
+        experimental_file: {
+          kind: "host",
+          hostId: "host-opened",
+          path: "/opened/persisted/readme.md",
         },
       },
       {
         environmentId: null,
         kind: "workspace-file-preview",
-        projectId: "project-stale",
+        projectId: "project-opened",
         tab: {
           lineRange: null,
-          path: "stale/readme.md",
+          path: "persisted/readme.md",
           source: { kind: "working-tree" },
           statusLabel: null,
         },
@@ -236,9 +250,72 @@ describe("RootComposePanelTabContent", () => {
       />,
     );
 
-    const preview = screen.getByTestId("project-persisted/readme.md");
+    const preview = screen.getByTestId("host-/opened/persisted/readme.md");
     expect(preview.getAttribute("data-environment-id")).toBeNull();
     expect(preview.getAttribute("data-host-id")).toBe("host-opened");
-    expect(preview.getAttribute("data-project-id")).toBe("project-opened");
+  });
+
+  it("resolves a persisted legacy project opener before rendering a current plugin", () => {
+    const currentTab = buildFileOpenerPanelTab(
+      { id: "markdown", pluginId: "docs" },
+      {
+        experimental_file: {
+          kind: "host",
+          hostId: "host-current",
+          path: "/project/current/persisted/readme.md",
+        },
+      },
+      {
+        environmentId: null,
+        kind: "workspace-file-preview",
+        projectId: "project-current",
+        tab: {
+          lineRange: null,
+          path: "persisted/readme.md",
+          source: { kind: "working-tree" },
+          statusLabel: null,
+        },
+        threadId: null,
+      },
+    );
+    const tab = {
+      ...currentTab,
+      paramsJson: JSON.stringify({
+        path: "persisted/readme.md",
+        source: {
+          kind: "workspace",
+          environmentId: null,
+          experimental_hostId: "host-current",
+          projectId: "project-current",
+          threadId: null,
+        },
+      }),
+    };
+
+    render(
+      <RootComposePanelTabContent
+        {...baseProps}
+        pane={{ isFocused: true, onFocusPane: noop }}
+        projectSources={[
+          {
+            id: "source-current",
+            projectId: "project-current",
+            isDefault: true,
+            createdAt: 1,
+            updatedAt: 1,
+            type: "local_path",
+            hostId: "host-current",
+            path: "/project/current",
+          },
+        ]}
+        tab={tab}
+      />,
+    );
+
+    expect(pluginPanelFileOpenerFiles).toHaveBeenCalledWith({
+      kind: "host",
+      hostId: "host-current",
+      path: "/project/current/persisted/readme.md",
+    });
   });
 });

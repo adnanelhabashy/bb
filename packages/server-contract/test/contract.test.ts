@@ -624,6 +624,86 @@ describe("public host contracts", () => {
         .success,
     ).toBe(false);
   });
+
+  it("validates canonical file references", () => {
+    expect(
+      contract.fileReferenceSchema.safeParse({
+        kind: "workspace",
+        environmentId: "env_1",
+        path: "reports/demo.html",
+      }).success,
+    ).toBe(true);
+    expect(
+      contract.fileReferenceSchema.safeParse({
+        kind: "host",
+        hostId: "host_1",
+        path: "/reports/demo.html",
+      }).success,
+    ).toBe(true);
+    expect(
+      contract.fileReferenceSchema.safeParse({
+        kind: "thread-storage",
+        threadId: "thr_1",
+        path: "reports/demo.html",
+      }).success,
+    ).toBe(true);
+    expect(
+      contract.fileReferenceSchema.safeParse({
+        kind: "host",
+        hostId: "host_1",
+        path: "C:\\reports\\demo.html",
+      }).success,
+    ).toBe(true);
+    expect(
+      contract.fileReferenceSchema.safeParse({
+        kind: "project-workspace",
+        projectId: "proj_1",
+        path: "reports/demo.html",
+      }).success,
+    ).toBe(false);
+  });
+
+  it.each([
+    { kind: "workspace", environmentId: "env_1", path: "/src/app.tsx" },
+    { kind: "workspace", environmentId: "env_1", path: "src/../app.tsx" },
+    { kind: "thread-storage", threadId: "thr_1", path: "./result.md" },
+    { kind: "host", hostId: "host_1", path: "relative/file.ts" },
+    { kind: "host", hostId: "host_1", path: "/tmp/../secret" },
+    {
+      kind: "workspace",
+      environmentId: "env_1",
+      path: "src/app.tsx",
+      ambientThreadId: "thr_1",
+    },
+  ])("rejects non-canonical file reference %#", (reference) => {
+    expect(contract.fileReferenceSchema.safeParse(reference).success).toBe(
+      false,
+    );
+  });
+
+  it("accepts valid surrogate pairs and rejects unpaired surrogates", () => {
+    expect(
+      contract.fileReferenceSchema.safeParse({
+        kind: "workspace",
+        environmentId: "env_1",
+        path: `reports/${String.fromCodePoint(0x1f4c4)}.md`,
+      }).success,
+    ).toBe(true);
+
+    for (const path of [
+      String.fromCharCode(0xd800),
+      String.fromCharCode(0xdc00),
+      `a${String.fromCharCode(0xd800)}b`,
+    ]) {
+      expect(
+        contract.fileReferenceSchema.safeParse({
+          kind: "workspace",
+          environmentId: "env_1",
+          path,
+        }).success,
+      ).toBe(false);
+    }
+  });
 });
 
 describe("public terminal contracts", () => {
@@ -1649,6 +1729,9 @@ describe("server-contract clients", () => {
       publicClient.threads[":id"].send.$url({ param: { id: "thr_123" } })
         .pathname,
     ).toBe("/api/v1/threads/thr_123/send");
+    expect(publicClient.files.resources.$url().pathname).toBe(
+      "/api/v1/files/resources",
+    );
     expect(
       publicClient.threads[":id"]["queued-messages"].$url({
         param: { id: "thr_123" },

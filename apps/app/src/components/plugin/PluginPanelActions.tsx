@@ -1,5 +1,8 @@
 import { useMemo, type ReactNode } from "react";
-import type { PluginPanelActionOpenOptions } from "@get-bb/plugin-sdk";
+import type {
+  ExperimentalFileReference,
+  PluginPanelActionOpenOptions,
+} from "@get-bb/plugin-sdk";
 import { EmptyStatePanel } from "@bb/shared-ui/empty-state";
 import {
   usePluginSlots,
@@ -13,6 +16,7 @@ import {
 } from "@/lib/plugin-json-value";
 import {
   fileOpenerIdFromActionId,
+  legacyFileOpenerProps,
   parseFileOpenerParams,
 } from "./file-opener-tabs";
 import { PluginSlotMount } from "./PluginSlotMount";
@@ -196,19 +200,23 @@ type PluginPanelSurfaceContext =
 export function PluginPanelTabContent({
   tab,
   context,
+  fileOpenerFile,
   fileOpenerOriginal,
 }: {
   tab: PluginPanelFixedPanelTab;
   context: PluginPanelSurfaceContext;
+  fileOpenerFile?: ExperimentalFileReference | null;
   fileOpenerOriginal?: ReactNode;
 }) {
   const openerId = fileOpenerIdFromActionId(tab.actionId);
   if (openerId !== null) {
     return (
       <FileOpenerTabContent
+        context={context}
         openerId={openerId}
         original={fileOpenerOriginal}
         tab={tab}
+        fileOpenerFile={fileOpenerFile}
       />
     );
   }
@@ -256,7 +264,7 @@ function PanelActionTabFrame({
 function usePersistedActionParams(tab: PluginPanelFixedPanelTab) {
   return useMemo(
     () => parsePersistedPluginPanelParams(tab.paramsJson),
-    [tab.paramsJson],
+    [tab.paramsJson, tab.fileOpenerOwner],
   );
 }
 
@@ -325,13 +333,17 @@ function NewThreadActionTabContent({
 }
 
 function FileOpenerTabContent({
+  context,
   openerId,
   original,
   tab,
+  fileOpenerFile,
 }: {
+  context: PluginPanelSurfaceContext;
   openerId: string;
   original: ReactNode | undefined;
   tab: PluginPanelFixedPanelTab;
+  fileOpenerFile: ExperimentalFileReference | null | undefined;
 }) {
   const { fileOpeners } = usePluginSlots();
   const replacement = resolveReplacement(
@@ -339,10 +351,18 @@ function FileOpenerTabContent({
     (candidate) =>
       candidate.pluginId === tab.pluginId && candidate.id === openerId,
   );
-  const file = useMemo(
-    () => parseFileOpenerParams(tab.paramsJson),
-    [tab.paramsJson],
+  const fileParams =
+    tab.fileOpenerOwner?.kind === "file-preview"
+      ? JSON.stringify({ experimental_file: tab.fileOpenerOwner.file })
+      : tab.paramsJson;
+  const persistedFile = useMemo(
+    () => parseFileOpenerParams(fileParams),
+    [fileParams],
   );
+  const file =
+    fileOpenerFile === undefined
+      ? (persistedFile?.experimental_file ?? null)
+      : fileOpenerFile;
   const owner = tab.fileOpenerOwner;
   const lineRange = useMemo(() => {
     const range = owner?.tab.lineRange;
@@ -363,8 +383,12 @@ function FileOpenerTabContent({
           data-testid="plugin-file-opener-tab-content"
         >
           <opener.component
-            path={file.path}
-            source={file.source}
+            {...legacyFileOpenerProps(
+              owner,
+              file,
+              context.kind === "thread" ? context.threadId : null,
+            )}
+            experimental_file={file}
             experimental_lineRange={lineRange}
             Original={BoundOriginal}
             experimental_Original={deprecatedOriginalAlias(BoundOriginal)}

@@ -202,7 +202,10 @@ import {
   PluginPanelTabContent,
   usePluginPanelActions,
 } from "@/components/plugin/PluginPanelActions";
-import { createFileOpenerOriginalTab } from "@/components/plugin/file-opener-tabs";
+import {
+  createFileOpenerOriginalTab,
+  resolveFileOpenerParams,
+} from "@/components/plugin/file-opener-tabs";
 import {
   PluginThreadPanelNavigationProvider,
   usePublishThreadPanelOpener,
@@ -709,6 +712,7 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
     panelStateId: threadId,
     syncThreadId: threadId,
     environmentId: thread?.environmentId,
+    environmentHostId: environment?.hostId,
     onCloseLastTab: secondaryPanelDrawerVisibility.closeDrawer,
     retainedTerminalId,
     storageFileExists: checkThreadStorageFileExists,
@@ -2519,12 +2523,18 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
       canUseGitUi={canUseGitUi}
       contextWindowUsage={contextWindowUsage}
       environmentCheckout={threadCheckoutDisplay}
-      environmentCompactLabel={composerEnvironmentChrome?.environmentCompactLabel}
+      environmentCompactLabel={
+        composerEnvironmentChrome?.environmentCompactLabel
+      }
       environmentHost={composerEnvironmentChrome?.environmentHost}
       environmentIcon={composerEnvironmentChrome?.environmentIcon}
       environmentLabel={composerEnvironmentChrome?.environmentLabel}
-      environmentMachineProvider={composerEnvironmentChrome?.environmentMachineProvider}
-      environmentProviderName={composerEnvironmentChrome?.environmentProviderName}
+      environmentMachineProvider={
+        composerEnvironmentChrome?.environmentMachineProvider
+      }
+      environmentProviderName={
+        composerEnvironmentChrome?.environmentProviderName
+      }
       environmentGoneStatus={threadEnvironmentGoneStatus}
       environmentHostId={environment?.hostId}
       isEnvironmentActionPending={requestEnvironmentAction.isPending}
@@ -2708,6 +2718,14 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
       }
       case "plugin-panel": {
         const originalTab = createFileOpenerOriginalTab(tab);
+        const fileOpenerFile =
+          tab.fileOpenerOwner === undefined
+            ? undefined
+            : resolveFileOpenerParams({
+                environmentHostId: environment?.hostId,
+                owner: tab.fileOpenerOwner,
+                paramsJson: tab.paramsJson,
+              })?.experimental_file;
         const fileOpenerOriginal =
           originalTab === null
             ? undefined
@@ -2724,6 +2742,7 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
             <PluginPanelTabContent
               tab={tab}
               context={{ kind: "thread", threadId: thread.id }}
+              fileOpenerFile={fileOpenerFile}
               fileOpenerOriginal={fileOpenerOriginal}
             />
           </ThreadTimelineNavigationProvider>
@@ -2951,6 +2970,7 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
               threadOriginKind,
               hasOlderTimelineRows,
               hostConnectionNotice,
+              environmentId: thread.environmentId ?? undefined,
               isLoadingOlderTimelineRows,
               isThreadTimelinePending,
               timelineError: Boolean(timelineError),

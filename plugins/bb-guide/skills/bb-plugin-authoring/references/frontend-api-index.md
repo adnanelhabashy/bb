@@ -33,6 +33,7 @@ Read the installed SDK declarations for the exact current signatures.
 - `useBbNavigate`
 - `experimental_useAppPanel`
 - `experimental_useFixedTabTarget`
+- `experimental_useFileResources`
 - `useComposer`
 - `useComposerView`
 - `experimental_useSidebarThreads`
@@ -47,6 +48,9 @@ Read the installed SDK declarations for the exact current signatures.
 - `ExperimentalAppIcons`
 - `ExperimentalIconRegistration`
 - `ExperimentalIconProps`
+- `ExperimentalFileResource`
+- `ExperimentalFileResources`
+- `ExperimentalFileReference`
 - `ExperimentalProviderIconProps`
 
 - `PluginHomepageSectionProps`
@@ -81,7 +85,6 @@ Read the installed SDK declarations for the exact current signatures.
 - `PluginThreadListProps`
 - `PluginThreadHeaderActionProps`
 - `ExperimentalPluginBrowserToolbarActionProps`
-- `PluginFileOpenerSource`
 - `PluginFileOpenerProps`
 - `CodeOverflowMode`
 - `DiffViewMode`
@@ -189,7 +192,6 @@ Read the installed SDK declarations for the exact current signatures.
 - `NewThreadComposerProps`
 - `MarkdownProps`
 - `UrlLinkProps`
-- `ExperimentalLiveFileTarget`
 - `ExperimentalFileLocation`
 - `ExperimentalFileOpenOptions`
 - `ExperimentalFileLinkProps`

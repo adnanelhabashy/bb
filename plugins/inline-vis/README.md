@@ -26,13 +26,14 @@ The default is 224px; accepted values are whole numbers from 120 through 1200.
 bb replaces that leaf with this plugin's React component, which:
 
 1. Validates the untrusted `source` and `file` attributes.
-2. Calls the plugin RPC `preparePreview` with the message `threadId`, source,
-   and file path to validate the target and surface clean inline errors.
+2. Resolves the canonical workspace or thread-storage file reference with
+   `experimental_useFileResources()` and fetches the resulting short-lived,
+   same-origin URL to surface clean inline errors.
 3. Shows loading / error states. Workspace previews include a header action
    that opens the source file in bb's sidebar workspace viewer; thread-storage
    previews do not.
-4. Points HTML files at bb's existing path-shaped worktree or thread storage
-   route inside a sandboxed iframe. Relative sibling assets work, scripts are
+4. Points HTML files at bb's confined preview lease inside a sandboxed iframe.
+   The lease is path-shaped, so relative sibling assets work, scripts are
    enabled, and normal web loading is allowed. The iframe keeps an opaque
    origin (no `allow-same-origin`) so scripts cannot access the bb page, its
    cookies, or storage. Remote scripts, styles, images, fonts, media, fetches,
@@ -40,19 +41,16 @@ bb replaces that leaf with this plugin's React component, which:
    remote-server policies.
 5. Renders Markdown files with bb's Markdown renderer. Raw HTML is disabled.
 
-## Backend security
+## File security
 
-`preparePreview` narrows `unknown` input immediately (rejects unknown keys and
-source values). Workspace previews load the thread with
-`include: "environment"` and require its live `path` and `hostId`. Thread
-storage previews use `bb.sdk.threads.storageLocation` instead and do not resolve
-the workspace. Both sources confine the relative `.html`, `.htm`, `.md`, or
-`.markdown` path under the returned root and read it through `bb.sdk.files`
-(host-routed). Absolute paths, traversal, unsupported extensions, missing files,
-non-UTF-8 content, and files over 5 MiB are rejected. HTML previews then use
-bb's existing confined worktree or thread-storage route to serve the document
-and relative assets; Markdown previews render the validated content returned by
-the RPC.
+The app validates source values and `.html`, `.htm`, `.md`, or `.markdown`
+paths before resolution. The message context supplies the workspace
+environment ID; thread-storage uses the message's thread ID. The host keeps
+filesystem roots private and issues a ten-minute preview
+lease confined to the selected root. Absolute paths and traversal are rejected.
+The app rejects missing files, non-UTF-8 content, and files over 5 MiB.
+Markdown renders the fetched content; HTML and its relative assets stay behind
+the same confined lease. The plugin's required server entrypoint is empty.
 
 It ships with bb and is reconciled through the builtin plugin lifecycle. Ship
 a supported file in either source, then ask the agent to show it with the

@@ -19,5 +19,4 @@ export type {
   ExperimentalDesktopBrowserCreateInput,
   ExperimentalDesktopBrowserAcquireInput,
 } from "@bb/sdk";
-
 export type * from "./machine-bootstrap.js";

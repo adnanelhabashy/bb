@@ -367,8 +367,7 @@ const FRONTEND_SLOT_PROP_FIELDS = {
     "isCompactViewport",
   ],
   fileOpener: [
-    "path",
-    "source",
+    "experimental_file",
     "experimental_lineRange",
     "Original",
     "experimental_Original",

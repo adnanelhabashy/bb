@@ -1042,6 +1042,12 @@ function dirtyEnvironmentRecordQueries(
 function dirtyEnvironmentWorkspaceStateQueries(
   context: EnvironmentRealtimeDirtyContext,
 ): void {
+  context.queryClient.invalidateQueries({
+    queryKey: [
+      "live-file-preview",
+      { kind: "workspace", environmentId: context.environmentId },
+    ],
+  });
   bumpDiffPatchFreshnessGeneration(context.environmentId);
   for (const queryKey of getEnvironmentWorkspaceStateInvalidationQueryKeys(
     context,
@@ -1054,6 +1060,9 @@ function dirtyEnvironmentLiveWorkspaceStateQueries({
   environmentId,
   queryClient,
 }: EnvironmentRealtimeDirtyContext): void {
+  queryClient.invalidateQueries({
+    queryKey: ["live-file-preview", { kind: "workspace", environmentId }],
+  });
   bumpDiffPatchFreshnessGeneration(environmentId);
   invalidateQueryKeyWithThrottledActiveRefetch({
     exact: false,
@@ -1073,6 +1082,9 @@ function dirtyEnvironmentRefDerivedWorkspaceStateQueries({
   environmentId,
   queryClient,
 }: EnvironmentRealtimeDirtyContext): void {
+  queryClient.invalidateQueries({
+    queryKey: ["live-file-preview", { kind: "workspace", environmentId }],
+  });
   bumpDiffPatchFreshnessGeneration(environmentId);
   for (const queryKey of getCachedEnvironmentRefWorkspaceStateInvalidationQueryKeys(
     queryClient,

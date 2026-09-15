@@ -303,3 +303,8 @@ Machine environment: `bb machine env list`, `bb machine env set NAME`
 (value from stdin), and `bb machine env unset NAME`; all accept `--json`.
 
 Standalone `bb machine create` machines remain until explicitly removed.
+
+`bb file read|write|list|paths <path> --environment <id>` resolves a workspace reference.
+Use `--thread-storage <thread-id>` for thread storage. These selectors cannot
+be combined with `--host` or `--root`. Listings accept `--resource-root` to
+list the reference’s workspace/storage root instead of the path itself.

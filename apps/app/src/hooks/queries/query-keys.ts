@@ -38,7 +38,6 @@ const PROJECT_COMMANDS_QUERY_KEY = "projectCommands";
 const THREAD_STORAGE_FILES_QUERY_KEY = "threadStorageFiles";
 const THREAD_STORAGE_LOCATION_QUERY_KEY = "threadStorageLocation";
 const THREAD_STORAGE_PATHS_QUERY_KEY = "threadStoragePaths";
-const THREAD_STORAGE_FILE_PREVIEW_QUERY_KEY = "threadStorageFilePreview";
 const THREAD_HOST_FILE_PREVIEW_QUERY_KEY = "threadHostFilePreview";
 const HOST_FILE_PREVIEW_QUERY_KEY = "hostFilePreview";
 const ENVIRONMENT_QUERY_KEY = "environment";
@@ -276,18 +275,6 @@ type ThreadStorageFilesForThreadQueryKeyPrefix = readonly [
 ];
 type ThreadStoragePathsForThreadQueryKeyPrefix = readonly [
   typeof THREAD_STORAGE_PATHS_QUERY_KEY,
-  string,
-];
-type AllThreadStorageFilePreviewQueryKeyPrefix = readonly [
-  typeof THREAD_STORAGE_FILE_PREVIEW_QUERY_KEY,
-];
-type ThreadStorageFilePreviewQueryKey = readonly [
-  typeof THREAD_STORAGE_FILE_PREVIEW_QUERY_KEY,
-  string,
-  string | null,
-];
-type ThreadStorageFilePreviewQueryKeyPrefix = readonly [
-  typeof THREAD_STORAGE_FILE_PREVIEW_QUERY_KEY,
   string,
 ];
 type ThreadHostFilePreviewQueryKey = readonly [
@@ -822,18 +809,19 @@ export function threadStoragePathsForThreadQueryKeyPrefix(
 export function threadStorageFilePreviewQueryKey(
   threadId: string,
   path: string | null,
-): ThreadStorageFilePreviewQueryKey {
-  return [THREAD_STORAGE_FILE_PREVIEW_QUERY_KEY, threadId, path];
+) {
+  return [
+    "live-file-preview",
+    { kind: "thread-storage", threadId, path },
+  ] as const;
 }
 
-export function allThreadStorageFilePreviewQueryKeyPrefix(): AllThreadStorageFilePreviewQueryKeyPrefix {
-  return [THREAD_STORAGE_FILE_PREVIEW_QUERY_KEY];
+export function allThreadStorageFilePreviewQueryKeyPrefix() {
+  return ["live-file-preview", { kind: "thread-storage" }] as const;
 }
 
-export function threadStorageFilePreviewQueryKeyPrefix(
-  threadId: string,
-): ThreadStorageFilePreviewQueryKeyPrefix {
-  return [THREAD_STORAGE_FILE_PREVIEW_QUERY_KEY, threadId];
+export function threadStorageFilePreviewQueryKeyPrefix(threadId: string) {
+  return ["live-file-preview", { kind: "thread-storage", threadId }] as const;
 }
 
 export function threadHostFilePreviewQueryKey(

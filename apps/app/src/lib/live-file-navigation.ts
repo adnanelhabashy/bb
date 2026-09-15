@@ -1,8 +1,5 @@
 import type { ExperimentalFileLocation } from "@get-bb/plugin-sdk";
-export {
-  normalizeExperimentalFileOpenOptions,
-  normalizeExperimentalLiveFileTarget,
-} from "@get-bb/plugin-sdk/internal/file-navigation-validation";
+export { normalizeExperimentalFileOpenOptions } from "@get-bb/plugin-sdk/internal/file-navigation-validation";
 import type { FilePreviewLineRange } from "@bb/client-core";
 
 export function getExperimentalFileLocationStart(

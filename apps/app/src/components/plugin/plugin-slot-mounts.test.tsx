@@ -2055,16 +2055,13 @@ describe("plugin thread panel actions", () => {
 });
 
 describe("plugin file opener tabs", () => {
-  function MarkdownEditorProbe({
-    path,
-    source,
-  }: {
-    path: string;
-    source: { kind: string; environmentId: string | null };
-  }) {
+  function MarkdownEditorProbe({ experimental_file }: PluginFileOpenerProps) {
     return (
       <div>
-        editor {path} @ {source.kind}:{String(source.environmentId)}
+        editor {experimental_file.path} @ {experimental_file.kind}:
+        {experimental_file.kind === "workspace"
+          ? experimental_file.environmentId
+          : "none"}
       </div>
     );
   }
@@ -2094,12 +2091,10 @@ describe("plugin file opener tabs", () => {
       ...createPluginPanelFixedPanelTab({
         actionId: "file-opener:editor",
         paramsJson: JSON.stringify({
-          path: "notes/todo.md",
-          source: {
+          experimental_file: {
             kind: "workspace",
-            threadId: null,
             environmentId: "env_1",
-            projectId: null,
+            path: "notes/todo.md",
           },
         }),
         pluginId: "notes",
@@ -2135,6 +2130,71 @@ describe("plugin file opener tabs", () => {
     );
   });
 
+  it("projects legacy opener props at runtime without exposing them in current types", () => {
+    setPluginSlotRegistrations(
+      "notes",
+      registrationSet({
+        fileOpeners: [
+          {
+            id: "editor",
+            title: "Notes editor",
+            extensions: ["md"],
+            component: (props) => (
+              <output data-testid="legacy-opener-props">
+                {JSON.stringify({
+                  path: Reflect.get(props, "path"),
+                  source: Reflect.get(props, "source"),
+                })}
+              </output>
+            ),
+          },
+        ],
+      }),
+    );
+    const tab = buildFileOpenerPanelTab(
+      { id: "editor", pluginId: "notes" },
+      {
+        experimental_file: {
+          kind: "workspace",
+          environmentId: "env_1",
+          path: "notes/todo.md",
+        },
+      },
+      {
+        environmentId: "env_1",
+        kind: "workspace-file-preview",
+        projectId: null,
+        tab: {
+          lineRange: null,
+          path: "notes/todo.md",
+          source: { kind: "working-tree" },
+          statusLabel: null,
+        },
+        threadId: "thr_1",
+      },
+    );
+
+    render(
+      <PluginPanelTabContent
+        tab={tab}
+        context={{ kind: "thread", threadId: "thr_1" }}
+        fileOpenerOriginal={<div>native preview</div>}
+      />,
+    );
+
+    expect(screen.getByTestId("legacy-opener-props").textContent).toBe(
+      JSON.stringify({
+        path: "notes/todo.md",
+        source: {
+          kind: "workspace",
+          environmentId: "env_1",
+          projectId: null,
+          threadId: "thr_1",
+        },
+      }),
+    );
+  });
+
   it.each(["workspace", "host", "thread-storage"] as const)(
     "forwards %s targets and refreshes only when the owner changes",
     (kind) => {
@@ -2161,13 +2221,16 @@ describe("plugin file opener tabs", () => {
         buildFileOpenerPanelTab(
           { id: "editor", pluginId: "notes" },
           {
-            path: "notes/todo.md",
-            source: {
-              kind,
-              environmentId: "env_1",
-              projectId: null,
-              threadId: "thr_1",
-            },
+            experimental_file:
+              kind === "workspace"
+                ? {
+                    kind,
+                    environmentId: "env_1",
+                    path: "notes/todo.md",
+                  }
+                : kind === "host"
+                  ? { kind, hostId: "host_1", path: "/notes/todo.md" }
+                  : { kind, threadId: "thr_1", path: "notes/todo.md" },
           },
           kind === "workspace"
             ? {
@@ -2220,7 +2283,9 @@ describe("plugin file opener tabs", () => {
       expect(seen.mock.lastCall?.[0].experimental_lineRange).not.toBe(
         first?.experimental_lineRange,
       );
-      expect(seen.mock.lastCall?.[0].source).toBe(first?.source);
+      expect(seen.mock.lastCall?.[0].experimental_file).toBe(
+        first?.experimental_file,
+      );
       tab = makeTab({ startLineNumber: 20, endLineNumber: 24 });
       mounted.rerender(content());
       expect(seen.mock.lastCall?.[0].experimental_lineRange).toEqual({
@@ -2253,12 +2318,10 @@ describe("plugin file opener tabs", () => {
     const tab = buildFileOpenerPanelTab(
       { id: "editor", pluginId: "notes" },
       {
-        path: "notes/todo.md",
-        source: {
+        experimental_file: {
           kind: "workspace",
           environmentId: "env_1",
-          projectId: null,
-          threadId: "thr_1",
+          path: "notes/todo.md",
         },
       },
       {
@@ -2295,12 +2358,10 @@ describe("plugin file opener tabs", () => {
       ...createPluginPanelFixedPanelTab({
         actionId: "file-opener:gone",
         paramsJson: JSON.stringify({
-          path: "a.md",
-          source: {
+          experimental_file: {
             kind: "workspace",
-            threadId: null,
             environmentId: "env_1",
-            projectId: null,
+            path: "a.md",
           },
         }),
         pluginId: "ghost",
@@ -2385,12 +2446,10 @@ describe("plugin file opener tabs", () => {
       ...createPluginPanelFixedPanelTab({
         actionId: "file-opener:editor",
         paramsJson: JSON.stringify({
-          path: "notes/todo.md",
-          source: {
+          experimental_file: {
             kind: "workspace",
-            threadId: "thr_1",
             environmentId: "env_1",
-            projectId: null,
+            path: "notes/todo.md",
           },
         }),
         pluginId: "notes",
@@ -2452,12 +2511,10 @@ describe("file opener experimental_Original alias", () => {
   const tab = buildFileOpenerPanelTab(
     { id: "editor", pluginId: "notes" },
     {
-      path: "notes/todo.md",
-      source: {
+      experimental_file: {
         kind: "workspace",
         environmentId: "env_1",
-        projectId: null,
-        threadId: "thr_1",
+        path: "notes/todo.md",
       },
     },
     {

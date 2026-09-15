@@ -298,3 +298,8 @@ or with `bb settings general telemetryEnabled false`. The saved server-wide pref
 takes effect immediately and persists across restarts. SDK callers can use
 `system.updateGeneralSettings` with `telemetryEnabled`. `BB_TELEMETRY=false`
 always disables telemetry, even when the saved preference is enabled.
+
+`bb file read|write|list|paths <path> --environment <id>` resolves a workspace reference.
+Use `--thread-storage <thread-id>` for thread storage. These selectors cannot
+be combined with `--host` or `--root`. Listings accept `--resource-root` to
+list the reference’s workspace/storage root instead of the path itself.

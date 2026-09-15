@@ -65,6 +65,9 @@ import {
   type ExperimentalFileLinkProps,
   type ExperimentalFileOpenOptions,
   type ExperimentalComposerSubmitOptions,
+  type ExperimentalFileResource,
+  type ExperimentalFileResources,
+  type ExperimentalFileReference,
   type ExperimentalAppPanel,
   type ExperimentalFixedTabTargetState,
   type ExperimentalOpenFixedTabOptions,
@@ -156,6 +159,10 @@ export interface ExperimentalFixedTabOpenCall {
   target?: JsonValue;
 }
 
+export interface ExperimentalFileResourceCall {
+  target: ExperimentalFileReference;
+}
+
 export interface ComposerLog {
   /** Latest plain text in this isolated composer scope. */
   readonly text: string;
@@ -201,6 +208,8 @@ interface SlotEnv {
   appPanel: ExperimentalAppPanel;
   experimental_fixedTabOpenCalls: ExperimentalFixedTabOpenCall[];
   fixedTabTarget: TestFixedTabTargetStore;
+  fileResources: ExperimentalFileResources;
+  experimental_fileResourceCalls: ExperimentalFileResourceCall[];
   composer: TestComposerStore;
   composerLog: ComposerLog;
   sidebarThreads: PluginSidebarThreadsState;
@@ -832,6 +841,9 @@ const testPluginSdkApp = {
       target: state.target,
     };
   },
+  experimental_useFileResources(): ExperimentalFileResources {
+    return useSlotEnv("experimental_useFileResources").fileResources;
+  },
   useComposer(): PluginComposerApi {
     const composer = useSlotEnv("useComposer").composer;
     const version = useSyncExternalStore(
@@ -1244,6 +1256,10 @@ export interface RenderSlotOptions<
     tabId: string;
     target: JsonValue;
   };
+  /** Resolve typed file identities as the host resource service would. */
+  experimental_resolveFileResource?: (
+    target: ExperimentalFileReference,
+  ) => ExperimentalFileResource | Promise<ExperimentalFileResource>;
 }
 
 /** Host-originated inputs a slot test can drive deterministically. */
@@ -1271,6 +1287,8 @@ export interface RenderedSlotInspectionState {
   readonly navigateCalls: NavigateCall[];
   /** Every validated `experimental_useAppPanel().openFixedTab` call. */
   readonly experimental_fixedTabOpenCalls: ExperimentalFixedTabOpenCall[];
+  /** Every validated file resource resolution, in order. */
+  readonly experimental_fileResourceCalls: ExperimentalFileResourceCall[];
   /** Every `experimental_useSidebarThreadActions()` call, in order. */
   readonly sidebarActionCalls: SidebarActionCall[];
   /** Everything written through `useComposer()`. */
@@ -1393,6 +1411,18 @@ export function renderSlot<
 
   const navigateCalls: NavigateCall[] = [];
   const experimental_fixedTabOpenCalls: ExperimentalFixedTabOpenCall[] = [];
+  const experimental_fileResourceCalls: ExperimentalFileResourceCall[] = [];
+  const fileResources: ExperimentalFileResources = {
+    async resolve(target) {
+      experimental_fileResourceCalls.push({ target });
+      if (options.experimental_resolveFileResource === undefined) {
+        throw new Error(
+          "no file resource resolver — add experimental_resolveFileResource to renderSlot options",
+        );
+      }
+      return options.experimental_resolveFileResource(target);
+    },
+  };
   let fixedTabTargetSnapshot =
     options.experimental_fixedTabTarget === undefined
       ? null
@@ -1680,6 +1710,8 @@ export function renderSlot<
     appPanel,
     experimental_fixedTabOpenCalls,
     fixedTabTarget,
+    fileResources,
+    experimental_fileResourceCalls,
     composer,
     composerLog,
     sidebarThreads,
@@ -1772,6 +1804,7 @@ export function renderSlot<
     setComposerScope,
     navigateCalls,
     experimental_fixedTabOpenCalls,
+    experimental_fileResourceCalls,
     sidebarActionCalls,
     composer: composerLog,
     behavior: {
@@ -1784,6 +1817,7 @@ export function renderSlot<
       rpcCalls,
       navigateCalls,
       experimental_fixedTabOpenCalls,
+      experimental_fileResourceCalls,
       sidebarActionCalls,
       composer: composerLog,
     },

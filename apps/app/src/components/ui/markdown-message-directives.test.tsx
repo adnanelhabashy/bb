@@ -107,6 +107,7 @@ const MESSAGE = {
   threadId: "thr_1",
   turnId: "turn_1",
   projectId: "proj_1",
+  experimental_environmentId: null,
 } as const;
 
 afterEach(() => {

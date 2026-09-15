@@ -25,6 +25,14 @@ experimental_openFilePreview(options), experimental_openFileExternally(options) 
   `openUrl` owns HTTP(S) only and returns false for schemes BB
   leaves to normal anchor behavior. The two file methods accept an
   `ExperimentalFileOpenOptions` live-file target.
+- `experimental_useFileResources()` → `{ resolve(target, { signal? }?) }`.
+  Use it when frontend plugin code must fetch or embed a workspace, host, or
+  thread-storage file. Pass an `ExperimentalFileReference`: workspace and
+  thread-storage paths are relative, while host paths are absolute. The result has a short-lived
+  same-origin `url`, a root-scoped `baseUrl` for relative assets, a
+  root-relative `path`, an expiry, and a canonical live-file `target`. Fetch
+  with `credentials: "same-origin"`. Do not construct core `/api/v1/.../files`
+  routes yourself.
 - `useComposer()` → programmatic access to the chat composer draft (the
   same one the built-in "Add to chat" affordances write to):
   `text` is the current plain text; `setText(next)` replaces it;

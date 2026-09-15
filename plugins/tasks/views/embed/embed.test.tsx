@@ -44,6 +44,7 @@ function directiveProps(attributes: Record<string, string>) {
       threadId: "thr_1",
       turnId: "turn_1",
       projectId: null,
+      experimental_environmentId: null,
     },
     openWorkspaceFile: null,
   };

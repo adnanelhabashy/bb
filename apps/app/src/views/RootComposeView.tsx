@@ -1051,8 +1051,15 @@ function RootComposeSurface({
     fileOwnerThreadId: rootPanelThreadId,
     onCloseLastTab: secondaryPanelDrawerVisibility.closeDrawer,
     preserveWorkspaceTabsAcrossContexts: true,
-    projectHostId: rootProjectHostId,
+    projectHostId:
+      rootPanelHostPathTerminalTarget?.kind === "host_path"
+        ? rootPanelHostPathTerminalTarget.hostId
+        : null,
     projectId: isProjectless ? null : projectId,
+    projectRootPath:
+      rootPanelHostPathTerminalTarget?.kind === "host_path"
+        ? rootPanelHostPathTerminalTarget.cwd
+        : null,
     retainedTerminalId,
     storageFileExists: checkRootThreadStorageFileExists,
     storageFiles: rootThreadStorageFiles,

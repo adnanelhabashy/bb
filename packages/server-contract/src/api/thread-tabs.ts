@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { fileReferenceSchema } from "./file-reference.js";
 import { terminalCreateTargetSchema } from "./terminals.js";
 
 const THREAD_TAB_ID_MAX_LENGTH = 4_194_304;
@@ -31,6 +32,15 @@ const threadTabEnvironmentFileSourceSchema = z.discriminatedUnion("kind", [
 ]);
 
 export const threadTabFileOpenerOwnerSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("file-preview"),
+      file: fileReferenceSchema,
+      tab: z
+        .object({ lineRange: threadTabLineRangeSchema.nullable() })
+        .strict(),
+    })
+    .strict(),
   z
     .object({
       environmentId: z.string().min(1).nullable(),
@@ -85,6 +95,51 @@ export type ThreadTabFileOpenerOwner = z.infer<
   typeof threadTabFileOpenerOwnerSchema
 >;
 
+export function normalizeFileOpenerTab<
+  T extends {
+    actionId: string;
+    paramsJson: string | null;
+    fileOpenerOwner?: ThreadTabFileOpenerOwner;
+  },
+>(
+  tab: T,
+): Omit<T, "paramsJson" | "fileOpenerOwner"> & {
+  paramsJson: string | null;
+  fileOpenerOwner?: ThreadTabFileOpenerOwner;
+} {
+  if (
+    !tab.actionId.startsWith("file-opener:") ||
+    tab.fileOpenerOwner === undefined
+  )
+    return tab;
+  if (tab.fileOpenerOwner.kind === "file-preview")
+    return { ...tab, paramsJson: null };
+  if (tab.paramsJson === null) return tab;
+  let params: unknown;
+  try {
+    params = JSON.parse(tab.paramsJson);
+  } catch {
+    return tab;
+  }
+  if (
+    typeof params !== "object" ||
+    params === null ||
+    !("experimental_file" in params)
+  )
+    return tab;
+  const file = fileReferenceSchema.safeParse(params.experimental_file);
+  if (!file.success) return tab;
+  return {
+    ...tab,
+    paramsJson: null,
+    fileOpenerOwner: {
+      kind: "file-preview",
+      file: file.data,
+      tab: { lineRange: tab.fileOpenerOwner.tab.lineRange },
+    },
+  };
+}
+
 export const threadTabSchema = z.discriminatedUnion("kind", [
   z.object({ id: threadTabIdSchema, kind: z.literal("thread-info") }).strict(),
   z.object({ id: threadTabIdSchema, kind: z.literal("git-diff") }).strict(),
@@ -98,7 +153,8 @@ export const threadTabSchema = z.discriminatedUnion("kind", [
       pluginId: z.string().min(1).max(THREAD_TAB_PATH_MAX_LENGTH),
       title: z.string().min(1).max(THREAD_TAB_TITLE_MAX_LENGTH),
     })
-    .strict(),
+    .strict()
+    .transform(normalizeFileOpenerTab),
   z
     .object({
       environmentId: z.string().min(1).nullable(),

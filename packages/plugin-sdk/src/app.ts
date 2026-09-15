@@ -75,6 +75,8 @@ export const useBbNavigate = runtime.useBbNavigate;
 export const experimental_useAppPanel = runtime.experimental_useAppPanel;
 export const experimental_useFixedTabTarget =
   runtime.experimental_useFixedTabTarget;
+export const experimental_useFileResources =
+  runtime.experimental_useFileResources;
 export const useComposer = runtime.useComposer;
 export const useComposerView = runtime.useComposerView;
 // Sidebar surfaces for plugins that replace the thread list (experimental —

@@ -8,6 +8,11 @@
       "source": "./src/index.ts",
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./file-reference": {
+      "source": "./src/api/file-reference.ts",
+      "types": "./src/api/file-reference.ts",
+      "default": "./src/api/file-reference.ts"
     }
   },
   "types": "./src/index.ts",

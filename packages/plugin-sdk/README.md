@@ -44,6 +44,15 @@ the current host accepted the intent. Targets never infer an ambient workspace.
 The frontend harness records both methods and accepts `openFilePreview` and
 `openFileExternally` behavior options.
 
+Use `experimental_useFileResources().resolve(target, { signal? })` when a
+frontend component must fetch or embed a live file. It accepts a canonical
+workspace, host, or thread-storage `ExperimentalFileReference`, then
+returns a short-lived same-origin `url`, a root-scoped `baseUrl` for relative
+assets, and the same canonical reference. BB resolves filesystem root context
+on the server; plugins should not construct internal file API
+URLs. The frontend harness accepts `experimental_resolveFileResource` and
+records validated targets in `experimental_fileResourceCalls`.
+
 A nav panel's `fixedTabs` entries must include the containing nav
 panel's `id` as `panelId`; each entry is also a stable reference to that
 plugin's own tab. Give a targeted tab an `experimental_target.validate` type guard, call

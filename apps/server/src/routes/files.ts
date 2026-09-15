@@ -5,7 +5,9 @@ import mimeTypes from "mime-types";
 import {
   publicApiRoutes,
   typedRoutes,
+  type FileReference,
   type PublicApiSchema,
+  type ResolveFileResourceResponse,
 } from "@bb/server-contract";
 import { COMMAND_TIMEOUT_MS } from "../constants.js";
 import { ApiError } from "../errors.js";
@@ -27,7 +29,13 @@ import {
   assertUsableHostId,
   requirePrimaryHostId,
 } from "../services/hosts/primary-host.js";
-import { requirePublicThreadEnvironment } from "../services/lib/entity-lookup.js";
+import {
+  requireEnvironment,
+  requirePublicThread,
+  requirePublicThreadEnvironment,
+  requireReadyEnvironment,
+} from "../services/lib/entity-lookup.js";
+import { requireThreadStoragePath } from "../services/threads/thread-storage.js";
 import {
   DEFAULT_PATH_LIST_EXCLUDE_NAMES,
   WORKSPACE_PATH_LIST_INCLUDE_HIDDEN,
@@ -49,6 +57,14 @@ interface FilePreviewLease {
   expiresAtMs: number;
 }
 
+interface ResolvedFileResource {
+  hostId: string;
+  path: string;
+  relativePath: string;
+  rootPath: string;
+  target: ResolveFileResourceResponse["target"];
+}
+
 function normalizeMimeType(value: string | null | undefined): string | null {
   const normalizedValue = value?.split(";")[0]?.trim().toLowerCase();
   return normalizedValue && normalizedValue.length > 0 ? normalizedValue : null;
@@ -68,6 +84,31 @@ function joinHostPath(rootPath: string, segments: string[]): string {
   return path.win32.isAbsolute(rootPath) && !path.posix.isAbsolute(rootPath)
     ? path.win32.join(rootPath, ...segments)
     : path.posix.join(rootPath, ...segments);
+}
+
+function splitAbsoluteHostPath(filePath: string): {
+  path: string;
+  relativePath: string;
+  rootPath: string;
+} {
+  const hostPath =
+    path.win32.isAbsolute(filePath) && !path.posix.isAbsolute(filePath)
+      ? path.win32
+      : path.posix;
+  const normalizedPath = hostPath.normalize(filePath);
+  const relativePath = hostPath.basename(normalizedPath);
+  return {
+    path: normalizedPath,
+    relativePath,
+    rootPath: hostPath.dirname(normalizedPath),
+  };
+}
+
+function buildPreviewContentUrl(baseUrl: string, relativePath: string): string {
+  return `${baseUrl}/${relativePath
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")}`;
 }
 
 function isHtmlMimeType(value: string | null | undefined): boolean {
@@ -163,6 +204,28 @@ export function registerFileRoutes(app: Hono, deps: AppDeps): void {
   const previewRoutes = publicApiRoutes.filePreviews;
   const previewLeases = new Map<string, FilePreviewLease>();
 
+  const createPreviewLease = (args: {
+    hostId: string;
+    rootPath: string;
+    ttlMs?: number;
+  }): { baseUrl: string; expiresAtMs: number } => {
+    const now = Date.now();
+    for (const [id, lease] of previewLeases) {
+      if (lease.expiresAtMs <= now) previewLeases.delete(id);
+    }
+    const id = randomUUID();
+    const expiresAtMs = now + (args.ttlMs ?? FILE_PREVIEW_TTL_MS);
+    previewLeases.set(id, {
+      hostId: args.hostId,
+      rootPath: normalizeHostPath(args.rootPath),
+      expiresAtMs,
+    });
+    return {
+      baseUrl: `/api/v1/file-previews/${encodeURIComponent(id)}`,
+      expiresAtMs,
+    };
+  };
+
   const resolveHostId = (hostId: string | undefined): string => {
     const resolved = hostId ?? requirePrimaryHostId(deps);
     assertUsableHostId(deps, { hostId: resolved });
@@ -233,51 +296,65 @@ export function registerFileRoutes(app: Hono, deps: AppDeps): void {
     }
   };
 
-  post(fileRoutes.read, (context, payload) =>
-    withHostFileRoute(payload.hostId, async (hostId) => {
+  post(fileRoutes.read, async (context, payload) => {
+    const target =
+      "experimental_target" in payload
+        ? await resolveFileResource(payload.experimental_target)
+        : payload;
+    return withHostFileRoute(target.hostId, async (hostId) => {
       const result = await callHostRetryableOnlineRpc(deps, {
         hostId,
         timeoutMs: COMMAND_TIMEOUT_MS,
         command: {
           type: "host.read_file",
-          path: payload.path,
-          ...(payload.rootPath !== undefined
-            ? { rootPath: payload.rootPath }
+          path: target.path,
+          ...(target.rootPath !== undefined
+            ? { rootPath: target.rootPath }
             : {}),
         },
       });
       return context.json(requireDaemonFileContentResult(result));
-    }),
-  );
+    });
+  });
 
-  post(fileRoutes.write, (context, payload) =>
-    withHostFileRoute(payload.hostId, async (hostId) => {
+  post(fileRoutes.write, async (context, payload) => {
+    const target =
+      "experimental_target" in payload
+        ? await resolveFileResource(payload.experimental_target)
+        : payload;
+    return withHostFileRoute(target.hostId, async (hostId) => {
       const result = await runHostFileMutationCommand(hostId, {
         type: "host.write_file",
-        path: payload.path,
+        path: target.path,
         content: payload.content,
         contentEncoding: payload.contentEncoding ?? "utf8",
         createParents: payload.createParents ?? false,
-        ...(payload.rootPath !== undefined
-          ? { rootPath: payload.rootPath }
-          : {}),
+        ...(target.rootPath !== undefined ? { rootPath: target.rootPath } : {}),
         ...(payload.expectedSha256 !== undefined
           ? { expectedSha256: payload.expectedSha256 }
           : {}),
         ...(payload.mode !== undefined ? { mode: payload.mode } : {}),
       });
       return context.json(result);
-    }),
-  );
+    });
+  });
 
-  post(fileRoutes.list, (context, payload) =>
-    withHostFileRoute(payload.hostId, async (hostId) => {
+  post(fileRoutes.list, async (context, payload) => {
+    const target =
+      "experimental_target" in payload
+        ? await resolveFileResource(payload.experimental_target)
+        : { ...payload, rootPath: payload.path };
+    return withHostFileRoute(target.hostId, async (hostId) => {
       const result = await callHostRetryableOnlineRpc(deps, {
         hostId,
         timeoutMs: COMMAND_TIMEOUT_MS,
         command: {
           type: "host.list_files",
-          path: payload.path,
+          path:
+            "experimental_directory" in payload &&
+            payload.experimental_directory === "root"
+              ? target.rootPath
+              : target.path,
           limit: payload.limit ?? HOST_FILE_LIST_LIMIT_DEFAULT,
           includeHidden:
             payload.includeHidden ?? WORKSPACE_PATH_LIST_INCLUDE_HIDDEN,
@@ -289,17 +366,25 @@ export function registerFileRoutes(app: Hono, deps: AppDeps): void {
         },
       });
       return context.json(result);
-    }),
-  );
+    });
+  });
 
-  post(fileRoutes.listPaths, (context, payload) =>
-    withHostFileRoute(payload.hostId, async (hostId) => {
+  post(fileRoutes.listPaths, async (context, payload) => {
+    const target =
+      "experimental_target" in payload
+        ? await resolveFileResource(payload.experimental_target)
+        : { ...payload, rootPath: payload.path };
+    return withHostFileRoute(target.hostId, async (hostId) => {
       const result = await callHostRetryableOnlineRpc(deps, {
         hostId,
         timeoutMs: COMMAND_TIMEOUT_MS,
         command: {
           type: "host.list_paths",
-          path: payload.path,
+          path:
+            "experimental_directory" in payload &&
+            payload.experimental_directory === "root"
+              ? target.rootPath
+              : target.path,
           limit: payload.limit ?? HOST_FILE_LIST_LIMIT_DEFAULT,
           includeFiles: payload.includeFiles,
           includeDirectories: payload.includeDirectories,
@@ -313,8 +398,8 @@ export function registerFileRoutes(app: Hono, deps: AppDeps): void {
         },
       });
       return context.json(result);
-    }),
-  );
+    });
+  });
 
   post(fileRoutes.mkdir, (context, payload) =>
     withHostFileRoute(payload.hostId, async (hostId) => {
@@ -368,20 +453,96 @@ export function registerFileRoutes(app: Hono, deps: AppDeps): void {
         false,
       );
     }
-    const now = Date.now();
-    for (const [id, lease] of previewLeases) {
-      if (lease.expiresAtMs <= now) previewLeases.delete(id);
+    return context.json(
+      createPreviewLease({
+        hostId,
+        rootPath: payload.rootPath,
+        ttlMs: payload.ttlMs,
+      }),
+    );
+  });
+
+  const resolveRelativeFileResource = (args: {
+    hostId: string;
+    path: string;
+    rootPath: string;
+    target: ResolveFileResourceResponse["target"];
+  }): ResolvedFileResource => {
+    return {
+      hostId: args.hostId,
+      path: joinHostPath(args.rootPath, args.path.split("/")),
+      relativePath: args.path,
+      rootPath: args.rootPath,
+      target: args.target,
+    };
+  };
+
+  const resolveFileResource = async (
+    target: FileReference,
+  ): Promise<ResolvedFileResource> => {
+    if (target.kind === "workspace") {
+      const environment = requireReadyEnvironment(
+        deps.db,
+        target.environmentId,
+      );
+      assertUsableHostId(deps, { hostId: environment.hostId });
+      return resolveRelativeFileResource({
+        hostId: environment.hostId,
+        path: target.path,
+        rootPath: environment.path,
+        target: {
+          kind: "workspace",
+          environmentId: environment.id,
+          path: target.path,
+        },
+      });
     }
-    const id = randomUUID();
-    const expiresAtMs = now + (payload.ttlMs ?? FILE_PREVIEW_TTL_MS);
-    previewLeases.set(id, {
+    if (target.kind === "thread-storage") {
+      const thread = requirePublicThread(deps.db, target.threadId);
+      if (!thread.environmentId) {
+        throw new ApiError(409, "invalid_request", "Thread has no environment");
+      }
+      const environment = requireEnvironment(deps.db, thread.environmentId);
+      assertUsableHostId(deps, { hostId: environment.hostId });
+      const storagePath = await requireThreadStoragePath(deps, {
+        hostId: environment.hostId,
+        threadId: thread.id,
+      });
+      return resolveRelativeFileResource({
+        hostId: environment.hostId,
+        path: target.path,
+        rootPath: storagePath,
+        target: {
+          kind: "thread-storage",
+          threadId: thread.id,
+          path: target.path,
+        },
+      });
+    }
+
+    const hostId = target.hostId;
+    assertUsableHostId(deps, { hostId });
+    const hostPath = splitAbsoluteHostPath(target.path);
+    return {
       hostId,
-      rootPath: normalizeHostPath(payload.rootPath),
-      expiresAtMs,
+      ...hostPath,
+      target: { kind: "host", hostId, path: hostPath.path },
+    };
+  };
+
+  post(fileRoutes.resolveResource, async (context, payload) => {
+    const resource = await resolveFileResource(payload.target);
+    const lease = createPreviewLease({
+      hostId: resource.hostId,
+      rootPath: resource.rootPath,
     });
     return context.json({
-      baseUrl: `/api/v1/file-previews/${encodeURIComponent(id)}`,
-      expiresAtMs,
+      ...lease,
+      absolutePath: resource.path,
+      rootPath: resource.rootPath,
+      path: resource.relativePath,
+      target: resource.target,
+      url: buildPreviewContentUrl(lease.baseUrl, resource.relativePath),
     });
   });
 

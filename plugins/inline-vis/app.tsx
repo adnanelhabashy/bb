@@ -3,31 +3,34 @@ import { Icon } from "@bb/shared-ui/icon";
 import { Skeleton } from "@bb/shared-ui/skeleton";
 import {
   definePluginApp,
+  experimental_useFileResources,
   Markdown,
-  useRpc,
+  type ExperimentalFileReference,
+  type ExperimentalFileResource,
   type PluginMessageDirectiveProps,
   type MarkdownProps,
 } from "@get-bb/plugin-sdk/app";
-import type { inlineVisRpcContract } from "./server.js";
 
 type PreviewSource = "workspace" | "thread-storage";
 
 const PREVIEW_SOURCE_CONFIG = {
-  workspace: { route: "worktree/files", opensWorkspace: true },
-  "thread-storage": {
-    route: "thread-storage/files",
-    opensWorkspace: false,
-  },
-} as const satisfies Record<
-  PreviewSource,
-  { route: string; opensWorkspace: boolean }
->;
+  workspace: { opensWorkspace: true },
+  "thread-storage": { opensWorkspace: false },
+} as const satisfies Record<PreviewSource, { opensWorkspace: boolean }>;
+
+type PreviewKind = "html" | "markdown";
 
 type LoadState =
   | { status: "missing-file" }
   | { status: "invalid-height"; message: string }
   | { status: "loading"; file: string }
-  | { status: "ready"; kind: "html"; file: string; source: PreviewSource }
+  | {
+      status: "ready";
+      kind: "html";
+      file: string;
+      source: PreviewSource;
+      resource: ExperimentalFileResource;
+    }
   | {
       status: "ready";
       kind: "markdown";
@@ -41,18 +44,84 @@ type LoadState =
 const DEFAULT_HEIGHT_PX = 224;
 const MIN_HEIGHT_PX = 120;
 const MAX_HEIGHT_PX = 1_200;
+const MAX_PREVIEW_BYTES = 5 * 1024 * 1024;
 
-function encodePathSegments(file: string): string {
-  return file.split("/").map(encodeURIComponent).join("/");
+const PREVIEW_KIND_BY_EXTENSION: ReadonlyMap<string, PreviewKind> = new Map([
+  ["html", "html"],
+  ["htm", "html"],
+  ["md", "markdown"],
+  ["markdown", "markdown"],
+]);
+
+function requirePreviewFile(value: string): {
+  file: string;
+  kind: PreviewKind;
+} {
+  const file = value.trim();
+  const segments = file.split("/");
+  if (
+    !file ||
+    file.includes("\\") ||
+    file.startsWith("/") ||
+    segments.some((segment) => !segment || segment === "." || segment === "..")
+  ) {
+    throw new Error(`"file" must be a source-relative path: ${file}`);
+  }
+  const extension = file.split(".").at(-1)?.toLowerCase() ?? "";
+  const kind = PREVIEW_KIND_BY_EXTENSION.get(extension);
+  if (kind === undefined) {
+    throw new Error(
+      `"file" must end with .html, .htm, .md, or .markdown, got ${JSON.stringify(file)}`,
+    );
+  }
+  return { file, kind };
 }
 
-function buildPreviewUrl(
+function buildResourceTarget(
+  environmentId: string | null,
   threadId: string,
   file: string,
   source: PreviewSource,
-): string {
-  const route = PREVIEW_SOURCE_CONFIG[source].route;
-  return `/api/v1/threads/${encodeURIComponent(threadId)}/${route}/${encodePathSegments(file)}`;
+): ExperimentalFileReference {
+  if (source === "workspace") {
+    if (environmentId === null) {
+      throw new Error("This message has no workspace environment");
+    }
+    return { kind: "workspace", environmentId, path: file };
+  }
+  return { kind: "thread-storage", threadId, path: file };
+}
+
+async function readPreviewText(
+  resource: ExperimentalFileResource,
+  signal: AbortSignal,
+): Promise<string> {
+  const response = await fetch(resource.url, {
+    credentials: "same-origin",
+    signal,
+  });
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error(`Preview file not found: ${resource.path}`);
+    }
+    if (response.status === 413) {
+      throw new Error(
+        `Preview file is too large (max ${MAX_PREVIEW_BYTES} bytes).`,
+      );
+    }
+    throw new Error(`Preview request failed with status ${response.status}.`);
+  }
+  const bytes = await response.arrayBuffer();
+  if (bytes.byteLength > MAX_PREVIEW_BYTES) {
+    throw new Error(
+      `Preview file is too large (${bytes.byteLength} bytes; max ${MAX_PREVIEW_BYTES}).`,
+    );
+  }
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error("Preview file is not valid UTF-8 text.");
+  }
 }
 
 function parsePreviewHeight(value: string | undefined): number | null {
@@ -96,7 +165,7 @@ function InlineVisDirective({
   message,
   openWorkspaceFile,
 }: PluginMessageDirectiveProps) {
-  const rpc = useRpc<typeof inlineVisRpcContract>();
+  const fileResources = experimental_useFileResources();
   const fileAttr = attributes.file?.trim() ?? "";
   const sourceAttr = attributes.source;
   const heightAttr = attributes.height;
@@ -122,20 +191,43 @@ function InlineVisDirective({
       setState({ status: "missing-file" });
       return;
     }
-    let cancelled = false;
+    const controller = new AbortController();
     setState({ status: "loading", file: fileAttr });
 
     void (async () => {
       try {
-        const result = await rpc.call("preparePreview", {
-          threadId: message.threadId,
-          file: fileAttr,
-          ...(sourceAttr === undefined ? {} : { source: sourceAttr }),
-        });
-        if (cancelled) return;
-        setState({ status: "ready", ...result });
+        const source = sourceAttr?.trim() ?? "workspace";
+        if (source !== "workspace" && source !== "thread-storage") {
+          throw new Error(
+            `"source" must be workspace or thread-storage, got ${JSON.stringify(source)}`,
+          );
+        }
+        const { file, kind } = requirePreviewFile(fileAttr);
+        const resource = await fileResources.resolve(
+          buildResourceTarget(
+            message.experimental_environmentId ?? null,
+            message.threadId,
+            file,
+            source,
+          ),
+          { signal: controller.signal },
+        );
+        const content = await readPreviewText(resource, controller.signal);
+        if (controller.signal.aborted) return;
+        setState(
+          kind === "markdown"
+            ? {
+                status: "ready",
+                kind,
+                file,
+                source,
+                content,
+                document: resource,
+              }
+            : { status: "ready", kind, file, source, resource },
+        );
       } catch (error) {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         setState({
           status: "error",
           file: fileAttr,
@@ -145,9 +237,9 @@ function InlineVisDirective({
     })();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
-  }, [fileAttr, heightError, message.threadId, rpc, sourceAttr]);
+  }, [fileAttr, fileResources, heightError, message.threadId, sourceAttr]);
 
   if (state.status === "missing-file") {
     return (
@@ -243,7 +335,7 @@ function InlineVisDirective({
       ) : (
         <iframe
           title={`inline-vis: ${state.file}`}
-          src={buildPreviewUrl(message.threadId, state.file, state.source)}
+          src={state.resource.url}
           sandbox="allow-scripts"
           style={{ height: previewHeight ?? DEFAULT_HEIGHT_PX }}
           className="block w-full border-0 bg-background"

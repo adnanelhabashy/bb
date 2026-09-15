@@ -2,6 +2,7 @@ import path from "node:path";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
+import { fileReferenceSchema } from "@bb/server-contract/file-reference";
 import { z } from "zod";
 
 const MAX_EDITABLE_BYTES = 8 * 1024 * 1024;
@@ -12,19 +13,7 @@ const ASSET_LEASE_TTL_MS = 60 * 60 * 1000;
 
 const ASSET_LEASE_REFRESH_MARGIN_MS = 5 * 60 * 1000;
 
-const sourceSchema = z
-  .object({
-    kind: z.enum(["workspace", "host", "thread-storage"]),
-    threadId: z.string().nullable(),
-    environmentId: z.string().nullable(),
-    projectId: z.string().nullable(),
-    experimental_hostId: z.string().optional(),
-  })
-  .strict();
-
-const fileSchema = z
-  .object({ path: z.string().min(1), source: sourceSchema })
-  .strict();
+const fileSchema = z.object({ file: fileReferenceSchema }).strict();
 
 export const rpcContract = defineRpcContract({
   assets: {
@@ -45,7 +34,7 @@ export const rpcContract = defineRpcContract({
     ]),
   },
   tree: {
-    input: z.object({ source: sourceSchema }).strict(),
+    input: fileSchema,
     output: z.object({
       root: z.string(),
       entries: z.array(
@@ -139,117 +128,50 @@ export default async function plugin(bb: BbPluginApi) {
     return assetLease;
   }
 
-  async function resolveTarget(
-    source: z.infer<typeof sourceSchema>,
-    filePath: string,
-  ): Promise<{ path: string; rootPath: string; hostId?: string }> {
-    if (source.kind === "thread-storage") {
-      if (source.threadId === null) {
-        throw new Error("This thread-storage file has no thread");
-      }
-      const { hostId, storageRootPath } = await bb.sdk.threads.storageLocation({
-        threadId: source.threadId,
-      });
-      return {
-        path: path.join(storageRootPath, filePath),
-        rootPath: storageRootPath,
-        hostId,
-      };
-    }
-    if (source.environmentId === null && source.kind === "workspace") {
-      if (source.projectId === null) {
-        throw new Error("This file has no environment or project");
-      }
-      const project = await bb.sdk.projects.get({
-        projectId: source.projectId,
-      });
-      const sources = project.sources;
-      const checkout =
-        source.experimental_hostId === undefined
-          ? (sources.find((entry) => entry.isDefault) ?? sources[0])
-          : sources.find(
-              (entry) => entry.hostId === source.experimental_hostId,
-            );
-      if (checkout === undefined) {
-        throw new Error("This project has no matching source checkout");
-      }
-      return {
-        path: path.join(checkout.path, filePath),
-        rootPath: checkout.path,
-        hostId: checkout.hostId,
-      };
-    }
-    if (source.environmentId === null) {
-      throw new Error("This file has no environment to resolve it against");
-    }
-    const environment = await bb.sdk.environments.get({
-      environmentId: source.environmentId,
-    });
-
-    if (source.kind === "host") {
-      const api = path.win32.isAbsolute(filePath) ? path.win32 : path.posix;
-      return {
-        path: filePath,
-        rootPath: api.dirname(filePath),
-        ...(environment.hostId ? { hostId: environment.hostId } : {}),
-      };
-    }
-
-    if (!environment.path) {
-      throw new Error("This environment has no workspace path");
-    }
-    return {
-      path: path.join(environment.path, filePath),
-      rootPath: environment.path,
-      ...(environment.hostId ? { hostId: environment.hostId } : {}),
-    };
-  }
-
-  function relativeTo(root: string, target: string): string {
-    const api = path.win32.isAbsolute(root) ? path.win32 : path.posix;
-    return api.relative(root, target) || api.basename(target);
-  }
-
   bb.rpc.register(rpcContract, {
     assets: () => assets(),
 
-    async read({ path: filePath, source }) {
-      const target = await resolveTarget(source, filePath);
-      const file = await bb.sdk.files.read(target);
+    async read({ file }) {
+      const [result, resource] = await Promise.all([
+        bb.sdk.files.read({ experimental_target: file }),
+        bb.sdk.files.experimental_resolveResource({ target: file }),
+      ]);
 
-      if (file.contentEncoding !== "utf8") {
+      if (result.contentEncoding !== "utf8") {
         return {
           kind: "unsupported" as const,
           reason: "This file is not text",
         };
       }
-      if (file.sizeBytes > MAX_EDITABLE_BYTES) {
+      if (result.sizeBytes > MAX_EDITABLE_BYTES) {
         return {
           kind: "unsupported" as const,
-          reason: `This file is too large to edit (${Math.round(file.sizeBytes / 1024 / 1024)} MB)`,
+          reason: `This file is too large to edit (${Math.round(result.sizeBytes / 1024 / 1024)} MB)`,
         };
       }
       return {
         kind: "text" as const,
-        content: file.content,
-        sha256: file.sha256,
-        absolutePath: target.path,
-        relativePath: relativeTo(target.rootPath, target.path),
+        content: result.content,
+        sha256: result.sha256,
+        absolutePath: resource.absolutePath,
+        relativePath: resource.path,
       };
     },
 
-    async tree({ source }) {
-      const target = await resolveTarget(source, ".");
+    async tree({ file }) {
+      const resource = await bb.sdk.files.experimental_resolveResource({
+        target: file,
+      });
       const result = await bb.sdk.files.listPaths({
-        path: target.rootPath,
+        experimental_target: file,
+        experimental_directory: "root",
         includeFiles: true,
         includeDirectories: true,
         includeHidden: true,
         limit: MAX_TREE_ENTRIES,
-        ...(target.hostId !== undefined ? { hostId: target.hostId } : {}),
       });
       return {
-        root: target.rootPath,
+        root: resource.rootPath,
         entries: result.paths.map((entry) => ({
           path: entry.path,
           kind: entry.kind,
@@ -258,10 +180,9 @@ export default async function plugin(bb: BbPluginApi) {
       };
     },
 
-    async write({ path: filePath, source, content, expectedSha256 }) {
-      const target = await resolveTarget(source, filePath);
+    async write({ file, content, expectedSha256 }) {
       const result = await bb.sdk.files.write({
-        ...target,
+        experimental_target: file,
         content,
         contentEncoding: "utf8",
         expectedSha256,

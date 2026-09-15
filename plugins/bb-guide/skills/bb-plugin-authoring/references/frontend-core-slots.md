@@ -237,7 +237,7 @@ target? })`. Inside the fixed-tab component,
   `experimental_activate`, and `experimental_Original`. Search activation opens
   the quick palette. No inline search field or query state exists. BB keeps the
   drawer, thread list, footer, resize handle, and shortcut ownership.
-- `fileOpener` → `{ path: string, source, experimental_lineRange?, Original }` — register as a viewer/editor
+- `fileOpener` → `{ experimental_file, experimental_lineRange?, Original }` — register as a viewer/editor
   for file extensions: `{ id, title, extensions: ["md"], component }`.
   Matching files use the first applicable opener in deterministic slot order
   by default. Users can pin BB's preview or a specific opener per extension
@@ -247,11 +247,11 @@ target? })`. Inside the fixed-tab component,
   render your component in a plugin tab instead of the built-in preview —
   this includes links clicked in rendered markdown, the file picker, and
   `bb thread open`. `source` is
-  `{ kind: "workspace" | "host" | "thread-storage", threadId, environmentId,
-projectId, experimental_hostId? }` (nullable fields). The optional host ID
-  selects a project-backed workspace host and persists in opener-tab parameters.
-  The `path` follows the source (workspace:
-  worktree-relative; host: absolute; thread-storage: storage-relative).
+  `experimental_file`, an `ExperimentalFileReference` with exactly one of
+  `{ kind: "workspace", environmentId, path }`,
+  `{ kind: "host", hostId, path }`, or
+  `{ kind: "thread-storage", threadId, path }`. Workspace and thread-storage
+  paths are relative; host paths are absolute.
   `experimental_lineRange` (SDK 0.4.56) is a nullable, one-based inclusive
   `{ startLineNumber, endLineNumber }` target; older hosts may omit it. Observe
   object identity: each targeted open supplies a new object, including an
@@ -262,5 +262,7 @@ projectId, experimental_hostId? }` (nullable fields). The optional host ID
   delegate conditionally without re-entering plugin replacement resolution.
   Applies only to live file content — git-ref snapshots and deleted files
   always use the built-in preview, and a removed/disabled opener degrades
-  back to it. Pair with `bb.sdk.files` (rpc from your server) to load and
-  CAS-save the content.
+  back to it. Viewers can pass `experimental_file` directly to
+  `experimental_useFileResources`. Editors can send the same reference through
+  RPC before using `bb.sdk.files` through their server RPC when they need
+  bounded reads and CAS saves.

@@ -28,10 +28,8 @@ import type {
 import { useDebouncedValue } from "../useDebouncedValue";
 import { applyTimelineDelta } from "@bb/server-contract";
 import type { ThreadListFilters } from "@bb/client-core";
-import type { FilePreview } from "@bb/client-core";
 import type { PathListOptions } from "@/lib/path-list-options";
 import type { ThreadStorageFileListOptions } from "@/lib/thread-storage-files";
-import * as api from "@/lib/api";
 import { sdk } from "@/lib/sdk";
 import {
   useThreadDetailRealtimeSubscription,
@@ -62,7 +60,6 @@ import {
   HEAVY_PAYLOAD_QUERY_POLICY,
   REALTIME_OWNED_MOUNT_BASELINE_QUERY_POLICY,
   REALTIME_OWNED_NO_FOCUS_QUERY_POLICY,
-  RESUME_REFETCH_QUERY_POLICY,
 } from "./query-policies";
 import {
   archivedThreadsListQueryKey,
@@ -77,8 +74,6 @@ import {
   threadStorageFilesQueryKey,
   threadStorageLocationQueryKey,
   threadStoragePathsQueryKey,
-  threadStorageFilePreviewQueryKey,
-  threadHostFilePreviewQueryKey,
   threadConversationOutlineQueryKey,
   threadTimelineQueryKey,
   threadTimelineTurnSummaryDetailsQueryKey,
@@ -828,55 +823,6 @@ export function useThreadStoragePaths(
     enabled,
     ...REALTIME_OWNED_MOUNT_BASELINE_QUERY_POLICY,
     placeholderData: (previousData) => previousData,
-  });
-}
-
-export function useThreadStorageFilePreview(
-  id: string,
-  path: string | null,
-  options?: QueryOptions,
-) {
-  const enabled = (options?.enabled ?? true) && Boolean(id) && Boolean(path);
-  useThreadDetailRealtimeSubscription(id, { enabled });
-
-  return useQuery<FilePreview>({
-    queryKey: threadStorageFilePreviewQueryKey(id, path),
-    queryFn: ({ signal }) =>
-      api.getThreadStorageFilePreview(
-        requireThreadId(id, "useThreadStorageFilePreview"),
-        path ?? "",
-        signal,
-      ),
-    enabled,
-    ...REALTIME_OWNED_MOUNT_BASELINE_QUERY_POLICY,
-    ...HEAVY_PAYLOAD_QUERY_POLICY,
-  });
-}
-
-export function useThreadHostFilePreview(
-  id: string,
-  environmentId: string | null | undefined,
-  path: string | null,
-  options?: QueryOptions,
-) {
-  const enabled =
-    (options?.enabled ?? true) &&
-    Boolean(id) &&
-    Boolean(environmentId) &&
-    Boolean(path);
-  useThreadDetailRealtimeSubscription(id, { enabled });
-
-  return useQuery<FilePreview>({
-    queryKey: threadHostFilePreviewQueryKey(id, environmentId, path),
-    queryFn: ({ signal }) =>
-      api.getThreadHostFilePreview(
-        requireThreadId(id, "useThreadHostFilePreview"),
-        path ?? "",
-        signal,
-      ),
-    enabled,
-    ...RESUME_REFETCH_QUERY_POLICY,
-    ...HEAVY_PAYLOAD_QUERY_POLICY,
   });
 }
 

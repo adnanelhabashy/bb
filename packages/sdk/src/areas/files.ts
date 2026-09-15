@@ -1,5 +1,10 @@
 import type {
   CreateFilePreviewResponse,
+  FileReference,
+  HostFileListRequest,
+  HostFileReadRequest,
+  HostFileWriteRequest,
+  HostPathListRequest,
   HostFileListResponse,
   HostFileReadResponse,
   HostFileWriteResponse,
@@ -7,41 +12,14 @@ import type {
   HostMovePathResponse,
   HostPathListResponse,
   HostRemovePathResponse,
+  ResolveFileResourceResponse,
 } from "@bb/server-contract";
 import { signalRequestArgs, type CreateSdkAreaArgs } from "./common.js";
 
-export interface FileReadArgs {
-  hostId?: string;
-  path: string;
-  rootPath?: string;
-  signal?: AbortSignal;
-}
-
-export interface FileWriteArgs {
-  hostId?: string;
-  path: string;
-  rootPath?: string;
-  content: string;
-  contentEncoding?: "utf8" | "base64";
-  createParents?: boolean;
-  expectedSha256?: string | null;
-  mode?: number;
-}
-
-export interface FileListArgs {
-  hostId?: string;
-  path: string;
-  query?: string;
-  limit?: number;
-  includeHidden?: boolean;
-  excludeNames?: string[];
-  signal?: AbortSignal;
-}
-
-export interface PathListArgs extends FileListArgs {
-  includeFiles: boolean;
-  includeDirectories: boolean;
-}
+export type FileReadArgs = HostFileReadRequest & { signal?: AbortSignal };
+export type FileWriteArgs = HostFileWriteRequest;
+export type FileListArgs = HostFileListRequest & { signal?: AbortSignal };
+export type PathListArgs = HostPathListRequest & { signal?: AbortSignal };
 
 export interface FileMkdirArgs {
   hostId?: string;
@@ -71,6 +49,11 @@ export interface FilePreviewArgs {
   ttlMs?: number;
 }
 
+export interface ExperimentalFileResourceArgs {
+  target: FileReference;
+  signal?: AbortSignal;
+}
+
 export type FileReadResult = HostFileReadResponse;
 export type FileWriteResult = HostFileWriteResponse;
 export type FileListResult = HostFileListResponse;
@@ -79,6 +62,7 @@ export type FileMkdirResult = HostMkdirResponse;
 export type FileMoveResult = HostMovePathResponse;
 export type FileRemoveResult = HostRemovePathResponse;
 export type FilePreviewResult = CreateFilePreviewResponse;
+export type ExperimentalFileResourceResult = ResolveFileResourceResponse;
 
 export interface FilesArea {
   read(args: FileReadArgs): Promise<FileReadResult>;
@@ -89,22 +73,20 @@ export interface FilesArea {
   move(args: FileMoveArgs): Promise<FileMoveResult>;
   remove(args: FileRemoveArgs): Promise<FileRemoveResult>;
   createPreview(args: FilePreviewArgs): Promise<FilePreviewResult>;
+  experimental_resolveResource(
+    args: ExperimentalFileResourceArgs,
+  ): Promise<ExperimentalFileResourceResult>;
 }
 
 export function createFilesArea(args: CreateSdkAreaArgs): FilesArea {
   const { transport } = args;
   return {
     async read(input) {
+      const { signal, ...json } = input;
       return transport.readJson(
         transport.api.v1.files.read.$post(
-          {
-            json: {
-              hostId: input.hostId,
-              path: input.path,
-              rootPath: input.rootPath,
-            },
-          },
-          ...signalRequestArgs(input.signal),
+          { json },
+          ...signalRequestArgs(signal),
         ),
       );
     },
@@ -114,38 +96,20 @@ export function createFilesArea(args: CreateSdkAreaArgs): FilesArea {
       );
     },
     async list(input) {
+      const { signal, ...json } = input;
       return transport.readJson(
         transport.api.v1.files.list.$post(
-          {
-            json: {
-              excludeNames: input.excludeNames,
-              hostId: input.hostId,
-              includeHidden: input.includeHidden,
-              limit: input.limit,
-              path: input.path,
-              query: input.query,
-            },
-          },
-          ...signalRequestArgs(input.signal),
+          { json },
+          ...signalRequestArgs(signal),
         ),
       );
     },
     async listPaths(input) {
+      const { signal, ...json } = input;
       return transport.readJson(
         transport.api.v1.files.paths.$post(
-          {
-            json: {
-              excludeNames: input.excludeNames,
-              hostId: input.hostId,
-              includeDirectories: input.includeDirectories,
-              includeFiles: input.includeFiles,
-              includeHidden: input.includeHidden,
-              limit: input.limit,
-              path: input.path,
-              query: input.query,
-            },
-          },
-          ...signalRequestArgs(input.signal),
+          { json },
+          ...signalRequestArgs(signal),
         ),
       );
     },
@@ -174,6 +138,14 @@ export function createFilesArea(args: CreateSdkAreaArgs): FilesArea {
               ttlMs: input.ttlMs,
             },
           },
+          ...signalRequestArgs(input.signal),
+        ),
+      );
+    },
+    async experimental_resolveResource(input) {
+      return transport.readJson(
+        transport.api.v1.files.resources.$post(
+          { json: { target: input.target } },
           ...signalRequestArgs(input.signal),
         ),
       );

@@ -1239,6 +1239,7 @@ describe("Docs nav panel", () => {
           threadId: "thr_1",
           turnId: "turn_1",
           projectId: null,
+          experimental_environmentId: null,
         },
         openWorkspaceFile: null,
       },
@@ -1307,13 +1308,10 @@ describe("Docs nav panel", () => {
     const slot = renderSlot(
       app.fileOpeners[0]!,
       {
-        path: "/Users/shared/notes/plan.mdx",
-        source: {
+        experimental_file: {
           kind: "host",
-          threadId: "thr_1",
-          environmentId: null,
-          projectId: "project_1",
-          experimental_hostId: "host_remote",
+          hostId: "host_remote",
+          path: "/Users/shared/notes/plan.mdx",
         },
         Original: () => null,
       },
@@ -1336,14 +1334,11 @@ describe("Docs nav panel", () => {
     expect(slot.rpcCalls).toContainEqual({
       method: "openFile",
       input: {
-        source: {
+        file: {
           kind: "host",
-          threadId: "thr_1",
-          environmentId: null,
-          projectId: "project_1",
-          experimental_hostId: "host_remote",
+          hostId: "host_remote",
+          path: "/Users/shared/notes/plan.mdx",
         },
-        path: "/Users/shared/notes/plan.mdx",
       },
     });
 
@@ -1354,14 +1349,11 @@ describe("Docs nav panel", () => {
         expect(slot.rpcCalls).toContainEqual({
           method: "saveOpenedFile",
           input: {
-            source: {
+            file: {
               kind: "host",
-              threadId: "thr_1",
-              environmentId: null,
-              projectId: "project_1",
-              experimental_hostId: "host_remote",
+              hostId: "host_remote",
+              path: "/Users/shared/notes/plan.mdx",
             },
-            path: "/Users/shared/notes/plan.mdx",
             content: "# Updated remote plan",
             expectedSha256: "sha",
           },

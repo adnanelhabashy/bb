@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Render workspace or thread-storage HTML visualizations and Markdown documents inline in assistant messages.",
   "engines": {
-    "bb": ">=0.0"
+    "bb": ">=0.0",
+    "bbPluginSdk": ">=0.4.89"
   },
   "bb": {
     "name": "Inline visualizations",
@@ -28,8 +29,7 @@
     "prepare:bundled": "bb-plugin-build prepare-bundled"
   },
   "dependencies": {
-    "@bb/shared-ui": "workspace:*",
-    "zod": "^4.3.6"
+    "@bb/shared-ui": "workspace:*"
   },
   "devDependencies": {
     "@bb/plugin-build": "workspace:*",

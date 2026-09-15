@@ -35,7 +35,6 @@ import {
   createFileOpenerOriginalTab,
   createFileOpenerTabForRequest,
   fileOpenerIdFromActionId,
-  parseFileOpenerParams,
 } from "@/components/plugin/file-opener-tabs";
 import type { FileOpenerOverride } from "@/lib/plugin-slot-resolvers";
 import type { OpenPluginPanelArgs } from "@/components/plugin/PluginPanelActions";
@@ -72,11 +71,13 @@ interface UseThreadFileTabsParams {
   panelStateId: string | null | undefined;
   syncThreadId: string | null | undefined;
   environmentId: string | null | undefined;
+  environmentHostId?: string | null;
   fileOwnerThreadId?: string | null;
   onCloseLastTab?: () => void;
   preserveWorkspaceTabsAcrossContexts?: boolean;
   projectHostId?: string | null;
   projectId?: string | null;
+  projectRootPath?: string | null;
   retainedTerminalId?: string | null;
   storageFileExists?: (path: string) => Promise<boolean>;
   storageFiles:
@@ -414,11 +415,13 @@ export function useThreadFileTabs({
   panelStateId,
   syncThreadId,
   environmentId,
+  environmentHostId = null,
   fileOwnerThreadId,
   onCloseLastTab,
   preserveWorkspaceTabsAcrossContexts = false,
   projectHostId = null,
   projectId = null,
+  projectRootPath = null,
   retainedTerminalId = null,
   storageFileExists,
   storageFiles,
@@ -636,9 +639,11 @@ export function useThreadFileTabs({
       viewer?: FileOpenerOverride,
     ): SecondaryPanelTab | null => {
       const openerTab = createFileOpenerTabForRequest({
+        environmentHostId,
         fileOpeners,
         preference: fileOpenerPreference,
         projectHostId,
+        projectRootPath,
         projectId,
         request,
         resolvedEnvironmentId,
@@ -680,7 +685,9 @@ export function useThreadFileTabs({
     [
       fileOpenerPreference,
       fileOpeners,
+      environmentHostId,
       projectHostId,
+      projectRootPath,
       recordRecentItem,
       projectId,
       resolvedEnvironmentId,
@@ -945,40 +952,45 @@ export function useThreadFileTabs({
     fileOpenerIdFromActionId(activePluginPanelTab.actionId) !== null
       ? (activePluginPanelTab.fileOpenerOwner ?? null)
       : null;
-  const activeFileOpenerFile =
-    activeFileOpenerOwner === null || activePluginPanelTab === null
-      ? null
-      : parseFileOpenerParams(activePluginPanelTab.paramsJson);
-  const activeWorkspaceFileOpener =
-    activeFileOpenerOwner?.kind === "workspace-file-preview" &&
-    activeFileOpenerFile?.source.kind === "workspace"
-      ? activeFileOpenerFile
-      : null;
-  const activeHostFileOpener =
-    activeFileOpenerOwner?.kind === "host-file-preview" &&
-    activeFileOpenerFile?.source.kind === "host"
-      ? activeFileOpenerFile
-      : null;
-  const activeStorageFileOpener =
-    activeFileOpenerOwner?.kind === "thread-storage-file-preview" &&
-    activeFileOpenerFile?.source.kind === "thread-storage"
-      ? activeFileOpenerFile
-      : null;
-
   return {
     activateTab,
     activeBrowserTab,
     activeHostFileLineRange:
       activeHostFileTab?.lineRange ??
+      (activeFileOpenerOwner?.kind === "file-preview" &&
+      activeFileOpenerOwner.file.kind === "host"
+        ? activeFileOpenerOwner.tab.lineRange
+        : null) ??
       (activeFileOpenerOwner?.kind === "host-file-preview"
         ? activeFileOpenerOwner.tab.lineRange
         : null),
     activeHostFilePath:
-      activeHostFileTab?.path ?? activeHostFileOpener?.path ?? null,
+      activeHostFileTab?.path ??
+      (activeFileOpenerOwner?.kind === "file-preview" &&
+      activeFileOpenerOwner.file.kind === "host"
+        ? activeFileOpenerOwner.file.path
+        : null) ??
+      (activeFileOpenerOwner?.kind === "host-file-preview"
+        ? activeFileOpenerOwner.tab.path
+        : null),
     activeStorageFilePath:
-      activeStorageFileTab?.path ?? activeStorageFileOpener?.path ?? null,
+      activeStorageFileTab?.path ??
+      (activeFileOpenerOwner?.kind === "file-preview" &&
+      activeFileOpenerOwner.file.kind === "thread-storage"
+        ? activeFileOpenerOwner.file.path
+        : null) ??
+      (activeFileOpenerOwner?.kind === "thread-storage-file-preview"
+        ? activeFileOpenerOwner.tab.path
+        : null),
     activeWorkspaceFilePath:
-      activeWorkspaceFileTab?.path ?? activeWorkspaceFileOpener?.path ?? null,
+      activeWorkspaceFileTab?.path ??
+      (activeFileOpenerOwner?.kind === "file-preview" &&
+      activeFileOpenerOwner.file.kind === "workspace"
+        ? activeFileOpenerOwner.file.path
+        : null) ??
+      (activeFileOpenerOwner?.kind === "workspace-file-preview"
+        ? activeFileOpenerOwner.tab.path
+        : null),
     browserTabs,
     clearActiveFileTabs,
     closeTab,

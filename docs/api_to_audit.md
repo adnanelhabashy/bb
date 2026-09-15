@@ -33,6 +33,47 @@ model or default binding policy.
 
 Before stabilization, audit schema export fidelity (especially refinements and transforms), descriptor size and reference limits, lifecycle races, and cross-plugin copied-schema compatibility. Verify `bb plugin rpc list|inspect` is sufficient to implement a consumer without a shared contract package. Method names carry optional versions; there is no negotiation.
 
+## `experimental_useFileResources`
+
+**What it does.** Resolves a canonical workspace, host, or thread-storage
+file identity in the app into a short-lived same-origin URL. The server resolves
+filesystem roots, confines every URL to the resolved source root, and
+returns the same `ExperimentalFileReference` so the resource can participate
+in file navigation. `baseUrl` supports relative document assets, while `url`
+names the requested file. The supporting public types are
+`ExperimentalFileReference`, `ExperimentalFileResources`, and
+`ExperimentalFileResource`. `MarkdownProps.experimental_document` accepts the
+same resource directly to resolve relative images and file links. The frontend
+test harness accepts
+`experimental_resolveFileResource` and records
+`experimental_fileResourceCalls`.
+
+**Compatibility.** The app continues to interpret the previous Markdown
+document context at runtime so already-built plugins keep their relative asset
+and link behavior. Author-facing declarations and the Plugin Guide expose only
+`ExperimentalFileResource`; newly compiled plugins cannot select the legacy
+shape.
+`PluginMessageDirectiveMessage.experimental_environmentId` lets a directive
+turn a workspace-relative attribute into the canonical workspace reference;
+it is `null` when the rendering surface has no environment.
+The backing server SDK method is
+`bb.sdk.files.experimental_resolveResource`.
+
+**Audit before stabilizing.**
+
+1. Confirm the three canonical locations cover plugin slots and that resolved
+   filesystem metadata is appropriate for trusted frontend plugins.
+2. Confirm a ten-minute lease is long enough for long-lived tabs and whether
+   the app hook should renew resources automatically.
+3. Decide whether callers need a content-disposition or download mode beside
+   browser-readable content.
+4. Confirm `baseUrl`, `path`, and canonical `target` are sufficient for nested
+   HTML and Markdown assets across POSIX and Windows hosts.
+5. Decide whether the raw URL should remain fetchable by all trusted frontend
+   plugins in the same bb app session.
+6. Confirm message directives need the environment ID directly rather than a
+   host-provided file-reference constructor.
+
 ## `bb.http.experimental_websocket`
 
 **What it does.** Registers an exact-path WebSocket upgrade in the plugin's
@@ -1184,9 +1225,9 @@ unterminated line is emitted before it.
    reasonably want to fail the session instead. Decide whether the reader
    should offer a fail-closed mode before the signature is a promise.
 
-## Live-file navigation (`experimental_FileLink`, `BbNavigate.experimental_openFilePreview`, `BbNavigate.experimental_openFileExternally`, and `PluginFileOpenerSource.experimental_hostId`)
+## Live-file navigation (`ExperimentalFileReference`, `experimental_FileLink`, `BbNavigate.experimental_openFilePreview`, and `BbNavigate.experimental_openFileExternally`)
 
-**Kept experimental (2026-08-22).** `experimental_hostId` is persisted inside opener-tab `paramsJson` (a rename needs a read-compat shim), Windows/UNC paths were never verified, and `experimental_openFilePreview` has no consumer.
+**Kept experimental (2026-08-22).** Windows/UNC paths were never verified, and `experimental_openFilePreview` has no consumer.
 
 **What it does.** Gives plugin UI explicit, source-safe references to live
 workspace, host, and thread-storage files. Ordinary `experimental_FileLink`
@@ -1194,18 +1235,23 @@ activation and the preview method use the current surface's shared file-tab
 controller, including extension preferences and plugin file openers. The
 external method resolves the current client's preferred file target, absolute
 path, local/remote-SSH context, and line/column support. The boolean methods
-report host acceptance; later OS failures remain host-owned. The host id added
-to file-opener sources preserves explicit host identity when a plugin page
-opens a host file without ambient thread context. Valid link targets expose a
+report host acceptance; later OS failures remain host-owned.
+`PluginFileOpenerProps.experimental_file` supplies the same canonical reference
+without ambient thread, project, or route context. Valid link targets expose a
 scheme-safe href, while traversal paths, ill-formed Unicode, and other
 malformed runtime targets remain inert in both the app and SDK test runtime.
+
+**Compatibility.** The app reads previously persisted file-opener params and
+projects the former `path` and `source` fields for already-built opener bundles.
+The SDK declarations expose only `experimental_file`, and the app persists only
+that canonical form for newly opened tabs.
 
 **Audit before stabilizing.**
 
 1. Verify strict target/path/location validation on POSIX, Windows drive, and
    UNC paths, including stale environment, host, and thread identities.
 2. Confirm preview identity, persistence, opener preference, one-off Open with,
-   disabled opener fallback, and explicit-host migration on Thread, New-thread,
+   disabled opener fallback, and canonical-reference persistence on Thread, New-thread,
    Settings, and plugin-page surfaces.
 3. Audit external opening across local and remote clients, disconnected hosts,
    missing preferred apps, and targets with line but not column support.
@@ -1216,8 +1262,8 @@ malformed runtime targets remain inert in both the app and SDK test runtime.
    preview imports, editor discovery, or panel-destination loading.
 6. Decide whether Git snapshots or deleted working-tree files merit separate
    target variants; do not weaken live-file guarantees to accommodate them.
-7. Confirm `PluginFileOpenerSource.experimental_hostId` can become a stable
-   required `hostId` field without breaking older opener implementations.
+7. Confirm `PluginFileOpenerProps.experimental_file` is sufficient for editors
+   that navigate among sibling files.
 
 ## Host plugin foundation (`bb.hosts.experimental_client`, `ExperimentalHostClient.experimental_onWorkerExit`, `ExperimentalHostClient.experimental_onSignal`, `ExperimentalHostRpcContext.experimental_retainWorker`, `experimental_defineHostEntry`, `experimental_killProcessesWithCwdUnder`, and `experimental_createHostEntryHarness`)
 
@@ -2310,27 +2356,6 @@ options.
 5. **Host choice.** Calls go to the primary host; decide whether a service may
    declare which host(s) can serve it.
 
-## `PluginFileOpenerSource.experimental_hostId` (`@get-bb/plugin-sdk/app`)
-
-**Kept experimental (2026-08-22).** persisted in opener-tab `paramsJson`; items 3–4 (every source kind vs project-only; omission semantics) decide whether the stable name is `hostId?` or a required field.
-
-**What it does.** Identifies the explicit host selected for a project-backed
-workspace file when a file opener cannot resolve that source through a thread
-or environment. It is omitted for environment-backed workspace files, host
-files, thread-storage files, and project files that use the primary host.
-
-**Audit before stabilizing.**
-
-1. Confirm an explicit host id is the minimum missing project-routing context,
-   rather than exposing the whole project workspace routing union.
-2. Verify project-compose file tabs retain the selected host across reloads,
-   host changes, plugin fallback, and per-open viewer overrides.
-3. Decide whether host identity should be present for every source kind or
-   remain project-specific once more file opener plugins exercise the API.
-4. Confirm omission should continue to mean primary-host resolution and that
-   this remains compatible with persisted opener tabs created before the field
-   existed.
-
 ## `experimental_SourceCode` / `experimental_Diff` (`@get-bb/plugin-sdk/app`)
 
 **Kept experimental (2026-08-22).** one consumer (the github plugin's `Diff`); items 2–4 (multi-file input, language override, worker pool at the component) all change the prop surface.
@@ -2681,19 +2706,6 @@ describing it as merely too large.
 3. Verify old persisted previews and mixed-version clients still receive a
    deterministic state before making the field stable.
 
-## Document Markdown (`MarkdownProps.experimental_document`)
-
-The existing Markdown component accepts explicit `{ target, rootPath, threadId }`
-document context. `target` is an existing workspace or thread-storage live-file
-identity; `rootPath` is its resolved filesystem root. Relative links and images
-resolve from the document directory within that root. Links open the explicit
-file target; images use the selected thread's existing source-confined route.
-Thread-storage targets must name the same thread. Omission retains message
-routing; malformed context does not fall back to the ambient workspace.
-Explicit absolute paths retain existing host-file behavior. HTML is unaffected.
-Stabilize after plugin consumers verify nested paths, source identity, missing
-files, containment and line locations, then rename and remove this audit entry.
-
 ## `PluginFileOpenerProps.experimental_lineRange` (`@get-bb/plugin-sdk/app`)
 
 **What it does.** Passes the owning file tab's latest one-based, inclusive
@@ -3015,3 +3027,19 @@ same-id isolation and legacy override fallback,
 asset-vs-glyph precedence, cross-plugin overrides, reload/error/recursion behavior,
 accessibility and theme rendering on desktop and mobile. Keep metadata fetching
 and plugin branding separate from provider artwork resolution.
+
+## Canonical backend file operations
+
+`bb.sdk.files.read` and `write` accept `experimental_target: FileReference`
+in place of `hostId`, `path`, and `rootPath`. `list` and `listPaths` accept
+that reference with `experimental_directory: "self" | "root"`; `root` lists
+the workspace, thread-storage root, or host file’s parent directory. Core
+resolves the current owning host and confines reads/writes to the reference
+root. The existing raw host/path inputs remain available for plugin-owned
+assets and vaults. Mixing the two input forms is rejected.
+
+`experimental_resolveResource` returns `absolutePath` and `rootPath` alongside
+the canonical target, relative path, and expiring preview URLs. Docs and
+Monaco use core operations directly instead of reproducing location policy.
+Stabilization requires remote-host, Windows path, storage relocation,
+confinement, concurrent-write, and old-plugin compatibility coverage.

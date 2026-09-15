@@ -150,7 +150,10 @@ className? }` —
   `{ content, className? }`. Use it wherever plugin UI quotes or previews
   message content (e.g. a reply header) so it reads like the rest of the
   chat instead of a differently-styled bundled renderer. Renderer options
-  beyond content/className stay host-internal.
+  beyond content/className stay host-internal. For a document resolved with
+  `experimental_useFileResources`, pass
+  `experimental_document={resource}` so relative images use its lease and
+  relative links open the canonical file target.
 - `UrlLink` — a real anchor whose ordinary HTTP(S) activation
   follows the current client's in-app/external-browser preference. It keeps
   internal BB routes in SPA history, preserves modifier clicks, copying,
@@ -310,7 +313,6 @@ serviceTier?, executionInputSources, environment, input }`. Forward it
   `docs/api_to_audit.md` is audited. Give it real width — the control row
   does not fit in a ~420px column.
 
-
 ## Shared app and provider icons
 
 Use `app.experimental_icons.register({ name, component })` during
@@ -334,10 +336,15 @@ string), and `strings.iconTint` without fetching. An id-only record resolves a
 frontend registration or fallback. For example:
 
 ```tsx
-<ProviderIcon providerKind="agent" provider={provider} fallback="Bot" className="size-4" />
+<ProviderIcon
+  providerKind="agent"
+  provider={provider}
+  fallback="Bot"
+  className="size-4"
+/>
 ```
 
- Resolution is the matching kind/id `app.slots.experimental_providerIcon` override,
+Resolution is the matching kind/id `app.slots.experimental_providerIcon` override,
 then a legacy unscoped override, then
 declared logo mask, then glyph through the shared app registry, then fallback.
 Invalid tints are ignored. Overrides update and remount per plugin generation;

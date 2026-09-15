@@ -7,19 +7,11 @@ import type {
   PromptHistoryResponse,
   WorkspacePathListResponse,
 } from "@bb/server-contract";
-import {
-  buildFilePreview,
-  normalizeFilePreviewMimeType,
-  type FilePreview,
-} from "@bb/client-core";
-import { decodeBase64Bytes } from "@/lib/base64-bytes";
-import { buildProjectFileContentUrl } from "@/lib/file-content-urls";
 import { readProjectBranchOptions } from "@/lib/project-branch-options";
 import { sdk } from "@/lib/sdk";
 import { useProjectDetailRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import {
   projectCommandsQueryKey,
-  projectFilePreviewQueryKey,
   projectPathsQueryKey,
   projectPromptHistoryQueryKey,
   projectSourceBranchesQueryKey,
@@ -32,8 +24,6 @@ import {
   type QueryOptions,
 } from "./query-helpers";
 import {
-  EXPENSIVE_MANUAL_QUERY_POLICY,
-  HEAVY_PAYLOAD_QUERY_POLICY,
   REALTIME_OWNED_NO_FOCUS_QUERY_POLICY,
   TYPEAHEAD_QUERY_POLICY,
 } from "./query-policies";
@@ -226,67 +216,6 @@ export function useProjectPathSuggestions(args: UseProjectPathSuggestionsArgs) {
     enabled,
     ...TYPEAHEAD_QUERY_POLICY,
     placeholderData: (previousData) => previousData,
-  });
-}
-
-export function useProjectFilePreview(
-  projectId: string | undefined,
-  path: string | null,
-  routing: { environmentId: string | null; hostId: string | null },
-  options?: QueryOptions,
-) {
-  const enabled =
-    (options?.enabled ?? true) && Boolean(projectId) && Boolean(path);
-  useProjectDetailRealtimeSubscription(projectId, { enabled });
-
-  return useQuery<FilePreview>({
-    queryKey: projectFilePreviewQueryKey(
-      projectId,
-      routing.environmentId,
-      routing.hostId,
-      path,
-    ),
-    queryFn: async ({ signal }) => {
-      const requiredProjectId = requireProjectId(
-        projectId,
-        "useProjectFilePreview",
-      );
-      const requiredPath = requireEnabledQueryArg({
-        value: path,
-        hookName: "useProjectFilePreview",
-        argName: "path",
-      });
-      const content = await sdk.projects.fileContent({
-        projectId: requiredProjectId,
-        path: requiredPath,
-        signal,
-        ...(routing.environmentId !== null
-          ? { environmentId: routing.environmentId }
-          : routing.hostId !== null
-            ? { hostId: routing.hostId }
-            : {}),
-      });
-      const contentBytes =
-        content.contentEncoding === "base64"
-          ? decodeBase64Bytes(content.content)
-          : new TextEncoder().encode(content.content);
-      return buildFilePreview({
-        contentBytes,
-        mimeType: normalizeFilePreviewMimeType(content.mimeType),
-        name: requiredPath.split("/").at(-1),
-        path: requiredPath,
-        url: buildProjectFileContentUrl(requiredProjectId, requiredPath, {
-          ...(routing.environmentId !== null
-            ? { environmentId: routing.environmentId }
-            : routing.hostId !== null
-              ? { hostId: routing.hostId }
-              : {}),
-        }),
-      });
-    },
-    enabled,
-    ...EXPENSIVE_MANUAL_QUERY_POLICY,
-    ...HEAVY_PAYLOAD_QUERY_POLICY,
   });
 }
 

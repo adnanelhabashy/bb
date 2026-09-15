@@ -1,72 +1,135 @@
 import type { ExperimentalFileOpenOptions } from "@get-bb/plugin-sdk";
-import { normalizeExperimentalLiveFileTarget } from "@/lib/live-file-navigation";
+import { fileReferenceSchema } from "@bb/server-contract/file-reference";
 import {
-  buildAbsoluteFilePath,
   isAbsoluteFilePathWithinRoot,
   normalizeAbsoluteFilePath,
 } from "@/lib/absolute-file-path";
 import {
+  buildFilePreviewLeaseContentUrl,
   buildThreadStorageRawContentUrl,
   buildThreadWorktreeRawContentUrl,
 } from "@/lib/file-content-urls";
-import { buildMarkdownFileImageRouting } from "./markdown-file-image-routing";
+import {
+  buildMarkdownFileImageRouting,
+  buildMarkdownContextRouting,
+} from "./markdown-file-image-routing";
 import type { MarkdownLinkRouting } from "./markdown-link-routing";
 
-export function buildMarkdownDocumentLinkRouting({
-  document,
-  messageRouting,
-  openFilePreview,
-}: {
-  document: unknown;
-  messageRouting: MarkdownLinkRouting;
-  openFilePreview: (intent: ExperimentalFileOpenOptions) => boolean;
-}): MarkdownLinkRouting {
-  if (typeof document !== "object" || document === null) return {};
+function resolveResourceLinkTarget(
+  target: ExperimentalFileOpenOptions["target"],
+  resourcePath: string,
+  rootRelativePath: string,
+): ExperimentalFileOpenOptions["target"] | null {
+  if (target.kind !== "host") return { ...target, path: rootRelativePath };
+  const slashPath = target.path.replace(/\\/g, "/");
+  const suffix = `/${resourcePath}`;
+  if (!slashPath.endsWith(suffix)) return null;
+  const rootPath = slashPath.slice(0, -suffix.length) || "/";
+  const joinedPath = `${rootPath === "/" ? "" : rootPath}/${rootRelativePath}`;
+  return {
+    ...target,
+    path:
+      target.path.includes("\\") && !target.path.startsWith("/")
+        ? joinedPath.replace(/\//g, "\\")
+        : joinedPath,
+  };
+}
+
+interface DocumentContext {
+  target: ExperimentalFileOpenOptions["target"];
+  path: string;
+  rootPath: string | null;
+  threadId: string | null;
+  resolveRelativeSrc: (path: string) => string;
+}
+
+function parseDocumentContext(resource: unknown): DocumentContext | null {
   if (
-    !("target" in document) ||
-    !("rootPath" in document) ||
-    !("threadId" in document)
+    typeof resource !== "object" ||
+    resource === null ||
+    !("target" in resource)
   )
-    return {};
-  const target = normalizeExperimentalLiveFileTarget(document.target);
+    return null;
+  const result = fileReferenceSchema.safeParse(resource.target);
+  if (!result.success) return null;
+  const target = result.data;
   if (
-    target === null ||
+    "baseUrl" in resource &&
+    typeof resource.baseUrl === "string" &&
+    "path" in resource &&
+    typeof resource.path === "string"
+  ) {
+    const baseUrl = resource.baseUrl;
+    return {
+      target,
+      path: resource.path,
+      rootPath: null,
+      threadId: null,
+      resolveRelativeSrc: (path) =>
+        buildFilePreviewLeaseContentUrl(baseUrl, path),
+    };
+  }
+  if (
     target.kind === "host" ||
-    typeof document.rootPath !== "string" ||
-    typeof document.threadId !== "string" ||
-    !document.threadId.trim() ||
-    (target.kind === "thread-storage" && target.threadId !== document.threadId)
+    !("rootPath" in resource) ||
+    typeof resource.rootPath !== "string" ||
+    !("threadId" in resource) ||
+    typeof resource.threadId !== "string" ||
+    !resource.threadId.trim() ||
+    (target.kind === "thread-storage" && target.threadId !== resource.threadId)
   )
-    return {};
-  const rootPath = normalizeAbsoluteFilePath({ path: document.rootPath });
-  if (rootPath === null) return {};
-  const threadId = document.threadId;
-  const routing = buildMarkdownFileImageRouting({
-    path: buildAbsoluteFilePath({ path: target.path, rootPath }),
+    return null;
+  const rootPath = normalizeAbsoluteFilePath({ path: resource.rootPath });
+  if (rootPath === null) return null;
+  const threadId = resource.threadId;
+  return {
+    target,
+    path: target.path,
     rootPath,
     threadId,
     resolveRelativeSrc: (path) =>
       target.kind === "workspace"
         ? buildThreadWorktreeRawContentUrl(threadId, path)
         : buildThreadStorageRawContentUrl(threadId, path),
+  };
+}
+
+export function buildMarkdownDocumentLinkRouting({
+  resource,
+  messageRouting,
+  openFilePreview,
+}: {
+  resource: unknown;
+  messageRouting: MarkdownLinkRouting;
+  openFilePreview: (intent: ExperimentalFileOpenOptions) => boolean;
+}): MarkdownLinkRouting {
+  const document = parseDocumentContext(resource);
+  if (document === null) return {};
+  const rootPath = document.rootPath ?? "/__bb_markdown_file_root__";
+  const routing = buildMarkdownFileImageRouting({
+    path: document.path,
+    rootPath: document.rootPath,
+    threadId: document.threadId,
+    resolveRelativeSrc: document.resolveRelativeSrc,
   });
-  return {
-    ...routing,
+  if (routing?.localImage === undefined) return {};
+  return buildMarkdownContextRouting({
+    absolutePaths: routing.localImage.absolutePaths,
+    relativePaths: routing.localImage.relativePaths,
+    resolveSrc: routing.localImage.resolveSrc,
     onOpenLink: messageRouting.onOpenLink,
-    localFile: {
-      absoluteLinks: { kind: "trusted-host" },
-      relativeLinks: routing?.localImage?.relativePaths,
-      onOpenLink: (link) => {
-        if (
-          !isAbsoluteFilePathWithinRoot({ candidatePath: link.path, rootPath })
-        ) {
-          return messageRouting.localFile?.onOpenLink(link) ?? false;
-        }
-        return openFilePreview({
-          target: {
-            ...target,
-            path: link.path.slice(rootPath === "/" ? 1 : rootPath.length + 1),
-          },
+    onOpenLocalFileLink: (link) => {
+      if (!isAbsoluteFilePathWithinRoot({ candidatePath: link.path, rootPath }))
+        return messageRouting.localFile?.onOpenLink(link) ?? false;
+      const target = resolveResourceLinkTarget(
+        document.target,
+        document.path,
+        link.path.slice(rootPath === "/" ? 1 : rootPath.length + 1),
+      );
+      return (
+        target !== null &&
+        openFilePreview({
+          target,
           location:
             link.lineRange === null
               ? null
@@ -75,8 +138,8 @@ export function buildMarkdownDocumentLinkRouting({
                   startLine: link.lineRange.startLineNumber,
                   endLine: link.lineRange.endLineNumber,
                 },
-        });
-      },
+        })
+      );
     },
-  };
+  });
 }

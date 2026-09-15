@@ -148,6 +148,7 @@ export interface ThreadTimelineRowsProps {
   timelineWindowingEnabled?: boolean;
   initialExpanded?: ReadonlySet<string>;
   canSpawnChild?: boolean;
+  environmentId?: string;
   threadOriginKind?: ThreadOriginKind | null;
   onForkMessage?: ThreadTimelineForkMessageHandler;
   onEditMessage?: ThreadTimelineEditMessageHandler;
@@ -188,6 +189,7 @@ interface TimelineRendererStaticContextValue {
   onSelectionAddToChat: ThreadTimelineAddToChatHandler | undefined;
   pluginMessageActions: readonly PluginMessageActionSlot[];
   consumerMessageActions: readonly ThreadTimelineConsumerMessageAction[];
+  environmentId: string | undefined;
   reportProseSelection:
     | ((
         rowId: string,
@@ -861,6 +863,7 @@ const ConversationRowContent = memo(function ConversationRowContent({
     onSelectionAddToChat,
     pluginMessageActions,
     consumerMessageActions,
+    environmentId,
     reportProseSelection,
     threadOriginKind,
     onOpenLink,
@@ -945,6 +948,7 @@ const ConversationRowContent = memo(function ConversationRowContent({
     return (
       <ConversationMessageContent
         attachments={row.attachments}
+        environmentId={environmentId}
         originKind={originKind}
         initiator={row.initiator}
         mentions={row.mentions}
@@ -997,6 +1001,7 @@ const ConversationRowContent = memo(function ConversationRowContent({
   return (
     <ConversationMessageContent
       attachments={row.attachments}
+      environmentId={environmentId}
       id={row.id}
       onAddToChat={onMessageAddToChat}
       onFork={onFork}
@@ -2091,6 +2096,7 @@ function ThreadTimelineRowsForTimelineView(props: ThreadTimelineRowsProps) {
           : messageActionSlots,
       consumerMessageActions:
         props.consumerMessageActions ?? EMPTY_CONSUMER_MESSAGE_ACTIONS,
+      environmentId: props.environmentId,
       reportProseSelection,
       threadOriginKind: props.threadOriginKind ?? null,
       onOpenLink: props.onOpenLink,
@@ -2117,6 +2123,7 @@ function ThreadTimelineRowsForTimelineView(props: ThreadTimelineRowsProps) {
       messageActionSlots,
       props.includePluginMessageActions,
       props.consumerMessageActions,
+      props.environmentId,
       reportProseSelection,
       props.threadOriginKind,
       timelineThreadId,

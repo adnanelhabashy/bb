@@ -24,7 +24,7 @@ signatures (see "Looking up the exact API").
 | `projects`       | `list` `get` `create` `update` `delete` `reorder` `paths` `files` `fileContent` `branches` `commands` `defaultExecutionOptions` `promptHistory` `sidebarBootstrap`; sub-areas `attachments` (`upload` `read` `copy`), `sources` (`add` `update` `delete`)                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `environments`   | `list` `listProviders` `get` `update` `delete` `status` `paths` `commit` `archiveThreads` `diff` `diffFile` `diffFiles` `diffBranches` `diffPatch` `pullRequest` `markPullRequestDraft` `markPullRequestReady` `mergePullRequest`                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `hosts`          | `create` `list` `listProviders` `get` `update` `delete` `directory` `pathsExist` `pickFolder` `cloneDefaultPath` `createJoinCode` `suspend` `resume` `retryCleanup` `retryUpdate` `providerCliStatus` `installProviderCli`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `files`          | `read` `write` `list` `listPaths` `mkdir` `move` `remove` `createPreview`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `files`          | `read` `write` `list` `listPaths` `mkdir` `move` `remove` `createPreview` `experimental_resolveResource`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `terminals`      | `list` `create` `get` `input` `output` `resize` `rename` `restart` `close`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `providers`      | `list` `models`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `skills`         | `list` `listFiles` `getContent` `update` `remove`; sub-area `registry` (`search` `entries` `get` `detail` `install` `repositoryStars`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -257,6 +257,13 @@ serve browser assets from that confined host root. This is the preferred
 transport for plugin images and sandboxed HTML with sibling-relative assets;
 preview URLs expire and never reveal the host id or absolute root.
 
+`bb.sdk.files.experimental_resolveResource({ target, signal? })` accepts the
+same three-location `ExperimentalFileReference` as the frontend
+`experimental_useFileResources` hook. It resolves root policy on the server
+and returns the requested file's `url`, its path-shaped `baseUrl`, expiry,
+relative path, and canonical reference. Prefer the frontend hook in app
+components.
+
 ## Standalone machines
 
 `bb.sdk.hosts.experimental_listProviders({ projectId? })` discovers machine providers and their
@@ -274,3 +281,19 @@ provider teardown. `get({ hostId })` additionally returns nullable
 `connectMachineId` from trusted gate metadata for legacy access revocation;
 Connect now persists its revocation identity during acquire, before enrollment.
 Host lists do not expose that detail.
+
+## Canonical backend file operations
+
+`bb.sdk.files.read` and `write` accept `experimental_target: FileReference`
+in place of `hostId`, `path`, and `rootPath`. `list` and `listPaths` accept
+that reference with `experimental_directory: "self" | "root"`; `root` lists
+the workspace, thread-storage root, or host file’s parent directory. Core
+resolves the current owning host and confines reads/writes to the reference
+root. The existing raw host/path inputs remain available for plugin-owned
+assets and vaults. Mixing the two input forms is rejected.
+
+`experimental_resolveResource` returns `absolutePath` and `rootPath` alongside
+the canonical target, relative path, and expiring preview URLs. Docs and
+Monaco use core operations directly instead of reproducing location policy.
+Stabilization requires remote-host, Windows path, storage relocation,
+confinement, concurrent-write, and old-plugin compatibility coverage.

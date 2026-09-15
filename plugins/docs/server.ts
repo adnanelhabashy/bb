@@ -8,6 +8,7 @@ import {
   type PluginCliContext,
   type PluginRpcHandlers,
 } from "@get-bb/plugin-sdk";
+import { fileReferenceSchema } from "@bb/server-contract/file-reference";
 import { z } from "zod";
 
 const DEFAULT_DIR = "~/Notes";
@@ -99,12 +100,6 @@ interface NoteSummary {
   modifiedAtMs: number;
 }
 
-interface ResolvedOpenerFile {
-  path: string;
-  rootPath: string;
-  hostId: string | null;
-}
-
 const vaultIdSchema = z.string().min(1).optional();
 const vaultSchema = z
   .object({
@@ -128,15 +123,6 @@ const vaultPathSchema = z.string().transform((value, context) => {
 const vaultDirectorySchema = z
   .union([z.literal(""), vaultPathSchema])
   .optional();
-const openerSourceSchema = z
-  .object({
-    kind: z.enum(["workspace", "host", "thread-storage"]),
-    threadId: z.string().nullable(),
-    environmentId: z.string().nullable(),
-    projectId: z.string().nullable(),
-    experimental_hostId: z.string().min(1).optional(),
-  })
-  .strict();
 const fileReadSchema = z
   .object({
     path: z.string(),
@@ -231,7 +217,6 @@ type SyncScope = z.infer<typeof syncScopeSchema>;
 type SyncStateEntry = z.infer<typeof syncStateEntrySchema>;
 type SyncState = z.infer<typeof syncStateSchema>;
 type SyncFile = z.infer<typeof syncSnapshotEntrySchema>;
-type OpenerSource = z.infer<typeof openerSourceSchema>;
 
 export const docsRpcContract = defineRpcContract({
   syncSnapshot: {
@@ -411,9 +396,7 @@ export const docsRpcContract = defineRpcContract({
     output: previewSchema,
   },
   openFile: {
-    input: z
-      .object({ source: openerSourceSchema, path: z.string().min(1) })
-      .strict(),
+    input: z.object({ file: fileReferenceSchema }).strict(),
     output: z
       .object({
         file: fileReadSchema,
@@ -425,8 +408,7 @@ export const docsRpcContract = defineRpcContract({
   saveOpenedFile: {
     input: z
       .object({
-        source: openerSourceSchema,
-        path: z.string().min(1),
+        file: fileReferenceSchema,
         content: z.string(),
         expectedSha256: z.string().nullable().optional(),
       })
@@ -495,19 +477,6 @@ function requireVaultPath(
 function requireOptionalDirectory(value: unknown): string {
   if (value === undefined || value === null || value === "") return "";
   return requireVaultPath(value);
-}
-
-function requireThreadStoragePath(value: unknown): string {
-  const raw = requireString(value, "path").replace(/\\/g, "/");
-  if (
-    path.posix.isAbsolute(raw) ||
-    path.win32.isAbsolute(raw) ||
-    raw.includes("\0") ||
-    raw.split("/").includes("..")
-  ) {
-    throw new Error(`Invalid thread-storage path: ${raw}`);
-  }
-  return path.posix.normalize(raw);
 }
 
 function absolutePath(vault: Vault, relativePath: string): string {
@@ -963,95 +932,6 @@ export default async function plugin(
       bb.realtime.publish("vault-changed", { vaultId: vault.id });
     }
     return result;
-  }
-
-  async function resolveOpenerFile(
-    source: OpenerSource,
-    pathValue: unknown,
-  ): Promise<ResolvedOpenerFile> {
-    const filePath = requireString(pathValue, "path");
-    if (source.kind === "host") {
-      if (!isAbsoluteHostPath(filePath)) {
-        throw new Error("Host file paths must be absolute");
-      }
-      const normalized = normalizeHostRoot(filePath);
-      const pathApi = path.win32.isAbsolute(normalized)
-        ? path.win32
-        : path.posix;
-      return {
-        path: normalized,
-        rootPath: pathApi.dirname(normalized),
-        hostId: source.experimental_hostId ?? null,
-      };
-    }
-    if (source.kind === "workspace" && source.environmentId) {
-      const environment = await bb.sdk.environments.get({
-        environmentId: source.environmentId,
-      });
-      if (!environment.path) {
-        throw new Error("This environment has no workspace path");
-      }
-      return {
-        path: path.join(environment.path, filePath),
-        rootPath: environment.path,
-        hostId: environment.hostId,
-      };
-    }
-    if (source.kind === "workspace" && source.projectId) {
-      const hostId =
-        source.experimental_hostId ??
-        (await bb.sdk.system.config()).primaryHostId;
-      if (!hostId) {
-        throw new Error("This project has no primary host");
-      }
-      const project = await bb.sdk.projects.get({
-        projectId: source.projectId,
-      });
-      const matchingSources = project.sources.filter(
-        (projectSource) => projectSource.hostId === hostId,
-      );
-      const [projectSource] = matchingSources;
-      if (!projectSource) {
-        throw new Error(
-          source.experimental_hostId
-            ? "This project has no workspace on the selected host"
-            : "This project has no workspace on the primary host",
-        );
-      }
-      if (matchingSources.length > 1) {
-        throw new Error("This project has multiple workspaces on that host");
-      }
-      const rootPath = normalizeHostRoot(projectSource.path);
-      if (!isAbsoluteHostPath(rootPath)) {
-        throw new Error("This project has no absolute workspace path");
-      }
-      return {
-        path: hostPathApi(rootPath).join(rootPath, ...filePath.split("/")),
-        rootPath,
-        hostId,
-      };
-    }
-    if (source.kind === "thread-storage") {
-      if (!source.threadId) {
-        throw new Error("Thread-storage files require a thread ID");
-      }
-      const relativePath = requireThreadStoragePath(filePath);
-      const storage = await bb.sdk.threads.storageLocation({
-        threadId: source.threadId,
-      });
-      if (!isAbsoluteHostPath(storage.storageRootPath)) {
-        throw new Error("This thread has no absolute storage path");
-      }
-      const rootPath = normalizeHostRoot(storage.storageRootPath);
-      return {
-        path: hostPathApi(rootPath).join(rootPath, ...relativePath.split("/")),
-        rootPath,
-        hostId: storage.hostId,
-      };
-    }
-    throw new Error(
-      "Docs can open workspace, host, and thread-storage files only",
-    );
   }
 
   async function createNote(
@@ -1703,36 +1583,19 @@ export default async function plugin(
       });
     },
     async openFile(input) {
-      const target = await resolveOpenerFile(input.source, input.path);
-      const args = {
-        ...hostIdArgs(target.hostId),
-        path: target.path,
-        rootPath: target.rootPath,
-      };
       const [file, preview] = await Promise.all([
-        bb.sdk.files.read(args),
-        bb.sdk.files.createPreview({
-          ...hostIdArgs(target.hostId),
-          rootPath: target.rootPath,
-        }),
+        bb.sdk.files.read({ experimental_target: input.file }),
+        bb.sdk.files.experimental_resolveResource({ target: input.file }),
       ]);
-      const pathApi = path.win32.isAbsolute(target.rootPath)
-        ? path.win32
-        : path.posix;
       return {
         file,
-        preview,
-        previewPath: pathApi
-          .relative(target.rootPath, target.path)
-          .replace(/\\/g, "/"),
+        preview: { baseUrl: preview.baseUrl, expiresAtMs: preview.expiresAtMs },
+        previewPath: preview.path,
       };
     },
     async saveOpenedFile(input) {
-      const target = await resolveOpenerFile(input.source, input.path);
       return bb.sdk.files.write({
-        ...hostIdArgs(target.hostId),
-        path: target.path,
-        rootPath: target.rootPath,
+        experimental_target: input.file,
         content: input.content,
         ...(input.expectedSha256 === null ||
         typeof input.expectedSha256 === "string"

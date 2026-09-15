@@ -16,6 +16,7 @@ const message = {
   threadId: "thr_origin",
   turnId: "turn_1",
   projectId: "proj_1",
+  experimental_environmentId: null,
 };
 
 const run: WorkflowRunView = {

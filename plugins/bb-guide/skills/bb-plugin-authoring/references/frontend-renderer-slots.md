@@ -48,8 +48,12 @@ openWorkspaceFile }` — register a leaf
   Props: `attributes` is a `Readonly<Record<string, string>>` of untrusted
   parsed key/values (validate your own fields); `source` is the original
   directive text (useful for diagnostics); `message` is
-  `{ id, threadId, turnId, projectId }` for the enclosing assistant (or
-  nested agent) message. `openWorkspaceFile` is either
+  `{ id, threadId, turnId, projectId, experimental_environmentId }` for the
+  enclosing assistant (or nested agent) message. The nullable experimental
+  environment id identifies the workspace when the surface has one, so a
+  directive can construct a canonical
+  `{ kind: "workspace", environmentId, path }` file reference.
+  `openWorkspaceFile` is either
   `(path: string) => boolean` or `null`; pass it a worktree-relative path to
   open that file in the host's workspace viewer. It is `null` when the message
   surface has no workspace viewer, and it returns whether the host accepted

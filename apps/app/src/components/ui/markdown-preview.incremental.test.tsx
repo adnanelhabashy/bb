@@ -94,6 +94,7 @@ function legMessageDirectives(leg: PreviewLeg) {
       threadId: "thr_stream",
       turnId: "turn_stream",
       projectId: null,
+      experimental_environmentId: null,
     },
     openWorkspaceFile: null,
     openThreadPanel: null,

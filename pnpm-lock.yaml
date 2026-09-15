@@ -3246,6 +3246,9 @@ importers:
       '@bb/plugin-build':
         specifier: workspace:*
         version: link:../../packages/plugin-build
+      '@bb/server-contract':
+        specifier: workspace:*
+        version: link:../../packages/server-contract
       '@get-bb/plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/plugin-sdk
@@ -3531,9 +3534,6 @@ importers:
       '@bb/shared-ui':
         specifier: workspace:*
         version: link:../../packages/shared-ui
-      zod:
-        specifier: 4.3.6
-        version: 4.3.6
     devDependencies:
       '@bb/plugin-build':
         specifier: workspace:*
@@ -3679,6 +3679,9 @@ importers:
       '@bb/plugin-build':
         specifier: workspace:*
         version: link:../../packages/plugin-build
+      '@bb/server-contract':
+        specifier: workspace:*
+        version: link:../../packages/server-contract
       '@get-bb/plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/plugin-sdk

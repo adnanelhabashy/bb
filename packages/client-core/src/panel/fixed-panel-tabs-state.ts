@@ -8,6 +8,7 @@ import {
 import {
   terminalCreateTargetSchema,
   threadTabFileOpenerOwnerSchema,
+  normalizeFileOpenerTab,
   type TerminalCreateTarget,
   type ThreadTabFileOpenerOwner,
 } from "@bb/server-contract";
@@ -152,7 +153,8 @@ const pluginPanelFixedPanelTabSchema = z
     pluginId: z.string().min(1),
     title: z.string().min(1),
   })
-  .strict();
+  .strict()
+  .transform(normalizeFileOpenerTab);
 const secondaryFixedPanelTabSchema = z.union([
   threadInfoFixedPanelTabSchema,
   gitDiffFixedPanelTabSchema,
@@ -747,7 +749,10 @@ function normalizeFixedPanelTabId(tab: FixedPanelTab): FixedPanelTab {
     case "plugin-panel": {
       const id = createPluginPanelFixedPanelTab({
         actionId: tab.actionId,
-        paramsJson: tab.paramsJson,
+        paramsJson:
+          tab.fileOpenerOwner?.kind === "file-preview"
+            ? JSON.stringify({ experimental_file: tab.fileOpenerOwner.file })
+            : tab.paramsJson,
         pluginId: tab.pluginId,
         title: tab.title,
       }).id;
@@ -831,9 +836,10 @@ function stripTransientFixedPanelTabForStorage(
       return tab.fileOpenerOwner === undefined
         ? tab
         : {
-            ...tab,
+            ...normalizeFileOpenerTab(tab),
             fileOpenerOwner: stripFileOpenerOwnerForStorage(
-              tab.fileOpenerOwner,
+              normalizeFileOpenerTab(tab).fileOpenerOwner ??
+                tab.fileOpenerOwner,
             ),
           };
   }
@@ -843,6 +849,8 @@ function stripFileOpenerOwnerForStorage(
   owner: ThreadTabFileOpenerOwner,
 ): ThreadTabFileOpenerOwner {
   switch (owner.kind) {
+    case "file-preview":
+      return { ...owner, tab: { lineRange: null } };
     case "workspace-file-preview":
       return { ...owner, tab: { ...owner.tab, lineRange: null } };
     case "host-file-preview":
@@ -1108,6 +1116,15 @@ function areFileOpenerOwnersEqual(
   b: ThreadTabFileOpenerOwner | undefined,
 ): boolean {
   if (a === undefined || b === undefined) return a === b;
+  if (a.kind === "file-preview" || b.kind === "file-preview") {
+    return (
+      a.kind === "file-preview" &&
+      b.kind === "file-preview" &&
+      JSON.stringify(a.file) === JSON.stringify(b.file) &&
+      areFilePreviewLineRangesEqual({ a: a.tab.lineRange, b: b.tab.lineRange })
+    );
+  }
+
   if (
     a.kind !== b.kind ||
     a.environmentId !== b.environmentId ||

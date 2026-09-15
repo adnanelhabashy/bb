@@ -10,7 +10,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   environmentDiffFilesQueryKeyPrefix,
   environmentFilePreviewQueryKeyPrefix,
-  hostFilePreviewQueryKey,
 } from "@/hooks/queries/query-keys";
 import { sdk } from "@/lib/sdk";
 import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
@@ -23,7 +22,11 @@ import {
 vi.mock("@/lib/sdk", () => ({
   sdk: {
     environments: { diffFiles: vi.fn(), diffFile: vi.fn() },
-    files: { createPreview: vi.fn(), read: vi.fn() },
+    files: {
+      createPreview: vi.fn(),
+      experimental_resolveResource: vi.fn(),
+      read: vi.fn(),
+    },
   },
 }));
 
@@ -114,7 +117,7 @@ describe("WorkspaceFilePreviewTabContent panel gating", () => {
           environmentId={ENVIRONMENT_ID}
           isPanelOpen={isPanelOpen}
           lineRange={null}
-          source={{ kind: "working-tree" }}
+          source={{ kind: "head" }}
           statusLabel={null}
           threadId="thr-1"
         />
@@ -143,6 +146,9 @@ describe("WorkspaceFilePreviewTabContent panel gating", () => {
 
 describe("HostScopedFilePreviewTabContent panel gating", () => {
   it("does not start or refetch a host read while the retained panel is closed", async () => {
+    vi.mocked(sdk.files.experimental_resolveResource).mockRejectedValue(
+      new Error("preview unavailable"),
+    );
     vi.mocked(sdk.files.createPreview).mockResolvedValue({
       baseUrl: "/api/v1/file-previews/lease-1",
       expiresAtMs: Date.now() + 60_000,
@@ -170,24 +176,31 @@ describe("HostScopedFilePreviewTabContent panel gating", () => {
 
     const view = render(renderTab(false));
     expect(sdk.files.read).not.toHaveBeenCalled();
+    expect(sdk.files.experimental_resolveResource).not.toHaveBeenCalled();
     expect(sdk.files.createPreview).not.toHaveBeenCalled();
 
     view.rerender(renderTab(true));
     await waitFor(() => {
       expect(sdk.files.read).toHaveBeenCalledTimes(1);
     });
+    expect(sdk.files.experimental_resolveResource).toHaveBeenCalledTimes(1);
 
     view.rerender(renderTab(false));
     await act(async () => {
       await queryClient.invalidateQueries({
-        queryKey: hostFilePreviewQueryKey("host-1", "/tmp/example.txt"),
+        queryKey: [
+          "live-file-preview",
+          { kind: "host", hostId: "host-1", path: "/tmp/example.txt" },
+        ],
       });
     });
     expect(sdk.files.read).toHaveBeenCalledTimes(1);
+    expect(sdk.files.experimental_resolveResource).toHaveBeenCalledTimes(1);
 
     view.rerender(renderTab(true));
     await waitFor(() => {
       expect(sdk.files.read).toHaveBeenCalledTimes(2);
     });
+    expect(sdk.files.experimental_resolveResource).toHaveBeenCalledTimes(2);
   });
 });

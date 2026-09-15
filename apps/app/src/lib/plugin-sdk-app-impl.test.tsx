@@ -2,6 +2,7 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import type { ComponentType } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PluginSlotMount } from "@/components/plugin/PluginSlotMount";
 import { ThreadTimelineNavigationProvider } from "@/components/thread/timeline/ThreadTimelineNavigationContext";
@@ -152,81 +153,126 @@ describe("plugin SDK Markdown", () => {
     expect(onOpenLink).not.toHaveBeenCalled();
   });
 
-  it.each(["workspace", "thread-storage"] as const)(
-    "resolves nested %s document destinations independently of message context",
-    (kind) => {
-      const openFilePreview = vi.fn(() => true);
-      const openUrl = vi.fn(() => true);
-      const Markdown = pluginSdkAppImplementation.Markdown;
-      const rootPath = kind === "workspace" ? "/workspace" : "/storage";
-      const target =
-        kind === "workspace"
-          ? {
-              kind,
+  it("resolves Markdown document links and images through a file resource lease", () => {
+    const openFilePreview = vi.fn(() => true);
+    const Markdown = pluginSdkAppImplementation.Markdown;
+    const resource = {
+      absolutePath: "/workspace/reports/report.md",
+      rootPath: "/workspace",
+      baseUrl: "/api/v1/file-previews/lease_1",
+      expiresAtMs: Date.now() + 60_000,
+      path: "reports/nested/report.md",
+      target: {
+        kind: "workspace" as const,
+        environmentId: "env_document",
+        path: "reports/nested/report.md",
+      },
+      url: "/api/v1/file-previews/lease_1/reports/nested/report.md",
+    };
+    render(
+      <AppNavigationHostProvider capabilities={{ openFilePreview }}>
+        <Markdown
+          content="[Sibling](sibling.md#L2) ![Chart](../chart%20one.svg)"
+          experimental_document={resource}
+        />
+      </AppNavigationHostProvider>,
+    );
+    fireEvent.click(screen.getByRole("link", { name: "Sibling" }));
+    expect(openFilePreview).toHaveBeenCalledWith({
+      target: {
+        ...resource.target,
+        path: "reports/nested/sibling.md",
+      },
+      location: { kind: "range", startLine: 2, endLine: 2 },
+    });
+    expect(screen.getByRole("img", { name: "Chart" }).getAttribute("src")).toBe(
+      "/api/v1/file-previews/lease_1/reports/chart%20one.svg",
+    );
+  });
+
+  it("accepts the previous Markdown document context at runtime", () => {
+    const openFilePreview = vi.fn(() => true);
+    const LegacyMarkdown =
+      pluginSdkAppImplementation.Markdown as ComponentType<{
+        content: string;
+        experimental_document: unknown;
+      }>;
+    render(
+      <AppNavigationHostProvider capabilities={{ openFilePreview }}>
+        <LegacyMarkdown
+          content="[Sibling](sibling.md#L2) ![Chart](../chart.svg)"
+          experimental_document={{
+            rootPath: "/workspace",
+            target: {
+              kind: "workspace",
               environmentId: "env_document",
-              path: "reports/nested/report.md",
-            }
-          : {
-              kind,
-              threadId: "thr_document",
-              path: "reports/nested/report.md",
-            };
-      const props = {
-        content:
-          "[Sibling](sibling.md#L2-L4) ![Chart](../chart%20one.svg) [Parent](../summary.md) [Missing](missing.md) [Web](https://example.com)",
-        experimental_document: { target, rootPath, threadId: "thr_document" },
-      };
-      render(
-        <AppNavigationHostProvider capabilities={{ openFilePreview, openUrl }}>
-          <ThreadTimelineNavigationProvider
-            environmentId="env_other"
-            onOpenLink={() => false}
-            onOpenLocalFileLink={() => {
-              throw new Error("Used ambient workspace");
-            }}
-            resolveMentionLink={() => null}
-            threadId="thr_other"
-            workspaceRootPath="/wrong-workspace"
-          >
-            <Markdown {...props} />
-          </ThreadTimelineNavigationProvider>
-        </AppNavigationHostProvider>,
-      );
-      fireEvent.click(screen.getByRole("link", { name: "Sibling" }));
-      expect(openFilePreview).toHaveBeenLastCalledWith({
-        target: { ...target, path: "reports/nested/sibling.md" },
-        location: { kind: "range", startLine: 2, endLine: 4 },
-      });
-      expect(
-        screen.getByRole("img", { name: "Chart" }).getAttribute("src"),
-      ).toBe(
-        `/api/v1/threads/thr_document/${kind === "workspace" ? "worktree" : kind}/files/reports/chart%20one.svg`,
-      );
-      fireEvent.click(screen.getByRole("link", { name: "Parent" }));
-      expect(openFilePreview).toHaveBeenLastCalledWith({
-        target: { ...target, path: "reports/summary.md" },
-        location: null,
-      });
-      fireEvent.click(screen.getByRole("link", { name: "Missing" }));
-      expect(openFilePreview).toHaveBeenLastCalledWith({
-        target: { ...target, path: "reports/nested/missing.md" },
-        location: null,
-      });
-      fireEvent.click(screen.getByRole("link", { name: "Web" }));
-      expect(openUrl).toHaveBeenCalledWith({ url: "https://example.com" });
-    },
-  );
+              path: "reports/report.md",
+            },
+            threadId: "thr_document",
+          }}
+        />
+      </AppNavigationHostProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: "Sibling" }));
+    expect(openFilePreview).toHaveBeenCalledWith({
+      target: {
+        kind: "workspace",
+        environmentId: "env_document",
+        path: "reports/sibling.md",
+      },
+      location: { kind: "range", startLine: 2, endLine: 2 },
+    });
+    expect(screen.getByRole("img", { name: "Chart" }).getAttribute("src")).toBe(
+      "/api/v1/threads/thr_document/worktree/files/chart.svg",
+    );
+  });
+
+  it("opens links from a host file resource on the same host", () => {
+    const openFilePreview = vi.fn(() => true);
+    const Markdown = pluginSdkAppImplementation.Markdown;
+    render(
+      <AppNavigationHostProvider capabilities={{ openFilePreview }}>
+        <Markdown
+          content="[Sibling](sibling.md)"
+          experimental_document={{
+            absolutePath: "/workspace/reports/report.md",
+            rootPath: "/workspace",
+            baseUrl: "/api/v1/file-previews/lease_1",
+            expiresAtMs: Date.now() + 60_000,
+            path: "reports/report.md",
+            target: {
+              kind: "host",
+              hostId: "host_1",
+              path: "C:\\vault\\reports\\report.md",
+            },
+            url: "/api/v1/file-previews/lease_1/reports/report.md",
+          }}
+        />
+      </AppNavigationHostProvider>,
+    );
+    fireEvent.click(screen.getByRole("link", { name: "Sibling" }));
+    expect(openFilePreview).toHaveBeenCalledWith({
+      target: {
+        kind: "host",
+        hostId: "host_1",
+        path: "C:\\vault\\reports\\sibling.md",
+      },
+      location: null,
+    });
+  });
 
   it("keeps escaping relative paths out of file navigation and preserves absolute links", () => {
     const openFilePreview = vi.fn(() => true);
-    const onOpenLocalFileLink = vi.fn(() => true);
     const Markdown = pluginSdkAppImplementation.Markdown;
     render(
       <AppNavigationHostProvider capabilities={{ openFilePreview }}>
         <ThreadTimelineNavigationProvider
           environmentId={null}
           onOpenLink={() => false}
-          onOpenLocalFileLink={onOpenLocalFileLink}
+          onOpenLocalFileLink={() => {
+            throw new Error("Used ambient workspace");
+          }}
           resolveMentionLink={() => null}
           threadId="thr_document"
           workspaceRootPath="/workspace"
@@ -234,13 +280,17 @@ describe("plugin SDK Markdown", () => {
           <Markdown
             content="[Escape](../../../outside.md) ![Escape](../../../outside.svg) [Absolute](/outside.md) ![Absolute](/outside.svg)"
             experimental_document={{
-              rootPath: "/storage",
-              threadId: "thr_document",
+              absolutePath: "/workspace/reports/report.md",
+              rootPath: "/workspace",
+              baseUrl: "/api/v1/file-previews/lease_1",
+              expiresAtMs: Date.now() + 60_000,
+              path: "reports/report.md",
               target: {
                 kind: "thread-storage",
                 threadId: "thr_document",
                 path: "reports/report.md",
               },
+              url: "/api/v1/file-previews/lease_1/reports/report.md",
             }}
           />
         </ThreadTimelineNavigationProvider>
@@ -254,15 +304,10 @@ describe("plugin SDK Markdown", () => {
     ).toBe("../../../outside.svg");
     expect(openFilePreview).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("link", { name: "Absolute" }));
-    expect(onOpenLocalFileLink).toHaveBeenCalledWith({
-      path: "/outside.md",
-      lineRange: null,
-    });
+    expect(openFilePreview).not.toHaveBeenCalled();
     expect(
       screen.getByRole("img", { name: "Absolute" }).getAttribute("src"),
-    ).toBe(
-      "/api/v1/threads/thr_document/host-files/content?path=%2Foutside.svg",
-    );
+    ).toBe("/outside.svg");
   });
 
   it("routes web links without requiring a thread navigation context", () => {

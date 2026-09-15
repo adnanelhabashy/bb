@@ -39,12 +39,10 @@ const app = await loadPluginApp(() => import("./app"));
 const registration = app.fileOpeners[0]!;
 const Component = registration.component;
 const base: PluginFileOpenerProps = {
-  path: "target.ts",
-  source: {
+  experimental_file: {
     kind: "workspace",
     environmentId: "env_1",
-    projectId: null,
-    threadId: null,
+    path: "target.ts",
   },
   Original: () => <div>native</div>,
 };

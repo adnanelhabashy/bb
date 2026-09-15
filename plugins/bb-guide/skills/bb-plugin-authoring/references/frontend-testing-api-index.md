@@ -9,6 +9,7 @@ Read `testing.md` for examples and fidelity limits.
 - `RpcCall`
 - `NavigateCall`
 - `ExperimentalFixedTabOpenCall`
+- `ExperimentalFileResourceCall`
 - `ComposerLog`
 - `SidebarActionCall`
 - `installTestPluginRuntime`

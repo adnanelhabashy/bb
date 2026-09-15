@@ -9,6 +9,12 @@ import type {
   ReadonlyJsonValue,
 } from "../index.js";
 import type { PluginProviderIconRegistration } from "../app-contract.js";
+import type {
+  ExperimentalFileResource,
+  MarkdownProps,
+  PluginFileOpenerProps,
+  PluginMessageDirectiveMessage,
+} from "../app-contract.js";
 
 type ExpectedBbPluginApiKey =
   | "agents"
@@ -338,4 +344,22 @@ it("requires provider presentation fields in author-facing declarations", () => 
     description: string;
     icon: string;
   }>();
+});
+
+it("keeps file APIs strictly canonical in author-facing declarations", () => {
+  expectTypeOf<
+    "path" extends keyof PluginFileOpenerProps ? true : false
+  >().toEqualTypeOf<false>();
+  expectTypeOf<
+    "source" extends keyof PluginFileOpenerProps ? true : false
+  >().toEqualTypeOf<false>();
+  expectTypeOf<PluginFileOpenerProps["experimental_file"]>().not.toBeNullable();
+  expectTypeOf<
+    NonNullable<MarkdownProps["experimental_document"]>
+  >().toEqualTypeOf<ExperimentalFileResource>();
+  expectTypeOf<
+    {} extends Pick<PluginMessageDirectiveMessage, "experimental_environmentId">
+      ? true
+      : false
+  >().toEqualTypeOf<false>();
 });

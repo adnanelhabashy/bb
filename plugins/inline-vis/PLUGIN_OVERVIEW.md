@@ -22,7 +22,7 @@ Read-only artifacts in the thread's storage directory can be rendered without re
 ::inline-vis{source="thread-storage" file="reports/result.html"}
 ```
 
-The plugin confirms the file exists in the selected source before it renders. Files must be UTF-8 text with a maximum size of 5 MiB. Relative assets next to HTML files load as usual.
+The plugin asks bb to resolve the selected source to a short-lived, confined file URL, then confirms the file exists before it renders. Files must be UTF-8 text with a maximum size of 5 MiB. Relative assets next to HTML files load through the same lease.
 
 HTML runs in a sandboxed iframe with an opaque origin. Scripts in the file cannot read the bb page, its cookies, or its storage. Markdown uses bb's renderer with raw HTML disabled.
 
