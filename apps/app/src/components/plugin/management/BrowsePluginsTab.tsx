@@ -196,6 +196,7 @@ export function BrowsePluginsTab({
     <ResourceCollectionViewport
       key={shelfKey ?? "browse"}
       scrollId="plugins-browse-results"
+      contentClassName="[&>div]:block!"
     >
       <div className={cn("space-y-7 pb-8", TOOLS_PAGE_BAND_CLASSES)}>
         {shelfKey !== null ? (
