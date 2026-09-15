@@ -83,7 +83,7 @@ describe("ask-user-question builtin plugin", () => {
     return command.dynamicTools;
   }
 
-  it("advertises required question fields and a single-select default to codex", async () => {
+  it("advertises the tool to codex with the Zod-derived schema", async () => {
     const tools = await dynamicToolsFor({
       providerId: "codex",
       model: "gpt-5.6",
