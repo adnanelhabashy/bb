@@ -5,6 +5,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InstalledPlugin } from "@bb/server-contract";
 import { appToast } from "@/components/ui/app-toast";
+import type { PluginCatalogSearchEntry } from "@/hooks/queries/plugin-catalog-queries";
 import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
 import { OpenPluginGuideButton } from "./OpenPluginGuideButton";
 
@@ -38,6 +39,30 @@ const GUIDE: InstalledPlugin = {
   logoDarkUrl: null,
   providerIds: [],
   icons: {},
+};
+
+const GUIDE_ENTRY: PluginCatalogSearchEntry = {
+  entryId: GUIDE.id,
+  pluginId: GUIDE.id,
+  displayName: "Plugin Guide",
+  description: "Explore the plugin API",
+  source: GUIDE.source,
+  marketplace: "bb-official",
+  marketplaceDisplayName: "BB Official",
+  publisherKey: "bb-official",
+  publisherLabel: "BB Official",
+  official: true,
+  author: { name: "BB", github: "get-bb", url: "https://github.com/get-bb" },
+  icon: null,
+  iconUrl: null,
+  iconTinted: false,
+  screenshots: [],
+  collections: [],
+  repositoryUrl: null,
+  installed: false,
+  installs: null,
+  compatible: true,
+  incompatibleReason: null,
 };
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -154,15 +179,65 @@ describe("OpenPluginGuideButton", () => {
     expect(attempts).toBe(2);
   });
 
-  it("opens the listing when Guide is absent without attempting to enable it", async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({ plugins: [] }));
+  it("offers the existing install dialog when Guide is absent and cancels without a write", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) =>
+      String(input).startsWith("/api/v1/plugin-catalog/search")
+        ? jsonResponse({ results: [GUIDE_ENTRY], collections: [] })
+        : jsonResponse({ plugins: [] }),
+    );
     vi.stubGlobal("fetch", fetchMock);
     fireEvent.click(renderGuide());
+    expect(
+      await screen.findByRole("dialog", { name: "Install Plugin Guide?" }),
+    ).toBeTruthy();
+    expect(screen.getByTestId("location").textContent).toBe("/plugins");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByTestId("location").textContent).toBe("/plugins");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("installs the official listing after confirmation and opens Guide after success", async () => {
+    let finishInstall: (response: Response) => void = () => undefined;
+    const installResponse = new Promise<Response>((resolve) => {
+      finishInstall = resolve;
+    });
+    const fetchMock = vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/v1/plugin-catalog/install") return installResponse;
+      return Promise.resolve(
+        url.startsWith("/api/v1/plugin-catalog/search")
+          ? jsonResponse({ results: [GUIDE_ENTRY], collections: [] })
+          : jsonResponse({ plugins: [] }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    fireEvent.click(renderGuide());
+    const install = await screen.findByRole("button", {
+      name: "Install Plugin Guide",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    fireEvent.click(install);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(fetchMock.mock.calls[2]?.[0]).toBe("/api/v1/plugin-catalog/install");
+    expect(fetchMock.mock.calls[2]?.[1]?.method).toBe("POST");
+    expect(JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body))).toEqual({
+      entryId: "plugin-api-docs",
+      marketplace: "bb-official",
+    });
+    expect(screen.getByTestId("location").textContent).toBe("/plugins");
+    finishInstall(
+      jsonResponse({
+        ok: true,
+        plugin: { ...GUIDE, enabled: true, status: "running" },
+      }),
+    );
     await vi.waitFor(() =>
       expect(screen.getByTestId("location").textContent).toBe(
-        "/plugins/plugin-api-docs",
+        "/plugins/plugin-api-docs/plugin-api",
       ),
     );
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
