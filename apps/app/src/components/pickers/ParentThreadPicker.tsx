@@ -23,6 +23,7 @@ export interface ParentThreadPickerOption {
 }
 
 export interface ParentThreadPickerProps {
+  title?: string;
   value: string;
   options: readonly ParentThreadPickerOption[];
   isLoading: boolean;
@@ -35,6 +36,7 @@ export interface ParentThreadPickerProps {
 }
 
 export function ParentThreadPicker({
+  title = "Assign parent thread",
   value,
   options,
   isLoading,
@@ -99,11 +101,7 @@ export function ParentThreadPicker({
           />
         </button>
       </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        className="w-72 p-0"
-        mobileTitle="Assign parent thread"
-      >
+      <PopoverContent align="start" className="w-72 p-0" mobileTitle={title}>
         <Command label="Search parent threads" shouldFilter={false}>
           <CommandInput
             aria-label="Search parent threads"
@@ -136,7 +134,7 @@ export function ParentThreadPicker({
                     No matching threads.
                   </div>
                 ) : (
-                  <CommandGroup heading="Assign parent thread">
+                  <CommandGroup heading={title}>
                     {filteredOptions.map((option) => (
                       <CommandItem
                         key={option.value}

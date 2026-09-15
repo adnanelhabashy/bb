@@ -32,6 +32,7 @@ export const workspaceThreads = definitions.map(([id, title, parent]) =>
     title,
     titleFallback: title,
     projectId: "proj_workspace_story",
+    environmentId: "env_demo",
     parentThreadId: parent ? `thr_workspace_${parent}` : null,
     lastReadAt: 300,
     latestAttentionAt: 200,
@@ -92,19 +93,4 @@ export function canMoveThread(
   return branchThreads(next, id).every(
     (thread) => threadAncestors(next, thread.id).length <= 4,
   );
-}
-
-export function handOverWorkspace(
-  threads: ThreadListEntry[],
-  currentId: string,
-  nextId: string,
-) {
-  if (currentId === nextId) return threads;
-  return threads.map((thread) => {
-    if (thread.id === nextId) return { ...thread, parentThreadId: null };
-    if (thread.id === currentId || thread.parentThreadId === currentId) {
-      return { ...thread, parentThreadId: nextId };
-    }
-    return thread;
-  });
 }

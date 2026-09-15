@@ -86,6 +86,7 @@ interface ParentSelectorRowProps {
   projectId: string;
   parentThreadProjectId: string | null;
   parentThreadDisplayName: string | null;
+  parentLabel?: string;
   parentThreads: readonly ThreadListEntry[];
   canAssignToParent: boolean;
   canTakeOverThread: boolean;
@@ -103,6 +104,7 @@ export function ParentSelectorRow({
   projectId,
   parentThreadProjectId,
   parentThreadDisplayName,
+  parentLabel,
   parentThreads,
   canAssignToParent,
   canTakeOverThread,
@@ -136,7 +138,11 @@ export function ParentSelectorRow({
 
   return (
     <DetailRow
-      label={<DetailRowIconLabel icon="UserRound">Parent</DetailRowIconLabel>}
+      label={
+        <DetailRowIconLabel icon="UserRound">
+          {parentLabel ?? "Parent"}
+        </DetailRowIconLabel>
+      }
       valueClassName="min-w-0"
     >
       {parentThreadId ? (
@@ -174,6 +180,7 @@ export function ParentSelectorRow({
         </div>
       ) : (
         <ParentThreadPicker
+          title={parentLabel}
           value={parentSelectorValue}
           options={parentSelectorOptions}
           isLoading={isLoadingParentThreads}
@@ -875,6 +882,7 @@ export interface ThreadMetadataContentProps {
   projectId: string;
   parentThreadProjectId: string | null;
   parentThreadDisplayName: string | null;
+  parentLabel?: string;
   parentThreads: readonly ThreadListEntry[];
   canAssignToParent: boolean;
   canTakeOverThread: boolean;
@@ -1000,6 +1008,7 @@ export function ThreadMetadataContent(props: ThreadMetadataContentProps) {
     projectId,
     parentThreadProjectId,
     parentThreadDisplayName,
+    parentLabel,
     parentThreads,
     canAssignToParent,
     canTakeOverThread,
@@ -1036,6 +1045,7 @@ export function ThreadMetadataContent(props: ThreadMetadataContentProps) {
         projectId={projectId}
         parentThreadProjectId={parentThreadProjectId}
         parentThreadDisplayName={parentThreadDisplayName}
+        parentLabel={parentLabel}
         parentThreads={parentThreads}
         canAssignToParent={canAssignToParent}
         canTakeOverThread={canTakeOverThread}
