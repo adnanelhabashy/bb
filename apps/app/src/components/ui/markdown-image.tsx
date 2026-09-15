@@ -83,6 +83,9 @@ export function MarkdownImage({
   const ratio = requestedWidth && requestedHeight
     ? requestedWidth / requestedHeight
     : dimensions ? dimensions.width / dimensions.height : undefined;
+  const aspectRatio = requestedWidth && requestedHeight
+    ? `${requestedWidth} / ${requestedHeight}`
+    : dimensions ? `${dimensions.width} / ${dimensions.height}` : undefined;
   const displayWidth = requestedWidth ?? (requestedHeight && ratio
     ? requestedHeight * ratio
     : dimensions?.width);
@@ -160,7 +163,7 @@ export function MarkdownImage({
       className={cn(className, status === "loading" && "bg-surface-recessed text-transparent")}
       style={{
         ...(ratio && displayWidth ? {
-          aspectRatio: String(ratio),
+          aspectRatio,
           width: `min(${displayWidth}px, calc(max(384px, 50vh) * ${ratio}))`,
           height: "auto",
         } : status === "loading" ? { minWidth: "1lh", minHeight: "1lh" } : {}),

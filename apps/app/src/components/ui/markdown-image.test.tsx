@@ -55,7 +55,7 @@ describe("MarkdownImage", () => {
     const second = render(<MarkdownImage src={source} alt="Screenshot" />);
     const restored = imageElement(second.getByAltText("Screenshot"));
     expect(restored.hasAttribute("src")).toBe(false);
-    expect(restored.style.aspectRatio).toBe(String(780 / 1688));
+    expect(restored.style.aspectRatio).toBe("780 / 1688");
     expect(restored.style.width).toContain("780px");
     expect(restored.dataset.markdownImageState).toBe("loading");
   });
@@ -84,12 +84,12 @@ describe("MarkdownImage", () => {
     const visible = mockVisibility();
     const { getByAltText } = render(<MarkdownImage src={source} width="320" height="200" alt="Sized" />);
     const image = imageElement(getByAltText("Sized"));
-    expect(image.style.aspectRatio).toBe("1.6");
+    expect(image.style.aspectRatio).toBe("320 / 200");
     expect(image.style.width).toContain("320px");
     visible(image, true);
     completeImage(image, 900, 600);
     await waitFor(() => expect(readMarkdownImageDimensions(source)).toEqual({ width: 900, height: 600 }));
-    expect(image.style.aspectRatio).toBe("1.6");
+    expect(image.style.aspectRatio).toBe("320 / 200");
   });
 
   it("revalidates visible local files, releases decoded bytes, and never reuses pixels after a denied request", async () => {
@@ -145,7 +145,7 @@ describe("MarkdownImage", () => {
     visible(image, true);
     fireEvent.error(image);
     expect(image.dataset.markdownImageState).toBe("error");
-    expect(image.style.aspectRatio).toBe(String(640 / 480));
+    expect(image.style.aspectRatio).toBe("640 / 480");
     expect(image.className).not.toContain("text-transparent");
     completeImage(image, 640, 480);
     await waitFor(() => expect(image.dataset.markdownImageState).toBe("ready"));
