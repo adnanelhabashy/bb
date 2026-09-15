@@ -108,8 +108,10 @@ export function BrowsePluginsTab({
     [catalog.collections, entries, shelfKey],
   );
   useResourceRouteLabel(selectedShelf?.label ?? null);
-  const shelfEntries =
-    shelfKey === null ? entries : (selectedShelf?.entries ?? []);
+  const shelfEntries = useMemo(
+    () => (shelfKey === null ? entries : (selectedShelf?.entries ?? [])),
+    [entries, selectedShelf, shelfKey],
+  );
   const installsKnown = shelfEntries.some((entry) => entry.installs !== null);
   const sort =
     requestedSort === "most-installed" && !installsKnown ? null : requestedSort;
@@ -207,7 +209,7 @@ export function BrowsePluginsTab({
             </Link>
             {selectedShelf === undefined ? null : (
               <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold text-foreground">
-                {selectedShelf.label}
+                {selectedShelf.label}{" "}
                 <span className="rounded-md bg-muted px-2 py-1 text-2xs font-medium tabular-nums text-subtle-foreground">
                   {selectedShelf.entries.length.toLocaleString()}{" "}
                   {selectedShelf.entries.length === 1 ? "plugin" : "plugins"}
