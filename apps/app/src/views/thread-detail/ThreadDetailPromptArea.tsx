@@ -72,6 +72,7 @@ import type { MachineLabelHost } from "@/components/machines/MachineLabel";
 import type { MachineProviderPresentation } from "@/components/plugin/MachineProviderIcon";
 import type { WorkspaceCheckoutDisplay } from "@/lib/workspace-checkout-display";
 import { useComposerTextEffects } from "@/lib/composer-text-effects";
+import { useSystemConfig } from "@/hooks/queries/system-queries";
 import { useLatestRef } from "@/hooks/useLatestRef";
 import { useThreadCreationOptions } from "@/hooks/useThreadCreationOptions";
 import { useProjectDisplayName } from "@/hooks/queries/sidebar-navigation-query";
@@ -104,9 +105,13 @@ import {
 } from "@/lib/mutation-errors";
 import { promptHistoryEntriesToDrafts } from "@/lib/prompt-history";
 import { usePromptHistoryEnabled } from "@/hooks/usePromptHistoryEnabled";
-import { getThreadRoutePath } from "@/lib/route-paths";
+import {
+  getProjectComposeRoutePath,
+  getThreadRoutePath,
+} from "@/lib/route-paths";
 import { getThreadDisplayTitle } from "@/lib/thread-title";
 import {
+  buildThreadHandoffLocationState,
   buildThreadHandoffCreateRequest,
   buildThreadHandoffFollowUpDraft,
   stripThreadHandoffPrefix,
@@ -468,6 +473,9 @@ export function ThreadDetailPromptArea({
   const clearThreadGoal = useClearThreadGoal();
   const unarchiveThread = useUnarchiveThread();
   const createThread = useCreateThread();
+  const systemConfigQuery = useSystemConfig();
+  const composerHandoffEnabled =
+    systemConfigQuery.data?.experiments.composerHandoff ?? false;
   const projectName = useProjectDisplayName(
     thread.projectId === PERSONAL_PROJECT_ID ? undefined : thread.projectId,
   );
@@ -680,10 +688,11 @@ export function ThreadDetailPromptArea({
   );
   const isHandoffProviderId = useCallback(
     (providerId: string) =>
+      composerHandoffEnabled &&
       providerId.length > 0 &&
       providerId !== thread.providerId &&
       providerOptions.some((option) => option.value === thread.providerId),
-    [providerOptions, thread.providerId],
+    [composerHandoffEnabled, providerOptions, thread.providerId],
   );
   const isHandoffSelection = isHandoffProviderId(selectedProviderId);
   const sourceThreadDisplayTitle = getThreadDisplayTitle({
@@ -743,6 +752,13 @@ export function ThreadDetailPromptArea({
       syncHandoffDraft,
     ],
   );
+  const previousComposerHandoffEnabled = useRef(composerHandoffEnabled);
+  useEffect(() => {
+    if (previousComposerHandoffEnabled.current && !composerHandoffEnabled) {
+      handleProviderChange(thread.providerId);
+    }
+    previousComposerHandoffEnabled.current = composerHandoffEnabled;
+  }, [composerHandoffEnabled, handleProviderChange, thread.providerId]);
   const handleHandoffSelect = useCallback(
     (selection: ModelReasoningPickerHandoffSelection) => {
       if (fallbackIdentity !== null) {
@@ -754,7 +770,7 @@ export function ThreadDetailPromptArea({
     [fallbackIdentity, setProviderModelReasoning, syncHandoffDraft],
   );
   useEffect(() => {
-    if (isHandoffSelection) {
+    if (!composerHandoffEnabled || isHandoffSelection) {
       return;
     }
     const restoredDraft = stripThreadHandoffPrefix(
@@ -764,7 +780,7 @@ export function ThreadDetailPromptArea({
     if (restoredDraft !== null) {
       promptDraft.setDraft(restoredDraft);
     }
-  }, [handoffSeed, isHandoffSelection, promptDraft]);
+  }, [composerHandoffEnabled, handoffSeed, isHandoffSelection, promptDraft]);
   const hasSentMessageEdit = sentMessageEdit !== undefined;
   useEffect(() => {
     if (hasSentMessageEdit && isHandoffSelection) {
@@ -1365,16 +1381,21 @@ export function ThreadDetailPromptArea({
     sentMessageEdit,
     sentMessageEditInput,
   ]);
+  const handleHandoffToNewThread = useCallback(() => {
+    navigate(getProjectComposeRoutePath(thread.projectId), {
+      state: buildThreadHandoffLocationState(handoffSeed),
+    });
+  }, [handoffSeed, navigate, thread.projectId]);
   const bottomExecutionConfig = useMemo(
     () => ({
       providerRouting:
-        thread.environmentId === null
+        !composerHandoffEnabled || thread.environmentId === null
           ? executionOptionsRouting
           : { environmentId: thread.environmentId },
       provider: {
         options: providerOptions,
         selectedId: selectedProviderId,
-        onChange: handleProviderChange,
+        ...(composerHandoffEnabled ? { onChange: handleProviderChange } : {}),
         hasMultiple: hasMultipleProviders,
       },
       model: {
@@ -1401,15 +1422,28 @@ export function ThreadDetailPromptArea({
         options: reasoningOptions,
         onChange: setReasoningLevel,
       },
-      handoff: {
-        sourceProviderId: thread.providerId,
-        onSelect: handleHandoffSelect,
-      },
+      ...(composerHandoffEnabled
+        ? {
+            footerAction: undefined,
+            handoff: {
+              sourceProviderId: thread.providerId,
+              onSelect: handleHandoffSelect,
+            },
+          }
+        : {
+            handoff: undefined,
+            footerAction: {
+              label: "Handoff to new thread",
+              onClick: handleHandoffToNewThread,
+            },
+          }),
     }),
     [
       effectiveSelectedModel,
       executionOptionsRouting,
       hasMultipleProviders,
+      composerHandoffEnabled,
+      handleHandoffToNewThread,
       handleHandoffSelect,
       handleModelChange,
       handleProviderChange,
@@ -1436,6 +1470,7 @@ export function ThreadDetailPromptArea({
   const compactExecutionConfig = useMemo(() => {
     const {
       handoff: _handoff,
+      footerAction: _footerAction,
       provider: { onChange: _onProviderChange, ...lockedProvider },
       ...lockedExecution
     } = bottomExecutionConfig;

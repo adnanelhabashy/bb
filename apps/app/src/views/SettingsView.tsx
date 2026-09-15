@@ -1027,6 +1027,11 @@ const EXPERIMENT_DEFINITIONS: Record<
     description:
       "Show the latest release notes as a compact preview on the Updates page.",
   },
+  composerHandoff: {
+    label: "Composer handoff",
+    description:
+      "Hand off to another provider in the follow-up composer, carrying the current draft into a new thread.",
+  },
   mobileApp: {
     label: "Mobile app",
     description:

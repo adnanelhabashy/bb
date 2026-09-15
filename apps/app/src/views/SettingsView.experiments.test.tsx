@@ -14,6 +14,7 @@ function renderSection(
       disabled={false}
       experiments={{
         changelogPreview: false,
+        composerHandoff: false,
         mobileApp: false,
         multiMachinePicker: false,
         sidebarProgressiveDisclosure: false,
@@ -30,6 +31,13 @@ describe("ExperimentsSettingsSection", () => {
     renderSection(onChange);
     fireEvent.click(screen.getByLabelText("Changelog preview"));
     expect(onChange).toHaveBeenCalledWith("changelogPreview", true);
+  });
+
+  it("reports composer handoff changes", () => {
+    const onChange = vi.fn();
+    renderSection(onChange);
+    fireEvent.click(screen.getByLabelText("Composer handoff"));
+    expect(onChange).toHaveBeenCalledWith("composerHandoff", true);
   });
 
   it("reports mobile app changes", () => {

@@ -248,6 +248,10 @@ vi.mock("@/hooks/mutations/thread-state-mutations", () => ({
   }),
 }));
 
+vi.mock("@/hooks/queries/system-queries", () => ({
+  useSystemConfig: () => ({ data: undefined }),
+}));
+
 vi.mock("@/hooks/queries/sidebar-navigation-query", () => ({
   useProjectDisplayName: () => null,
 }));

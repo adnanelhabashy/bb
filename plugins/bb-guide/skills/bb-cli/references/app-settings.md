@@ -123,6 +123,16 @@ every window and client sees the same value.
 - Enable it with `bb settings experiment changelogPreview true` to show the
   latest release notes on Settings → Updates.
 
+## Composer handoff
+
+The `composerHandoff` experiment is off by default. Enable it in Settings →
+Experiments or with `bb settings experiment composerHandoff true` to switch
+providers and create a new thread directly from the follow-up composer while
+carrying the current draft. With it off, the provider stays locked and
+**Handoff to new thread** opens the new-thread composer with a source-thread
+reference. SDK clients can toggle it with `bb.system.updateExperiments`,
+preserving the other experiment values.
+
 ## Sidebar progressive disclosure
 
 - The `sidebarProgressiveDisclosure` experiment defaults to false.

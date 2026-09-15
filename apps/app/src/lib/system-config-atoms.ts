@@ -30,6 +30,7 @@ const unavailableSystemConfig: SystemConfigResponse = {
   keybindingOverrides: [],
   experiments: {
     changelogPreview: false,
+    composerHandoff: false,
     mobileApp: false,
     multiMachinePicker: false,
     sidebarProgressiveDisclosure: false,

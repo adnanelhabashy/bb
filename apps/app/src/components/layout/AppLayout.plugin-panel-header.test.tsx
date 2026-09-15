@@ -26,6 +26,7 @@ vi.mock("@/hooks/queries/system-queries", () => ({
     data: {
       experiments: {
         changelogPreview: false,
+        composerHandoff: false,
         mobileApp: false,
         multiMachinePicker: false,
         sidebarProgressiveDisclosure: false,

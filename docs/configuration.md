@@ -930,6 +930,15 @@ while keeping workspace changes.
 
 Experimental surfaces are changed in Settings → Experiments or with
 `bb settings experiment <key> <true|false>`. All experiments start off.
+
+The `composerHandoff` experiment is off by default. Enable it in Settings →
+Experiments or with `bb settings experiment composerHandoff true` to switch
+providers and create a new thread directly from the follow-up composer while
+carrying the current draft. With it off, the provider stays locked and
+**Handoff to new thread** opens the new-thread composer with a source-thread
+reference. SDK clients can toggle it with `bb.system.updateExperiments`,
+preserving the other experiment values.
+
 The default-off `changelogPreview` experiment shows the latest release notes
 as a compact, dismissible card on Settings → Updates.
 The `mobileApp` experiment turns on pairing for the bb mobile app: the

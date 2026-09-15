@@ -97,6 +97,11 @@ interface ResolvedProviderPreview {
   supportsServiceTier: boolean;
 }
 
+export interface ModelReasoningPickerFooterAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface ModelReasoningPickerHandoffSelection {
   providerId: string;
   model: string;
@@ -208,6 +213,7 @@ interface ModelReasoningPickerProps {
   modal?: boolean;
   align?: "start" | "center" | "end";
   disabled?: boolean;
+  footerAction?: ModelReasoningPickerFooterAction;
   handoff?: ModelReasoningPickerHandoff;
 }
 
@@ -241,6 +247,7 @@ export function ModelReasoningPicker({
   modal = true,
   align = "start",
   disabled,
+  footerAction,
   handoff,
 }: ModelReasoningPickerProps) {
   const isCompactViewport = useIsCompactViewport();
@@ -270,7 +277,10 @@ export function ModelReasoningPicker({
   const [handoffReasoningLevel, setHandoffReasoningLevel] =
     useState<ReasoningLevel | null>(null);
 
-  if (trackedSelectedProviderId !== selectedProviderId) {
+  if (
+    trackedSelectedProviderId !== selectedProviderId ||
+    (handoff === undefined && handoffMode)
+  ) {
     setTrackedSelectedProviderId(selectedProviderId);
     setHandoffMode(
       open &&
@@ -870,6 +880,16 @@ export function ModelReasoningPicker({
     if (next) handleReasoningSelect(next.value);
   };
 
+  const handleFooterActionClick = useCallback(() => {
+    if (!footerAction) {
+      return;
+    }
+    footerAction.onClick();
+    setOpen(false);
+    setPreviewProviderId(null);
+    setMoreModelsOpen(false);
+  }, [footerAction]);
+
   const handleQueryChange = useCallback((value: string) => {
     setSearchQuery(value);
     setActiveIndex(-1);
@@ -1066,9 +1086,7 @@ export function ModelReasoningPicker({
         <ResetBrowseStateOnContentUnmount onReset={resetBrowseState} />
         {handoffMode ? <HandoffModeHeader onBack={exitHandoffMode} /> : null}
         {showProviderTabs ? (
-          <div
-            className="flex shrink-0 items-center gap-0.5 border-b border-border bg-background px-2.5 pt-1"
-          >
+          <div className="flex shrink-0 items-center gap-0.5 border-b border-border bg-background px-2.5 pt-1">
             {providerOptions.map((provider) => {
               const TabIcon = provider.icon;
               const isActive = provider.value === activeProviderId;
@@ -1301,6 +1319,19 @@ export function ModelReasoningPicker({
                       className={cn(LIST_HOVER_TRANSITION, "[&>span]:size-3.5")}
                     />
                   </div>
+                </div>
+              </>
+            ) : null}
+
+            {footerAction ? (
+              <>
+                <div className="shrink-0 border-t border-border" />
+                <div className="shrink-0 p-1">
+                  <MenuActionButton
+                    label={footerAction.label}
+                    iconName="MessageSquarePlus"
+                    onClick={handleFooterActionClick}
+                  />
                 </div>
               </>
             ) : null}

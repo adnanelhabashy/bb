@@ -47,6 +47,7 @@ import {
 import { makePluginRegistrationSet } from "@/test/fixtures/plugins";
 
 const mocks = vi.hoisted(() => ({
+  composerHandoff: false,
   cancelThreadPlanMutate: vi.fn(),
   clearThreadGoalMutate: vi.fn(),
   createQueuedMessageMutateAsync: vi.fn(),
@@ -83,6 +84,12 @@ const mocks = vi.hoisted(() => ({
   useThreadCreationOptions: vi.fn(),
   useThreadPromptHistory: vi.fn(),
   useThreadQueuedMessages: vi.fn(),
+}));
+
+vi.mock("@/hooks/queries/system-queries", () => ({
+  useSystemConfig: () => ({
+    data: { experiments: { composerHandoff: mocks.composerHandoff } },
+  }),
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
@@ -143,6 +150,7 @@ vi.mock("@/components/promptbox/FollowUpPromptBox", async () => {
           selectedId: string;
           onChange?: (value: string) => void;
         };
+        footerAction?: { label: string; onClick: () => void };
         handoff?: {
           onSelect: (selection: {
             providerId: string;
@@ -331,6 +339,11 @@ vi.mock("@/components/promptbox/FollowUpPromptBox", async () => {
               Switch provider back
             </button>
           </>
+        ) : null}
+        {execution.footerAction ? (
+          <button type="button" onClick={execution.footerAction.onClick}>
+            {execution.footerAction.label}
+          </button>
         ) : null}
         {execution.handoff ? (
           <button
@@ -853,6 +866,7 @@ function renderPromptArea(options: RenderPromptAreaOptions = {}) {
 }
 
 beforeEach(() => {
+  mocks.composerHandoff = false;
   testQueryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -1514,6 +1528,7 @@ describe("ThreadDetailPromptArea", () => {
       }),
     ];
 
+    mocks.composerHandoff = true;
     renderPromptArea();
     fireEvent.click(screen.getByRole("button", { name: "Switch provider" }));
     fireEvent.click(
@@ -1939,10 +1954,59 @@ describe("ThreadDetailPromptArea", () => {
     expect(screen.getByText("Model fallback")).toBeTruthy();
   });
 
+  it("opens root compose by default without changing the follow-up draft", () => {
+    mocks.promptDraft.text = "Keep going";
+    renderPromptArea({
+      thread: makeThread({
+        environmentId: "env_source",
+        title: "Source thread",
+      }),
+    });
+    expect(
+      screen.queryByRole("button", { name: "Switch provider" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Complete handoff flow" }),
+    ).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Handoff to new thread" }),
+    );
+    expect(mocks.navigate).toHaveBeenCalledWith("/projects/proj_1", {
+      state: {
+        focusPrompt: true,
+        reuseEnvironmentId: "env_source",
+        threadHandoffCreateSeed: {
+          environmentId: "env_source",
+          projectId: "proj_1",
+          sourceThreadId: "thr_1",
+          sourceThreadTitle: "Source thread",
+        },
+      },
+    });
+    expect(mocks.promptDraft.setDraft).not.toHaveBeenCalled();
+    expect(mocks.createThreadMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("restores follow-up when the experiment is disabled during handoff", () => {
+    mocks.composerHandoff = true;
+    mocks.promptDraft.text = "Keep going";
+    const { rerender } = renderPromptArea();
+    fireEvent.click(screen.getByRole("button", { name: "Switch provider" }));
+    mocks.composerHandoff = false;
+    rerender(buildPromptAreaElement());
+    expect(
+      screen.queryByRole("button", { name: "Switch provider" }),
+    ).toBeNull();
+    expect(screen.getByTestId("submit-label").textContent).toBe("");
+    expect(screen.getByTestId("selected-model").textContent).toBe("gpt-5");
+    expect(mocks.promptDraft.getCurrent().text).toBe("Keep going");
+  });
+
   it.each(["Switch provider", "Complete handoff flow"])(
     "%s prepares a handoff and restores the draft on return",
     (entryAction) => {
       mocks.promptDraft.text = "Keep going";
+      mocks.composerHandoff = true;
       renderPromptArea();
       expect(screen.getByTestId("submit-title").textContent).toBe("Submit");
       expect(screen.getByTestId("submit-label").textContent).toBe("");
@@ -1993,6 +2057,7 @@ describe("ThreadDetailPromptArea", () => {
       id: "thr_new",
       projectId: "proj_1",
     });
+    mocks.composerHandoff = true;
     renderPromptArea({ activePromptMode: activePlan });
     expect(screen.getByTestId("active-permission-mode").textContent).toBe(
       "plan",
@@ -2028,6 +2093,7 @@ describe("ThreadDetailPromptArea", () => {
         id: "thr_new",
         projectId: "proj_1",
       });
+      mocks.composerHandoff = true;
       const { rerender } = renderPromptArea({ thread });
       fireEvent.click(
         screen.getByRole("button", { name: "Switch provider back" }),
@@ -2083,6 +2149,7 @@ describe("ThreadDetailPromptArea", () => {
       projectId: "proj_source",
     });
 
+    mocks.composerHandoff = true;
     renderPromptArea({
       thread: makeThread({
         environmentId: "env_1",

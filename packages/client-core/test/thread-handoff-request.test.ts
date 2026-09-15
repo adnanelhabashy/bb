@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildThreadHandoffLocationState,
+  readThreadHandoffCreateSeedFromLocationState,
+  THREAD_HANDOFF_CREATE_SEED_LOCATION_STATE_KEY,
   buildThreadHandoffCreateRequest,
   buildThreadHandoffFollowUpDraft,
   stripThreadHandoffPrefix,
@@ -217,6 +220,39 @@ describe("buildThreadHandoffCreateRequest", () => {
         draft: { text: "Keep going", mentions: [], attachments: [] },
         execution: { ...EXECUTION, model: "" },
         seed: SEED,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("handoff navigation", () => {
+  it("builds location state that focuses compose and reuses the source environment", () => {
+    expect(buildThreadHandoffLocationState(SEED)).toEqual({
+      focusPrompt: true,
+      reuseEnvironmentId: "env_source",
+      [THREAD_HANDOFF_CREATE_SEED_LOCATION_STATE_KEY]: SEED,
+    });
+  });
+
+  it("reads a valid handoff seed from location state", () => {
+    expect(
+      readThreadHandoffCreateSeedFromLocationState({
+        [THREAD_HANDOFF_CREATE_SEED_LOCATION_STATE_KEY]: {
+          ...SEED,
+          sourceThreadTitle: " Source thread ",
+        },
+      }),
+    ).toEqual(SEED);
+  });
+
+  it("returns null for unusable handoff state", () => {
+    expect(readThreadHandoffCreateSeedFromLocationState(null)).toBeNull();
+    expect(
+      readThreadHandoffCreateSeedFromLocationState({
+        [THREAD_HANDOFF_CREATE_SEED_LOCATION_STATE_KEY]: {
+          ...SEED,
+          sourceThreadId: "",
+        },
       }),
     ).toBeNull();
   });

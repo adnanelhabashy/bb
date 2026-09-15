@@ -148,6 +148,14 @@ BB releases restorable provider sessions after 30 idle minutes. The daemon
 checks for these sessions every five minutes. Active turns, commands, agents,
 workflows, and monitors keep their sessions loaded.
 
+The `composerHandoff` experiment is off by default. Enable it in Settings →
+Experiments or with `bb settings experiment composerHandoff true` to switch
+providers and create a new thread directly from the follow-up composer while
+carrying the current draft. With it off, the provider stays locked and
+**Handoff to new thread** opens the new-thread composer with a source-thread
+reference. SDK clients can toggle it with `bb.system.updateExperiments`,
+preserving the other experiment values.
+
 The default-off `sidebarProgressiveDisclosure` experiment shows the first five
 groups in the current sort order in **By project** and **By machine**, keeps
 attention groups visible, and reveals ten more per **Show more** click. Revealed
