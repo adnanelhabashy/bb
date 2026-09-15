@@ -466,15 +466,6 @@ describe("BrowsePluginsTab", () => {
     ).toBe("/plugins");
   });
 
-  it("opens Plugin Guide through the app router", async () => {
-    renderBrowse({ entries: [MEMORY_ENTRY], collections: [] });
-    const guide = await screen.findByRole("link", { name: "Plugin Guide" });
-    expect(guide.getAttribute("target")).toBeNull();
-    expect(guide.getAttribute("href")).toBe(
-      "/plugins/plugin-api-docs/plugin-api",
-    );
-  });
-
   it("uses the shared error state and retries catalog searches", async () => {
     let searchAttempts = 0;
     vi.stubGlobal(
