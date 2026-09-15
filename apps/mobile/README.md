@@ -134,7 +134,7 @@ EXPO_PUBLIC_BB_SERVER_URL=http://127.0.0.1:<port> pnpm dev   # Metro (dev-client
 ```
 
 The iOS Simulator shares the Mac loopback, so `pnpm dev` (repo root) or
-`scripts/bb-dev-app current` gives a server URL that works as-is. Physical
+`pnpm dev` gives a server URL that works as-is. Physical
 phones need a Tailscale Serve URL, bb connect, or a temporary
 `BB_SERVER_BIND_HOST=0.0.0.0`.
 
@@ -496,9 +496,8 @@ Beta App Review and another build of the same version usually does not.
 
 - Server profiles: `expo-secure-store`, one key per profile
   (`bb.profile.<id>`) plus `bb.profiles.index`.
-- Preferences (theme mode `bb.theme`, haptics `bb.haptics.enabled`, the
-  shell's last page path `bb.webviewShell.lastPath.<profileId>`): MMKV store
-  `bb.preferences`, one shared instance from
+- Preferences (theme mode `bb.theme`, haptics `bb.haptics.enabled`): MMKV
+  store `bb.preferences`, one shared instance from
   `src/lib/native/preferences-storage.ts`. Push state shares it:
   `bb.push.enabled.<profileId>` (+ `bb.push.enabledProfiles` index),
   `bb.push.registration.<profileId>` (+ `bb.push.registrations` index: the

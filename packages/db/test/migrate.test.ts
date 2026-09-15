@@ -1939,10 +1939,12 @@ describe("migrate", () => {
         showDiagnosticEvents: true,
         providerOrder: [],
         defaultProviderId: null,
+        providerCompletedTurnDisplay: {},
         machineServerUrl: null,
         defaultMachineAccess: null,
         machineGitCredentialsEnabled: true,
         streamerMode: false,
+        telemetryEnabled: true,
         managedBranchPrefix: "bb/",
       });
       expect(

@@ -1,3 +1,7 @@
+import type {
+  PluginRpcDiscoveryQuery,
+  PublishedPluginRpcMethod,
+} from "@bb/server-contract";
 import { watch } from "node:fs";
 import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -185,6 +189,24 @@ export function dispatchPluginSourceWatchChange(
   handleChange(filename === null || filename.length === 0 ? "." : filename);
 }
 
+interface BuiltinPluginSourceWatcher {
+  close(): void;
+  on(event: "close", listener: () => void): unknown;
+  on(event: "error", listener: (error: Error) => void): unknown;
+}
+
+export function superviseBuiltinPluginSourceWatcher(args: {
+  watcher: BuiltinPluginSourceWatcher;
+  onClose: () => void;
+  onError: (error: Error) => void;
+}): void {
+  args.watcher.on("close", args.onClose);
+  args.watcher.on("error", (error) => {
+    args.onError(error);
+    args.watcher.close();
+  });
+}
+
 export interface PluginService {
   isBuiltin(id: string): boolean;
   events: PluginThreadEventEmitter;
@@ -298,6 +320,7 @@ export interface PluginService {
     id: string,
     path: string,
   ): PluginWireLookup<PluginWebSocketRouteRecord>;
+  discoverRpc(query: PluginRpcDiscoveryQuery): PublishedPluginRpcMethod[];
   getRpcHandler(id: string, method: string): PluginWireLookup<PluginRpcHandler>;
   invokeHttpRoute(
     id: string,
@@ -1354,7 +1377,14 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
               dispatchPluginSourceWatchChange(loop.handleChange, filename);
             },
           );
-          watcher.on("close", () => loop.dispose());
+          superviseBuiltinPluginSourceWatcher({
+            watcher,
+            onClose: () => loop.dispose(),
+            onError: (error) =>
+              logger.warn(
+                `plugin ${row.id}: source watcher failed; hot reload is off until the server restarts: ${error.message}`,
+              ),
+          });
           builtinSourceWatchers.push(watcher);
         }
       }
@@ -1722,6 +1752,32 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
       return wireLookup(id, (plugin) =>
         plugin.handle.websocketRoutes.find((route) => route.path === path),
       );
+    },
+
+    discoverRpc(query) {
+      return [...loaded.entries()]
+        .flatMap(([pluginId, plugin]) => {
+          if (query.pluginId !== undefined && query.pluginId !== pluginId)
+            return [];
+          return [...plugin.handle.rpcHandlers.values()].flatMap(
+            ({ publication }) => {
+              if (
+                publication === null ||
+                (query.method !== undefined &&
+                  publication.method !== query.method)
+              )
+                return [];
+              return [
+                { pluginId, displayName: plugin.manifest.name, ...publication },
+              ];
+            },
+          );
+        })
+        .sort(
+          (a, b) =>
+            a.pluginId.localeCompare(b.pluginId) ||
+            a.method.localeCompare(b.method),
+        );
     },
 
     getRpcHandler(id, method) {
@@ -2205,16 +2261,62 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
             mentionResolveTimeoutMs,
             `timed out after ${mentionResolveTimeoutMs}ms`,
           );
-          const context = (result as { context?: unknown } | null)?.context;
+          const record = result as {
+            context?: unknown;
+            experimental_images?: unknown;
+          } | null;
+          const context = record?.context;
           if (typeof context !== "string" || context.trim().length === 0) {
             throw new Error(
               `mention provider "${providerId}" resolve() must return { context: string }`,
             );
           }
-          return context;
+          const rawImages = record?.experimental_images ?? [];
+          if (!Array.isArray(rawImages) || rawImages.length > 50) {
+            throw new Error(
+              `mention provider "${providerId}" resolve() experimental_images must be an array with at most 50 items`,
+            );
+          }
+          const images = rawImages.map((image, index) => {
+            if (typeof image !== "object" || image === null) {
+              throw new Error(
+                `mention provider "${providerId}" resolve() experimental_images[${index}] must be an object`,
+              );
+            }
+            const candidate = image as Record<string, unknown>;
+            const type = candidate.type;
+            const key = type === "image" ? "url" : "path";
+            if (
+              (type !== "image" && type !== "localImage") ||
+              typeof candidate[key] !== "string" ||
+              candidate[key].trim().length === 0 ||
+              (candidate.context !== undefined &&
+                typeof candidate.context !== "string")
+            ) {
+              throw new Error(
+                `mention provider "${providerId}" resolve() experimental_images[${index}] is invalid`,
+              );
+            }
+            return type === "image"
+              ? {
+                  type: "image" as const,
+                  url: candidate.url as string,
+                  ...(candidate.context === undefined
+                    ? {}
+                    : { context: candidate.context as string }),
+                }
+              : {
+                  type: "localImage" as const,
+                  path: candidate.path as string,
+                  ...(candidate.context === undefined
+                    ? {}
+                    : { context: candidate.context as string }),
+                };
+          });
+          return { context, images };
         },
       );
-      if (outcome.ok) return { ok: true, context: outcome.value };
+      if (outcome.ok) return { ok: true, ...outcome.value };
       return { ok: false, error: outcome.error };
     },
 
