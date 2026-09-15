@@ -380,11 +380,7 @@ const selectedOption = () =>
 
 async function requestShortcutHints() {
   fireEvent.keyDown(window, { key: "Control", ctrlKey: true });
-  await waitFor(
-    () =>
-      expect(document.querySelector("[data-palette-footer]")).not.toBeNull(),
-    { timeout: 1500 },
-  );
+  await act(() => new Promise((resolve) => setTimeout(resolve, 800)));
 }
 
 afterEach(() => {
@@ -550,55 +546,10 @@ describe("CommandPalette", () => {
       "data-tab-pill-close",
     );
     expect(screen.queryByRole("button", { name: "Thread scope" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Open in split" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Open in split" })).toBeTruthy();
     expect(document.querySelector("[data-palette-footer]")).toBeNull();
     await requestShortcutHints();
-    const footer = screen
-      .getByTestId("command-palette")
-      .querySelector("[data-palette-footer]");
-    expectClasses(
-      footer,
-      "flex-wrap",
-      "bg-surface-recessed-soft-solid",
-      "border-border/40",
-      "px-3",
-      "py-2",
-    );
-    expectAttribute(footer, "aria-hidden", "true");
-    for (const keycap of footer?.querySelectorAll("kbd") ?? []) {
-      expectClasses(
-        keycap,
-        "rounded-sm",
-        "bg-state-hover",
-        "font-sans",
-        "font-normal",
-        "tabular-nums",
-        "text-subtle-foreground",
-        "opacity-60",
-      );
-      expectNoClasses(
-        keycap,
-        "border-border/70",
-        "bg-background/70",
-        "font-mono",
-        "text-muted-foreground",
-        "shadow-xs",
-      );
-    }
-    for (const label of footer?.querySelectorAll(
-      "[data-palette-footer-label]",
-    ) ?? []) {
-      expectClasses(label, "text-subtle-foreground");
-      expectNoClasses(label, "opacity-50");
-      expectClasses(
-        label.closest("[data-palette-footer]"),
-        "text-subtle-foreground",
-      );
-    }
-    expect(footer?.textContent).not.toContain("Backspace");
-    expect(footer?.textContent).not.toContain("Select");
-    expect(footer?.textContent).not.toContain("Esc");
-    expectText(footer, "Open in split");
+    expect(document.querySelector("[data-palette-footer]")).toBeNull();
     const threadInput = screen.getByRole("combobox", {
       name: "Search threads",
     });
@@ -735,7 +686,7 @@ describe("CommandPalette", () => {
     },
   );
 
-  it("reveals split guidance on demand and hides it on release, input blur, no matches, and Commands", async () => {
+  it("shows split guidance on the selected row without a footer and hides it for no matches and Commands", async () => {
     modeState.activeRecents = [makeThread("selected")];
     renderPalette();
     openThreadSearch();
@@ -743,21 +694,20 @@ describe("CommandPalette", () => {
     const palette = screen.getByTestId("command-palette");
     expect(palette.querySelector("[data-palette-footer]")).toBeNull();
     await requestShortcutHints();
-    expect(
-      palette.querySelector("[data-palette-footer]")?.textContent,
-    ).toContain("Ctrl+↵");
+    expectText(screen.getByRole("button", { name: "Open in split" }), "Ctrl+↵");
     fireEvent.keyUp(window, { key: "Control" });
     expect(palette.querySelector("[data-palette-footer]")).toBeNull();
     await requestShortcutHints();
-    act(() => screen.getByRole("button", { name: "Return to commands" }).focus());
+    act(() =>
+      screen.getByRole("button", { name: "Return to commands" }).focus(),
+    );
     expect(palette.querySelector("[data-palette-footer]")).toBeNull();
     act(() => searchField().focus());
     await requestShortcutHints();
-    expect(
-      palette.querySelector("[data-palette-footer]")?.textContent,
-    ).not.toContain("Esc");
+    expect(palette.querySelector("[data-palette-footer]")).toBeNull();
     fireEvent.change(searchField(), { target: { value: "no match" } });
     await screen.findByText("No matching threads");
+    expect(screen.queryByRole("button", { name: "Open in split" })).toBeNull();
     expectClasses(
       screen.getByText("No matching threads").parentElement,
       "px-3",
@@ -771,6 +721,7 @@ describe("CommandPalette", () => {
     await screen.findByRole("option");
     fireEvent.keyDown(searchField(), { key: "Escape" });
     await screen.findByRole("combobox", { name: "Search commands" });
+    expect(screen.queryByRole("button", { name: "Open in split" })).toBeNull();
     expect(palette.querySelector("[data-palette-footer]")).toBeNull();
   });
 
@@ -809,8 +760,33 @@ describe("CommandPalette", () => {
     expect(document.querySelector("[data-palette-footer]")).toBeNull();
     fireEvent.keyUp(window, { key: "Control" });
     fireEvent.keyDown(searchField(), { key: "ArrowDown" });
-    expect(screen.queryByRole("button", { name: "Open in split" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Open in split" })).toBeTruthy();
     fireEvent.keyDown(searchField(), { key: "Enter", ctrlKey: true });
+    await waitFor(() =>
+      expect(openThreadInSplitMock).toHaveBeenCalledWith(
+        expect.objectContaining({ threadId: "second" }),
+      ),
+    );
+    expect(openThreadInSplitMock).toHaveBeenCalledTimes(1);
+    expect(routeNavigateMock).not.toHaveBeenCalled();
+  });
+
+  it("opens the selected result once from its row action without normal navigation", async () => {
+    modeState.activeRecents = [
+      makeThread("first"),
+      makeThread("second", { updatedAt: 1 }),
+    ];
+    renderPalette();
+    openThreadSearch();
+    await screen.findByRole("option", { name: /Title first/ });
+    fireEvent.keyDown(searchField(), { key: "ArrowDown" });
+    const button = screen.getByRole("button", { name: "Open in split" });
+    expect(
+      button.parentElement?.querySelector('[aria-selected="true"]')
+        ?.textContent,
+    ).toContain("Title second");
+    expect(button.closest('[role="option"]')).toBeNull();
+    fireEvent.click(button);
     await waitFor(() =>
       expect(openThreadInSplitMock).toHaveBeenCalledWith(
         expect.objectContaining({ threadId: "second" }),
@@ -855,7 +831,9 @@ describe("CommandPalette", () => {
         ),
       );
       expect(document.querySelector("[data-palette-footer]")).toBeNull();
-      expect(screen.queryByRole("button", { name: "Open in split" })).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: "Open in split" }),
+      ).toBeNull();
       expect(screen.getByRole("combobox")).toBeTruthy();
     },
   );

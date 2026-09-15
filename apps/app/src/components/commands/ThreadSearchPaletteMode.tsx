@@ -251,9 +251,7 @@ export function ThreadSearchPaletteMode({
   return (
     <PaletteShell
       activeDescendantId={activeDescendantId}
-      footerKeys={
-        canSplit ? [{ keys: [splitShortcut], label: "Open in split" }] : []
-      }
+      footerKeys={[]}
       inputDescription={
         canSplit
           ? presentation.inputDescription
@@ -292,6 +290,12 @@ export function ThreadSearchPaletteMode({
             row={row}
             onActivate={() => setHighlightedIndex(index)}
             onSelect={() => openRow(row, false)}
+            onSplit={
+              index === activeIndex && canSplit
+                ? () => openRow(row, true)
+                : undefined
+            }
+            splitShortcut={isCompact ? undefined : splitShortcut}
           />
         ))
       ) : showThreadListEmptyState ||
@@ -314,12 +318,16 @@ function ThreadSearchPaletteRow({
   isActive,
   onActivate,
   onSelect,
+  onSplit,
+  splitShortcut,
   row,
 }: {
   id: string;
   isActive: boolean;
   onActivate: () => void;
   onSelect: () => void;
+  onSplit?: () => void;
+  splitShortcut?: string;
   row: PaletteThreadSearchRow;
 }) {
   const primaryRef = useRef<HTMLSpanElement | null>(null);
@@ -353,41 +361,63 @@ function ThreadSearchPaletteRow({
 
   const metadata = row.metadataText;
   return (
-    <div
-      id={id}
-      role="option"
-      aria-selected={isActive}
-      className={cn(
-        "flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm",
-        isActive && "bg-state-hover text-foreground",
-      )}
-      onPointerMove={onActivate}
-      onClick={onSelect}
-    >
-      <span className="min-w-0 flex-1">
-        <span
-          ref={primaryRef}
-          className="block min-w-0 truncate text-foreground"
-        >
-          <HighlightedText
-            text={primary.text}
-            ranges={primary.highlightRanges}
-          />
-        </span>
-        {metadata.length === 0 ? null : (
-          <span
-            className={cn(
-              "block min-h-4 truncate text-xs leading-4",
-              PALETTE_FOOTER_LABEL_CLASS,
-            )}
-            data-palette-thread-metadata
-            title={metadata}
-          >
-            {metadata}
-          </span>
+    <div className="relative" onPointerMove={onActivate}>
+      <div
+        id={id}
+        role="option"
+        aria-selected={isActive}
+        className={cn(
+          "flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm",
+          isActive && "bg-state-hover text-foreground",
         )}
-      </span>
-      <ThreadSearchPaletteStatus row={row} />
+        onClick={onSelect}
+      >
+        <span className="min-w-0 flex-1">
+          <span
+            ref={primaryRef}
+            className="block min-w-0 truncate text-foreground"
+          >
+            <HighlightedText
+              text={primary.text}
+              ranges={primary.highlightRanges}
+            />
+          </span>
+          {metadata.length === 0 ? null : (
+            <span
+              className={cn(
+                "block min-h-4 truncate text-xs leading-4",
+                PALETTE_FOOTER_LABEL_CLASS,
+              )}
+              data-palette-thread-metadata
+              title={metadata}
+            >
+              {metadata}
+            </span>
+          )}
+        </span>
+        {splitShortcut === undefined ? null : (
+          <span aria-hidden="true" className="w-14 shrink-0" />
+        )}
+        <ThreadSearchPaletteStatus row={row} />
+      </div>
+      {onSplit === undefined ? null : (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label="Open in split"
+              className="absolute right-9 top-1/2 inline-flex h-7 w-14 -translate-y-1/2 items-center justify-center rounded-sm text-xs text-subtle-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+              onFocus={onActivate}
+              onClick={onSplit}
+            >
+              <kbd className="font-sans font-normal opacity-70">
+                {splitShortcut}
+              </kbd>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Open in split</TooltipContent>
+        </Tooltip>
+      )}
     </div>
   );
 }
