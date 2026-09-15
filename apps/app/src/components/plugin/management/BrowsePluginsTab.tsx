@@ -231,8 +231,9 @@ export function BrowsePluginsTab({
           </div>
         ) : (
           <>
-            <div className="ml-auto flex w-fit flex-col items-center gap-2">
-              <div className="flex items-stretch">
+            <div className="flex items-center justify-between gap-3">
+              <OpenPluginGuideButton />
+              <div className="flex shrink-0 items-stretch">
                 <Button
                   className="rounded-r-none"
                   onClick={() => {
@@ -244,7 +245,7 @@ export function BrowsePluginsTab({
                   }}
                 >
                   <Icon name="MessageSquarePlus" className="size-3.5" />
-                  Create a plugin
+                  Create<span className="hidden sm:inline"> a</span> plugin
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -263,7 +264,6 @@ export function BrowsePluginsTab({
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              <OpenPluginGuideButton />
             </div>
 
             <BrowseHeroCarousel
