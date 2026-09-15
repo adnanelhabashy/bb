@@ -93,7 +93,10 @@ Slot props contracts (versioned, additive-only):
   back/forward then walks panel-internal history (prefer this over hash
   routing).
   Registration:
-  `{ id, title, icon, path, component, fixedTabs?, experimental_sidebarAccessory?, headerContent? }`.
+  `{ id, title, icon, path, component, fixedTabs?, experimental_rightPanel?, experimental_sidebarAccessory?, headerContent? }`.
+  `experimental_rightPanel: false` removes the page's right panel and toggle,
+  including Browser, Terminal, and declared fixed tabs. Omitted or true keeps
+  the panel. Saved panel state is retained. Requires SDK 0.4.96 or newer.
   BB automatically wraps every plugin page in the same host-owned App panel
   used by New thread and thread pages. The page component supplies only its
   main body; it must not mount a second panel layout or register Browser and
