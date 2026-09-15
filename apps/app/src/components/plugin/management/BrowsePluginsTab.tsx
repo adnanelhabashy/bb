@@ -210,7 +210,18 @@ export function BrowsePluginsTab({
             </Link>
             {selectedShelf === undefined ? null : (
               <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold text-foreground">
-                {selectedShelf.label}{" "}
+                <span className="inline-flex min-w-0 items-center gap-2">
+                  {selectedShelf.key.startsWith("category:") ? (
+                    <span
+                      className="size-2 shrink-0 rounded-full"
+                      style={pluginCatalogCategoryMutedAccentStyle(
+                        selectedShelf.categoryId,
+                      )}
+                      aria-hidden
+                    />
+                  ) : null}
+                  {selectedShelf.label}
+                </span>{" "}
                 <span className="rounded-md bg-muted px-2 py-1 text-2xs font-medium tabular-nums text-subtle-foreground">
                   {selectedShelf.entries.length.toLocaleString()}{" "}
                   {selectedShelf.entries.length === 1 ? "plugin" : "plugins"}
@@ -325,6 +336,7 @@ export function BrowsePluginsTab({
             ) : (
               <PluginCatalogGrid
                 entries={flatEntries}
+                showCategory={!selectedShelf?.key.startsWith("category:")}
                 onInstall={onInstall}
                 onOpenPlugin={onOpenPlugin}
               />
@@ -469,10 +481,12 @@ function BrowseShelf({
 
 export function PluginCatalogGrid({
   entries,
+  showCategory = true,
   onInstall,
   onOpenPlugin,
 }: {
   entries: readonly PluginCatalogSearchEntry[];
+  showCategory?: boolean;
   onInstall: (initial: AddPluginInitial) => void;
   onOpenPlugin: (pluginId: string, trigger: HTMLButtonElement) => void;
 }) {
@@ -482,7 +496,7 @@ export function PluginCatalogGrid({
         <PluginCatalogCard
           key={`${entry.marketplace}/${entry.entryId}`}
           entry={entry}
-          showCategory
+          showCategory={showCategory}
           onInstall={onInstall}
           onOpenPlugin={onOpenPlugin}
         />
