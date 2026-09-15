@@ -255,7 +255,7 @@ export function resolveMigrationsFolderForModuleDir(
   );
 }
 
-function resolveMigrationsFolder(): string {
+export function resolveMigrationsFolder(): string {
   return resolveMigrationsFolderForModuleDir({
     moduleDir: migrationModuleDirname,
   });

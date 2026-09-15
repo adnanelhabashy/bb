@@ -16,6 +16,7 @@ export {
 } from "./ids.js";
 
 export { migrate } from "./migrate.js";
+export { installFreshDatabase } from "./fresh-database.js";
 export {
   isSqliteForeignKeyConstraint,
   isSqliteUniqueConstraintOnColumns,

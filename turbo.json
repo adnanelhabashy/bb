@@ -3,6 +3,22 @@
   "globalEnv": ["BB_BUILD_TOOLCHAIN"],
   "tasks": {
     "@bb/db#db:generate": { "cache": false },
+    "@bb/db#generate:fresh-database": {
+      "dependsOn": ["//#ensure-native-modules"],
+      "inputs": [
+        "package.json",
+        "scripts/generate-fresh-database.ts",
+        "src/**",
+        "tsconfig.json",
+        "drizzle/**/*.sql",
+        "drizzle/meta/_journal.json",
+        "$TURBO_ROOT$/packages/domain/src/project.ts",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/pnpm-lock.yaml",
+        "$TURBO_ROOT$/scripts/ensure-native-modules.mjs"
+      ],
+      "outputs": ["drizzle/fresh.db"]
+    },
     "@bb/desktop#smoke:browser-broker": {
       "cache": false,
       "dependsOn": [
@@ -345,6 +361,7 @@
       // `@get-bb/plugin-sdk/provider-bridge` entry from the SDK dist, so a
       // clean worktree must build that runtime before the server starts.
       "dependsOn": [
+        "@bb/db#generate:fresh-database",
         "@bb/server#generate:bb-official-marketplace",
         "@bb/templates#generate:templates",
         "@bb/plugin-build#generate",
@@ -412,6 +429,9 @@
         "@bb/templates#generate:templates",
         "@bb/templates#generate:plugin-scaffold"
       ]
+    },
+    "@bb/db#topo": {
+      "dependsOn": ["^topo", "@bb/db#generate:fresh-database"]
     },
     "@bb/plugin-build#topo": {
       "dependsOn": ["^topo", "@bb/plugin-build#generate"]
