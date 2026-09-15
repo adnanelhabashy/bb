@@ -1,5 +1,6 @@
 import {
   useLayoutEffect,
+  useEffect,
   useRef,
   useState,
   type ComponentPropsWithoutRef,
@@ -47,6 +48,16 @@ function positiveDimension(value: number | string | undefined): number | undefin
     : undefined;
 }
 
+function isLocalFileImage(source: string): boolean {
+  try {
+    const url = new URL(source, window.location.href);
+    return url.origin === window.location.origin &&
+      /^\/api\/v1\/threads\/[^/]+\/(?:host-files\/content|worktree\/(?:content|files\/.*)|thread-storage\/(?:content|files\/.*))$/u.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
 export function MarkdownImage({
   src,
   srcSet,
@@ -65,6 +76,8 @@ export function MarkdownImage({
   const [active, setActive] = useState(false);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [responsive, setResponsive] = useState(Boolean(srcSet));
+  const [localSource, setLocalSource] = useState<string>();
+  const revalidate = !responsive && isLocalFileImage(src);
   const requestedWidth = positiveDimension(width);
   const requestedHeight = positiveDimension(height);
   const ratio = requestedWidth && requestedHeight
@@ -83,6 +96,29 @@ export function MarkdownImage({
     }
     return observeImage(image, () => setActive(true));
   }, []);
+
+  useEffect(() => {
+    if (!active || !revalidate) return;
+    const controller = new AbortController();
+    let objectUrl: string | undefined;
+    const load = async () => {
+      try {
+        const response = await fetch(src, { cache: "no-cache", signal: controller.signal });
+        if (!response.ok) throw new Error("Image unavailable");
+        const blob = await response.blob();
+        if (controller.signal.aborted) return;
+        objectUrl = URL.createObjectURL(blob);
+        setLocalSource(objectUrl);
+      } catch {
+        if (!controller.signal.aborted) setStatus("error");
+      }
+    };
+    void load();
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [active, revalidate, src]);
 
   useLayoutEffect(() => {
     const image = imageRef.current;
@@ -106,13 +142,13 @@ export function MarkdownImage({
       cancelled = true;
       image.removeEventListener("load", ready);
     };
-  }, [src, active, responsive]);
+  }, [src, active, responsive, localSource]);
 
   return (
     <img
       {...attributes}
       ref={imageRef}
-      src={active || responsive ? src : undefined}
+      src={revalidate ? localSource : active || responsive ? src : undefined}
       srcSet={srcSet}
       width={width}
       height={height}

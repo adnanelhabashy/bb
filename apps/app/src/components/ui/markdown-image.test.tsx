@@ -27,6 +27,11 @@ function mockVisibility() {
   });
 }
 
+function imageElement(element: HTMLElement): HTMLImageElement {
+  if (!(element instanceof HTMLImageElement)) throw new Error("Expected an image");
+  return element;
+}
+
 function completeImage(image: HTMLImageElement, width: number, height: number) {
   Object.defineProperties(image, {
     complete: { configurable: true, value: true },
@@ -40,7 +45,7 @@ describe("MarkdownImage", () => {
   it("reserves learned geometry on remount before fetching or decoding", async () => {
     const visible = mockVisibility();
     const first = render(<MarkdownImage src={source} alt="Screenshot" />);
-    const image = first.getByAltText<HTMLImageElement>("Screenshot");
+    const image = imageElement(first.getByAltText("Screenshot"));
     expect(image.hasAttribute("src")).toBe(false);
     visible(image, true);
     expect(image.src).toBe(source);
@@ -48,7 +53,7 @@ describe("MarkdownImage", () => {
     await waitFor(() => expect(image.dataset.markdownImageState).toBe("ready"));
     first.unmount();
     const second = render(<MarkdownImage src={source} alt="Screenshot" />);
-    const restored = second.getByAltText<HTMLImageElement>("Screenshot");
+    const restored = imageElement(second.getByAltText("Screenshot"));
     expect(restored.hasAttribute("src")).toBe(false);
     expect(restored.style.aspectRatio).toBe(String(780 / 1688));
     expect(restored.style.width).toContain("780px");
@@ -62,9 +67,9 @@ describe("MarkdownImage", () => {
       <MarkdownImage src={`${source}?offscreen`} alt="Offscreen" />
       <div hidden><MarkdownImage src={`${source}?hidden`} alt="Hidden" /></div>
     </>);
-    const image = getByAltText<HTMLImageElement>("Visible");
-    const offscreen = getByAltText<HTMLImageElement>("Offscreen");
-    const hidden = getByAltText<HTMLImageElement>("Hidden");
+    const image = imageElement(getByAltText("Visible"));
+    const offscreen = imageElement(getByAltText("Offscreen"));
+    const hidden = imageElement(getByAltText("Hidden"));
     visible(offscreen, false);
     visible(hidden, true);
     expect(offscreen.hasAttribute("src")).toBe(false);
@@ -78,13 +83,44 @@ describe("MarkdownImage", () => {
     rememberMarkdownImageDimensions(source, { width: 780, height: 1688 });
     const visible = mockVisibility();
     const { getByAltText } = render(<MarkdownImage src={source} width="320" height="200" alt="Sized" />);
-    const image = getByAltText<HTMLImageElement>("Sized");
+    const image = imageElement(getByAltText("Sized"));
     expect(image.style.aspectRatio).toBe("1.6");
     expect(image.style.width).toContain("320px");
     visible(image, true);
     completeImage(image, 900, 600);
     await waitFor(() => expect(readMarkdownImageDimensions(source)).toEqual({ width: 900, height: 600 }));
     expect(image.style.aspectRatio).toBe("1.6");
+  });
+
+  it("revalidates visible local files, releases decoded bytes, and never reuses pixels after a denied request", async () => {
+    const visible = mockVisibility();
+    const createObjectURL = vi.fn(() => "blob:local-image");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", class extends URL {
+      static createObjectURL = createObjectURL;
+      static revokeObjectURL = revokeObjectURL;
+    });
+    const fetchImage = vi.fn().mockResolvedValue({ ok: true, blob: async () => new Blob(["image"]) });
+    vi.stubGlobal("fetch", fetchImage);
+    const local = "/api/v1/threads/thr_image/host-files/content?path=%2Fimage.png";
+    const first = render(<MarkdownImage src={local} alt="Local" />);
+    const image = imageElement(first.getByAltText("Local"));
+    expect(fetchImage).not.toHaveBeenCalled();
+    visible(image, true);
+    await waitFor(() => expect(image.getAttribute("src")).toBe("blob:local-image"));
+    expect(fetchImage).toHaveBeenCalledWith(local, expect.objectContaining({ cache: "no-cache" }));
+    completeImage(image, 640, 480);
+    await waitFor(() => expect(image.dataset.markdownImageState).toBe("ready"));
+    expect(readMarkdownImageDimensions(local)).toEqual({ width: 640, height: 480 });
+    first.unmount();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:local-image");
+    fetchImage.mockResolvedValue({ ok: false });
+    const second = render(<MarkdownImage src={local} alt="Denied" />);
+    const denied = imageElement(second.getByAltText("Denied"));
+    visible(denied, true);
+    await waitFor(() => expect(denied.dataset.markdownImageState).toBe("error"));
+    expect(denied.hasAttribute("src")).toBe(false);
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
   });
 
   it("does not cache the fallback dimensions for picture sources", async () => {
@@ -94,7 +130,7 @@ describe("MarkdownImage", () => {
       <source srcSet="https://example.com/dark.png" media="(prefers-color-scheme: dark)" />
       <MarkdownImage src={source} alt="Responsive" />
     </picture>);
-    const image = getByAltText<HTMLImageElement>("Responsive");
+    const image = imageElement(getByAltText("Responsive"));
     expect(image.style.aspectRatio).toBe("");
     completeImage(image, 900, 600);
     await waitFor(() => expect(image.dataset.markdownImageState).toBe("ready"));
@@ -105,7 +141,7 @@ describe("MarkdownImage", () => {
     const visible = mockVisibility();
     rememberMarkdownImageDimensions(source, { width: 640, height: 480 });
     const { getByAltText } = render(<MarkdownImage src={source} alt="Retry screenshot" />);
-    const image = getByAltText<HTMLImageElement>("Retry screenshot");
+    const image = imageElement(getByAltText("Retry screenshot"));
     visible(image, true);
     fireEvent.error(image);
     expect(image.dataset.markdownImageState).toBe("error");

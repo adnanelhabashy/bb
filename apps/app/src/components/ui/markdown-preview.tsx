@@ -967,7 +967,7 @@ function MarkdownRenderedImage({
         );
         const imageIndex = images.indexOf(event.currentTarget);
         const imageSources = images.map(
-          (image) => image.getAttribute("data-markdown-image-src") ?? image.src,
+          (image) => image.currentSrc || image.src || image.getAttribute("data-markdown-image-src") || "",
         );
         setExpandedImage({
           imageSources,
