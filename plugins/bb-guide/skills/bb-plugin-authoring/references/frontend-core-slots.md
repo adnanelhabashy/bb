@@ -266,3 +266,11 @@ target? })`. Inside the fixed-tab component,
   `experimental_useFileResources`. Editors can send the same reference through
   RPC before using `bb.sdk.files` through their server RPC when they need
   bounded reads and CAS saves.
+
+### File opener migration in SDK 0.4.96
+
+File opener source types intentionally change in 0.4.96: use
+`experimental_file` instead of `path`, `source`, and `PluginFileOpenerSource`.
+Existing compiled plugins continue receiving the legacy props at runtime.
+Plugins built against the canonical file APIs must declare
+`engines.bbPluginSdk: ">=0.4.96"` so older hosts reject them before loading.

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { PluginFileOpenerProps } from "@get-bb/plugin-sdk/app";
@@ -15,7 +15,7 @@ const editor = vi.hoisted(() => ({
     dispose: vi.fn(),
   })),
   onDidFocusEditorWidget: vi.fn(),
-  onDidChangeModelContent: vi.fn(),
+  onDidChangeModelContent: vi.fn<(listener: () => void) => void>(),
   addCommand: vi.fn(),
   updateOptions: vi.fn(),
   dispose: vi.fn(),
@@ -190,3 +190,82 @@ it("does not apply a stale target cleared during loading", async () => {
   await waitFor(() => expect(create).toHaveBeenCalledOnce());
   expect(editor.setSelection).not.toHaveBeenCalled();
 });
+
+it.each([
+  ["/workspace", false],
+  ["C:\\workspace", false],
+  ["/workspace", true],
+  ["C:\\workspace", true],
+] as const)(
+  "opens host tree entries below %s with dirty=%s",
+  async (root, dirty) => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const scrollDescriptor = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      "scrollIntoView",
+    );
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    try {
+      const read = vi.fn(() => file);
+      const slot = renderSlot(
+        registration,
+        {
+          ...base,
+          experimental_file: {
+            kind: "host",
+            hostId: "host_1",
+            path: `${root}/target.ts`,
+          },
+        },
+        {
+          rpc: {
+            assets: () => ({ baseUrl: "/assets", expiresAtMs: 99999 }),
+            read,
+            tree: () => ({
+              root,
+              entries: [{ path: "sibling.ts", kind: "file" }],
+              truncated: false,
+            }),
+          },
+        },
+      );
+      await waitFor(() => expect(create).toHaveBeenCalledOnce());
+      fireEvent.click(slot.getByRole("button", { name: "Show in files" }));
+      if (dirty) act(() => editor.onDidChangeModelContent.mock.lastCall?.[0]());
+      fireEvent.click(await slot.findByRole("button", { name: /sibling.ts/ }));
+      if (dirty) {
+        expect(read).toHaveBeenCalledOnce();
+        fireEvent.click(slot.getByRole("button", { name: "Discard and open" }));
+      }
+      await waitFor(() =>
+        expect(read).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            file: {
+              kind: "host",
+              hostId: "host_1",
+              path: `${root.replace(/\\/g, "/")}/sibling.ts`,
+            },
+          }),
+        ),
+      );
+    } finally {
+      if (scrollDescriptor)
+        Object.defineProperty(
+          HTMLElement.prototype,
+          "scrollIntoView",
+          scrollDescriptor,
+        );
+      else Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+      vi.unstubAllGlobals();
+    }
+  },
+);

@@ -1092,6 +1092,7 @@ function TimelineExpandableBody({
   showAssistantMessageActions,
 }: TimelineExpandableBodyProps) {
   const {
+    environmentId,
     onOpenLink,
     onOpenLocalFileLink,
     projectId,
@@ -1165,6 +1166,7 @@ function TimelineExpandableBody({
                 <ConversationMessageContent
                   attachments={null}
                   id={row.id}
+                  environmentId={environmentId}
                   onOpenLink={onOpenLink}
                   onOpenLocalFileLink={onOpenLocalFileLink}
                   projectId={projectId}

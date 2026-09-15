@@ -2,6 +2,7 @@
 
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { focusManager } from "@tanstack/react-query";
 import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
 import { HEAVY_PAYLOAD_GC_TIME_MS } from "./query-policies";
 import { useHostFilePreview } from "./host-file-preview-query";
@@ -19,6 +20,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   vi.useRealTimers();
+  focusManager.setFocused(undefined);
 });
 
 describe("useHostFilePreview", () => {
@@ -211,4 +213,82 @@ describe("useHostFilePreview", () => {
       }),
     ).toBeUndefined();
   });
+});
+
+it("reads text while resolution is pending and renews only the resource lease", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  let resolveResource = (_value: { url: string }) => {};
+  filesSdk.experimental_resolveResource.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveResource = resolve;
+      }),
+  );
+  filesSdk.read.mockResolvedValue({
+    content: "<h1>Preview</h1>",
+    contentEncoding: "utf8",
+    mimeType: "text/html",
+  });
+  const { wrapper } = createQueryClientTestHarness();
+  const { result } = renderHook(
+    () => useHostFilePreview("host-1", "/tmp/preview.html"),
+    { wrapper },
+  );
+  await waitFor(() => expect(filesSdk.read).toHaveBeenCalledOnce());
+  await act(async () => resolveResource({ url: "/lease/first/preview.html" }));
+  await waitFor(() =>
+    expect(result.current.data?.url).toBe("/lease/first/preview.html"),
+  );
+  filesSdk.experimental_resolveResource.mockResolvedValue({
+    url: "/lease/renewed/preview.html",
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(8 * 60_000);
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1);
+  });
+  expect(result.current.data?.url).toBe("/lease/renewed/preview.html");
+  expect(result.current.data).toMatchObject({
+    kind: "text",
+    content: "<h1>Preview</h1>",
+  });
+  focusManager.setFocused(false);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(8 * 60_000);
+  });
+  filesSdk.experimental_resolveResource.mockResolvedValue({
+    url: "/lease/focused/preview.html",
+  });
+  await act(async () => {
+    focusManager.setFocused(true);
+    await vi.advanceTimersByTimeAsync(1);
+  });
+  expect(result.current.data?.url).toBe("/lease/focused/preview.html");
+
+  expect(filesSdk.read).toHaveBeenCalledOnce();
+});
+
+it("renews a media URL when its contents are invalidated", async () => {
+  filesSdk.experimental_resolveResource.mockResolvedValue({
+    url: "/lease/old/image.png",
+  });
+  const { queryClient, wrapper } = createQueryClientTestHarness();
+  const { result } = renderHook(
+    () => useHostFilePreview("host-1", "/tmp/image.png"),
+    { wrapper },
+  );
+  await waitFor(() =>
+    expect(result.current.data?.url).toBe("/lease/old/image.png"),
+  );
+  filesSdk.experimental_resolveResource.mockResolvedValue({
+    url: "/lease/new/image.png",
+  });
+  await act(async () => {
+    await queryClient.invalidateQueries({ queryKey: ["live-file-preview"] });
+  });
+  await waitFor(() =>
+    expect(result.current.data?.url).toBe("/lease/new/image.png"),
+  );
+  expect(filesSdk.read).not.toHaveBeenCalled();
 });

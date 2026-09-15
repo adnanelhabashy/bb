@@ -245,3 +245,24 @@ describe("InlineVisDirective", () => {
     expect(slot.experimental_fileResourceCalls).toEqual([]);
   });
 });
+
+it("retries a workspace preview when the message environment becomes available", async () => {
+  const registration = app.messageDirectives[0]!;
+  const Component = registration.component;
+  const props = {
+    attributes: { file: "demo.html" },
+    source: "::inline-vis{}",
+    message: { ...message, experimental_environmentId: null },
+    openWorkspaceFile: null,
+  };
+  const slot = renderSlot(registration, props, {
+    experimental_resolveFileResource: resourceFor,
+  });
+  expect((await slot.findByRole("alert")).textContent).toContain(
+    "no workspace environment",
+  );
+  slot.lifecycle.rerender(<Component {...props} message={message} />);
+  await waitFor(() =>
+    expect(slot.container.querySelector("iframe")).not.toBeNull(),
+  );
+});

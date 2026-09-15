@@ -2670,6 +2670,7 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
         const baseDir = getAbsoluteDirname({ path: tab.path });
         return (
           <LazyHostFilePreviewTabContent
+            hostId={tab.hostId}
             activePath={tab.path}
             copyPath={tab.path}
             environmentId={tab.environmentId}

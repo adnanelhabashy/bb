@@ -97,6 +97,7 @@ export function ThreadTimelinePanelContent({
 
   return (
     <ThreadTimelineSurface
+      environmentId={threadQuery.data?.environmentId ?? undefined}
       activeThinking={resolvedTimeline.activeThinking}
       contextBoundarySeq={resolvedTimeline.contextBoundarySeq}
       hasOlderTimelineRows={resolvedTimeline.hasOlderTimelineRows}

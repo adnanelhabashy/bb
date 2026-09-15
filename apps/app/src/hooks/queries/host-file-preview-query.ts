@@ -6,7 +6,8 @@ import type {
   FileReference,
   ResolveFileResourceResponse,
 } from "@bb/server-contract";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { decodeBase64Bytes, encodeBase64Bytes } from "@/lib/base64-bytes";
 import { sdk } from "@/lib/sdk";
 import {
@@ -93,24 +94,53 @@ export function useLiveFilePreview(
     { enabled: enabled && target?.kind === "thread-storage" },
   );
   const activeTarget = enabled ? target : null;
+  const queryClient = useQueryClient();
+  const resourceOptions = {
+    queryKey: ["live-file-resource", activeTarget],
+    queryFn: async ({ signal }: { signal: AbortSignal }) => {
+      if (activeTarget === null)
+        throw new Error("File preview target is incomplete");
+      return sdk.files
+        .experimental_resolveResource({ target: activeTarget, signal })
+        .catch(() => {
+          signal.throwIfAborted();
+          return null;
+        });
+    },
+    enabled,
+    staleTime: 8 * 60_000,
+    refetchInterval: 8 * 60_000,
+    ...HEAVY_PAYLOAD_QUERY_POLICY,
+  };
+  const resourceQuery = useQuery(resourceOptions);
+  const select = useCallback(
+    (
+      preview: FilePreview & { resource: ResolveFileResourceResponse | null },
+    ) => {
+      const resource = resourceQuery.data ?? preview.resource;
+      return { ...preview, resource, url: resource?.url ?? preview.url };
+    },
+    [resourceQuery.data],
+  );
   return useQuery<
     FilePreview & { resource: ResolveFileResourceResponse | null }
   >({
     queryKey: ["live-file-preview", activeTarget],
+    select,
     queryFn: async ({ signal }) => {
       if (activeTarget === null)
         throw new Error("File preview target is incomplete");
       const activePath = activeTarget.path;
       const name = getHostFileName(activePath);
-      const resource = await sdk.files
-        .experimental_resolveResource({
-          target: activeTarget,
-          signal,
-        })
-        .catch(() => null);
+      const mediaPreviewType = getHostMediaPreviewType(name);
+      const read = () =>
+        sdk.files.read({ experimental_target: activeTarget, signal });
+      const [resource, initialResponse] = await Promise.all([
+        queryClient.fetchQuery({ ...resourceOptions, staleTime: 0 }),
+        mediaPreviewType === null ? read() : Promise.resolve(null),
+      ]);
       signal.throwIfAborted();
       const previewUrl = resource?.url ?? null;
-      const mediaPreviewType = getHostMediaPreviewType(name);
       if (previewUrl !== null && mediaPreviewType !== null) {
         return {
           ...mediaPreviewType,
@@ -121,10 +151,7 @@ export function useLiveFilePreview(
         };
       }
 
-      const response = await sdk.files.read({
-        experimental_target: activeTarget,
-        signal,
-      });
+      const response = initialResponse ?? (await read());
       const contentBytes =
         response.contentEncoding === "base64"
           ? decodeBase64Bytes(response.content)
@@ -159,7 +186,7 @@ export function useLiveFilePreview(
     enabled,
     staleTime: 30_000,
     refetchOnMount: "always",
-    refetchInterval: 8 * 60_000,
+    refetchOnWindowFocus: false,
     ...HEAVY_PAYLOAD_QUERY_POLICY,
   });
 }

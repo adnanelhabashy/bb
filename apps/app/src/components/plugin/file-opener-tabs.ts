@@ -90,7 +90,7 @@ export function parseFileOpenerParams(
   return result.success ? { experimental_file: result.data } : null;
 }
 
-function parseLegacyFileOpenerParams(
+export function parseLegacyFileOpenerParams(
   paramsJson: string | null,
 ): LegacyPluginFileOpenerFile | null {
   if (paramsJson === null) return null;

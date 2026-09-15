@@ -191,6 +191,8 @@ function getServerReconnectInvalidationQueryKeys(): QueryKey[] {
     allThreadStorageFilesQueryKeyPrefix(),
     allThreadStorageLocationsQueryKeyPrefix(),
     allThreadStoragePathsQueryKeyPrefix(),
+    ["live-file-preview"],
+    ["live-file-resource"],
     allThreadStorageFilePreviewQueryKeyPrefix(),
     allThreadHostFilePreviewQueryKeyPrefix(),
     allTerminalsQueryKeyPrefix(),

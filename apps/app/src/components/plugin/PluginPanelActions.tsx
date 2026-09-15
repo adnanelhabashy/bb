@@ -18,6 +18,7 @@ import {
   fileOpenerIdFromActionId,
   legacyFileOpenerProps,
   parseFileOpenerParams,
+  parseLegacyFileOpenerParams,
 } from "./file-opener-tabs";
 import { PluginSlotMount } from "./PluginSlotMount";
 import { PluginReplacementSlot } from "./PluginReplacementSlot";
@@ -352,22 +353,32 @@ function FileOpenerTabContent({
       candidate.pluginId === tab.pluginId && candidate.id === openerId,
   );
   const fileParams =
-    tab.fileOpenerOwner?.kind === "file-preview"
-      ? JSON.stringify({ experimental_file: tab.fileOpenerOwner.file })
-      : tab.paramsJson;
+    fileOpenerFile !== undefined
+      ? fileOpenerFile === null
+        ? null
+        : JSON.stringify({ experimental_file: fileOpenerFile })
+      : tab.fileOpenerOwner?.kind === "file-preview"
+        ? JSON.stringify({ experimental_file: tab.fileOpenerOwner.file })
+        : tab.paramsJson;
   const persistedFile = useMemo(
     () => parseFileOpenerParams(fileParams),
     [fileParams],
   );
-  const file =
-    fileOpenerFile === undefined
-      ? (persistedFile?.experimental_file ?? null)
-      : fileOpenerFile;
+  const file = persistedFile?.experimental_file ?? null;
   const owner = tab.fileOpenerOwner;
   const lineRange = useMemo(() => {
     const range = owner?.tab.lineRange;
     return range == null ? null : { ...range };
   }, [owner]);
+  const contextThreadId = context.kind === "thread" ? context.threadId : null;
+  const legacyParams =
+    owner === undefined || file === null
+      ? null
+      : JSON.stringify(legacyFileOpenerProps(owner, file, contextThreadId));
+  const legacyProps = useMemo(
+    () => parseLegacyFileOpenerParams(legacyParams),
+    [legacyParams],
+  );
   if (file === null || owner === undefined || original === undefined) {
     return <UnavailableFileOpenerTab />;
   }
@@ -383,11 +394,7 @@ function FileOpenerTabContent({
           data-testid="plugin-file-opener-tab-content"
         >
           <opener.component
-            {...legacyFileOpenerProps(
-              owner,
-              file,
-              context.kind === "thread" ? context.threadId : null,
-            )}
+            {...legacyProps}
             experimental_file={file}
             experimental_lineRange={lineRange}
             Original={BoundOriginal}

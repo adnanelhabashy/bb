@@ -79,6 +79,7 @@ interface ProjectFilePreviewTabContentProps {
 }
 
 interface HostFilePreviewTabContentProps {
+  hostId?: string | null;
   activePath: string;
   isPanelOpen: boolean;
   copyPath: string;
@@ -489,7 +490,7 @@ export function HostFilePreviewTabContent(
   const environment = useEnvironment(props.environmentId ?? null, {
     enabled: props.isPanelOpen,
   });
-  const hostId = environment.data?.hostId;
+  const hostId = props.hostId ?? environment.data?.hostId;
   return (
     <LiveFilePreviewTabContent
       {...props}

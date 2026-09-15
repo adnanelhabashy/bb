@@ -239,7 +239,14 @@ function InlineVisDirective({
     return () => {
       controller.abort();
     };
-  }, [fileAttr, fileResources, heightError, message.threadId, sourceAttr]);
+  }, [
+    fileAttr,
+    fileResources,
+    heightError,
+    message.threadId,
+    message.experimental_environmentId,
+    sourceAttr,
+  ]);
 
   if (state.status === "missing-file") {
     return (

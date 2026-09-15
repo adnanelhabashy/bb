@@ -63,7 +63,10 @@ function parseDocumentContext(resource: unknown): DocumentContext | null {
     return {
       target,
       path: resource.path,
-      rootPath: null,
+      rootPath:
+        "rootPath" in resource && typeof resource.rootPath === "string"
+          ? normalizeAbsoluteFilePath({ path: resource.rootPath })
+          : null,
       threadId: null,
       resolveRelativeSrc: (path) =>
         buildFilePreviewLeaseContentUrl(baseUrl, path),

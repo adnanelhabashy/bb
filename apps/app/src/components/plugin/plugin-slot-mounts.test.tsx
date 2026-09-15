@@ -75,7 +75,10 @@ import {
   type OpenPluginPanelArgs,
 } from "./PluginPanelActions";
 import { NewTabActions } from "@/components/secondary-panel/NewTabActions";
-import { buildFileOpenerPanelTab } from "./file-opener-tabs";
+import {
+  buildFileOpenerPanelTab,
+  resolveFileOpenerParams,
+} from "./file-opener-tabs";
 import { splitLayoutAtom } from "@/lib/split-layout/atoms";
 import type { PromptDraftState } from "@bb/client-core";
 
@@ -2055,6 +2058,89 @@ describe("plugin thread panel actions", () => {
 });
 
 describe("plugin file opener tabs", () => {
+  it("preserves a restored legacy editor's dirty buffer across parent rerenders", () => {
+    function Editor(props: PluginFileOpenerProps) {
+      const [content, setContent] = useState("disk content");
+      const source = Reflect.get(props, "source");
+      useLayoutEffect(() => {
+        setContent("disk content");
+      }, [props.experimental_file, source]);
+      return (
+        <input
+          aria-label="Editor buffer"
+          value={content}
+          onChange={(event) => setContent(event.target.value)}
+        />
+      );
+    }
+    setPluginSlotRegistrations(
+      "notes",
+      registrationSet({
+        fileOpeners: [
+          {
+            id: "editor",
+            title: "Editor",
+            extensions: ["md"],
+            component: Editor,
+          },
+        ],
+      }),
+    );
+    const tab = {
+      ...createPluginPanelFixedPanelTab({
+        actionId: "file-opener:editor",
+        pluginId: "notes",
+        title: "todo.md",
+        paramsJson: JSON.stringify({
+          path: "todo.md",
+          source: {
+            kind: "workspace",
+            environmentId: "env_1",
+            projectId: null,
+            threadId: "thr_1",
+          },
+        }),
+      }),
+      fileOpenerOwner: {
+        kind: "workspace-file-preview" as const,
+        environmentId: "env_1",
+        projectId: null,
+        threadId: "thr_1",
+        tab: {
+          path: "todo.md",
+          lineRange: null,
+          source: { kind: "working-tree" as const },
+          statusLabel: null,
+        },
+      },
+    };
+    const content = () => (
+      <PluginPanelTabContent
+        tab={tab}
+        context={{ kind: "thread", threadId: "thr_1" }}
+        fileOpenerOriginal={<div>native</div>}
+        fileOpenerFile={
+          resolveFileOpenerParams({
+            owner: tab.fileOpenerOwner,
+            paramsJson: tab.paramsJson,
+          })?.experimental_file
+        }
+      />
+    );
+    const mounted = render(content());
+    fireEvent.change(screen.getByRole("textbox", { name: "Editor buffer" }), {
+      target: { value: "unsaved changes" },
+    });
+    mounted.rerender(content());
+    expect(
+      (
+        screen.getByRole("textbox", {
+          name: "Editor buffer",
+        }) as HTMLInputElement
+      ).value,
+    ).toBe("unsaved changes");
+  });
+
   function MarkdownEditorProbe({ experimental_file }: PluginFileOpenerProps) {
     return (
       <div>
@@ -2182,17 +2268,17 @@ describe("plugin file opener tabs", () => {
       />,
     );
 
-    expect(screen.getByTestId("legacy-opener-props").textContent).toBe(
-      JSON.stringify({
-        path: "notes/todo.md",
-        source: {
-          kind: "workspace",
-          environmentId: "env_1",
-          projectId: null,
-          threadId: "thr_1",
-        },
-      }),
-    );
+    expect(
+      JSON.parse(screen.getByTestId("legacy-opener-props").textContent!),
+    ).toEqual({
+      path: "notes/todo.md",
+      source: {
+        kind: "workspace",
+        environmentId: "env_1",
+        projectId: null,
+        threadId: "thr_1",
+      },
+    });
   });
 
   it.each(["workspace", "host", "thread-storage"] as const)(

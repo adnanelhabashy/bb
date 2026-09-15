@@ -593,6 +593,38 @@ describe("ThreadTimelineRows actions", () => {
     expect(markup).toContain("max-md:pointer-coarse:opacity-100");
   });
 
+  it("supplies workspace context to delegation output directives", () => {
+    setPluginSlotRegistrations(
+      "context-probe",
+      makePluginRegistrationSet({
+        messageDirectives: [
+          {
+            id: "workspace-probe",
+            component: ({ message }) => (
+              <span>Environment: {message.experimental_environmentId}</span>
+            ),
+          },
+        ],
+      }),
+    );
+    renderWithRouter(
+      <ThreadTimelineRows
+        environmentId="env-delegated"
+        initialExpanded={new Set(["delegation-context"])}
+        timelineRows={[
+          delegationRow({
+            id: "delegation-context",
+            output: "::workspace-probe{}",
+            childRows: [],
+          }),
+        ]}
+        threadRuntimeDisplayStatus="idle"
+        workspaceRootPath="/workspace"
+      />,
+    );
+    expect(screen.getByText("Environment: env-delegated")).toBeDefined();
+  });
+
   it("hides assistant message actions inside delegation rows", () => {
     const markup = toMarkup(
       <ThreadTimelineRows

@@ -32,7 +32,9 @@ import type {
  * sync (`satisfies PluginSdkApp`). Plugin authors import the same shapes through
  * `@get-bb/plugin-sdk/app`.
  *
- * Per-slot props are versioned contracts: additive-only within an SDK major.
+ * Per-slot props are versioned contracts: additive-only within an SDK major,
+ * except the 0.4.96 file-opener source migration. Older bundles still receive
+ * legacy path/source props at runtime; new builds use experimental_file.
  */
 
 // ---------------------------------------------------------------------------

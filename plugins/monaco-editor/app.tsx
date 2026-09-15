@@ -199,16 +199,27 @@ function MonacoFileOpener({
     };
   }, [experimental_file, isFilesOpen, rpc]);
 
+  const treeFile = useCallback(
+    (path: string) => ({
+      ...experimental_file,
+      path:
+        experimental_file.kind === "host"
+          ? `${tree.root.replace(/[\\/]$/u, "")}/${path}`.replace(/\\/g, "/")
+          : path,
+    }),
+    [experimental_file, tree.root],
+  );
+
   const openFromTree = useCallback(
     (next: string) => {
-      if (next === activePath) return;
+      if (treeFile(next).path === activePath.replace(/\\/g, "/")) return;
       if (saveStateRef.current.kind === "dirty") {
         setPendingOpen(next);
         return;
       }
-      setActiveFile({ ...experimental_file, path: next });
+      setActiveFile(treeFile(next));
     },
-    [activePath, experimental_file],
+    [activePath, treeFile],
   );
 
   const requestRefresh = useCallback(() => {
@@ -332,7 +343,16 @@ function MonacoFileOpener({
     <div className="flex min-h-0 flex-1 flex-col">
       {isFilesOpen ? (
         <FileTreePanel
-          activePath={activePath}
+          activePath={
+            experimental_file.kind === "host"
+              ? activePath
+                  .replace(/\\/g, "/")
+                  .slice(
+                    tree.root.replace(/\\/g, "/").replace(/\/$/u, "").length +
+                      1,
+                  )
+              : activePath
+          }
           background={editorBackground(codeTheme.theme)}
           entries={tree.entries}
           error={tree.error}
@@ -362,7 +382,7 @@ function MonacoFileOpener({
           const next = pendingOpen;
           setPendingOpen(null);
           if (next !== null) {
-            setActiveFile({ ...experimental_file, path: next });
+            setActiveFile(treeFile(next));
           }
         }}
         onOverwrite={() => void overwrite()}

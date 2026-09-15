@@ -25,12 +25,12 @@ vi.mock("@/hooks/queries/environment-queries", () => ({
 vi.mock("@/hooks/queries/host-file-preview-query", () => ({
   useLiveFilePreview: (target: FileReference) => {
     seenTarget(target);
-    const path = target.kind === "host" ? "readme.md" : target.path;
+    const path = target.kind === "host" ? "docs/readme.md" : target.path;
     return {
       data: {
         kind: "text",
         content:
-          "![relative](images/chart.png) ![escape](../../outside.png) [Sibling](next.md#L2)",
+          "![relative](images/chart.png) ![absolute](/workspace/images/chart.png) ![outside](/outside/chart.png) ![escape](../../outside.png) [Sibling](next.md#L2) [Absolute sibling](/workspace/next.md#L3)",
         mimeType: "text/markdown",
         name: "readme.md",
         path: target.path,
@@ -110,6 +110,20 @@ const cases = [
     ),
   },
   {
+    name: "thread host without an environment",
+    target: { ...host, hostId: "explicit-host" },
+    node: (
+      <HostFilePreviewTabContent
+        {...common}
+        activePath={host.path}
+        copyPath={host.path}
+        hostId="explicit-host"
+        environmentId={null}
+        threadId="thread"
+      />
+    ),
+  },
+  {
     name: "host",
     target: host,
     node: (
@@ -150,12 +164,24 @@ describe("canonical native Markdown routing", () => {
       expect(seenTarget).toHaveBeenCalledWith(target);
       expect(
         screen.getByRole("img", { name: "relative" }).getAttribute("src"),
-      ).toBe(
-        `/api/v1/file-previews/lease/${target.kind === "host" ? "" : "docs/"}images/chart.png`,
-      );
+      ).toBe("/api/v1/file-previews/lease/docs/images/chart.png");
       expect(
         screen.getByRole("img", { name: "escape" }).getAttribute("src"),
       ).toBe("../../outside.png");
+      expect(
+        screen.getByRole("img", { name: "absolute" }).getAttribute("src"),
+      ).toBe("/api/v1/file-previews/lease/images/chart.png");
+      expect(
+        screen.getByRole("img", { name: "outside" }).getAttribute("src"),
+      ).toBe("/outside/chart.png");
+      fireEvent.click(screen.getByRole("link", { name: "Absolute sibling" }));
+      expect(openFilePreview).toHaveBeenCalledWith({
+        target: {
+          ...target,
+          path: target.kind === "host" ? "/workspace/next.md" : "next.md",
+        },
+        location: { kind: "range", startLine: 3, endLine: 3 },
+      });
       fireEvent.click(screen.getByRole("link", { name: "Sibling" }));
       expect(openFilePreview).toHaveBeenCalledWith({
         target: {

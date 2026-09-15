@@ -6,7 +6,7 @@
   "description": "Render workspace or thread-storage HTML visualizations and Markdown documents inline in assistant messages.",
   "engines": {
     "bb": ">=0.0",
-    "bbPluginSdk": ">=0.4.89"
+    "bbPluginSdk": ">=0.4.96"
   },
   "bb": {
     "name": "Inline visualizations",

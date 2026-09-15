@@ -12,12 +12,14 @@ const mocks = vi.hoisted(() => ({
   activeBackgroundAgentCount: 0,
   displayStatus: "idle" as ThreadRuntimeDisplayStatus,
   threadStatus: "idle",
+  environmentId: null as string | null,
 }));
 
 vi.mock("@/hooks/queries/thread-queries", () => ({
   useThread: () => ({
     data: {
       activeBackgroundAgentCount: mocks.activeBackgroundAgentCount,
+      environmentId: mocks.environmentId,
       runtime: { displayStatus: mocks.displayStatus },
       status: mocks.threadStatus,
     },
@@ -27,13 +29,15 @@ vi.mock("@/hooks/queries/thread-queries", () => ({
 
 vi.mock("./ThreadTimelineSurface.js", () => ({
   ThreadTimelineSurface: ({
+    environmentId,
     ongoingIndicatorLabel,
     showOngoingIndicator,
   }: {
+    environmentId?: string;
     ongoingIndicatorLabel?: string;
     showOngoingIndicator: boolean;
   }) => (
-    <div>
+    <div data-environment={environmentId}>
       {showOngoingIndicator ? (
         <div>{ongoingIndicatorLabel ?? "Working..."}</div>
       ) : null}
@@ -124,6 +128,24 @@ afterEach(() => {
 });
 
 describe("ThreadTimelinePanelContent", () => {
+  it("propagates the environment after provisioning a secondary thread", () => {
+    mocks.environmentId = null;
+    const content = () => (
+      <ThreadTimelinePanelContent
+        threadId="thr-test"
+        timeline={baseTimeline({})}
+      />
+    );
+    const view = render(content());
+    expect(view.container.querySelector("[data-environment]")).toBeNull();
+    mocks.environmentId = "env-secondary";
+    view.rerender(content());
+    expect(
+      view.container.querySelector('[data-environment="env-secondary"]'),
+    ).not.toBeNull();
+    mocks.environmentId = null;
+  });
+
   it("shows a background-only working indicator while runtime is idle", () => {
     render(
       <ThreadTimelinePanelContent

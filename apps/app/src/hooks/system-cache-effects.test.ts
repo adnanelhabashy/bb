@@ -99,6 +99,25 @@ async function waitForQueryCalls(
 }
 
 describe("system cache effects", () => {
+  it.each(["host", "workspace", "thread-storage"])(
+    "invalidates %s preview contents and resource leases after reconnect",
+    (kind) => {
+      const queryClient = createCacheEffectQueryClient();
+      const keys = ["live-file-preview", "live-file-resource"].map((prefix) => [
+        prefix,
+        { kind, path: "example.html" },
+      ]);
+      for (const key of keys)
+        queryClient.setQueryData(key, { url: "/old-lease" });
+      invalidateRealtimeQueriesAfterServerReconnect({
+        disconnectedAt: afterAllCachedData(),
+        queryClient,
+      });
+      for (const key of keys)
+        expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    },
+  );
+
   it("invalidates canonical active thread caches after reconnect", () => {
     const queryClient = createCacheEffectQueryClient();
     const threadKey = threadQueryKey("thread-1");
