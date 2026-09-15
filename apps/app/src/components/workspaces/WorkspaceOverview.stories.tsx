@@ -177,7 +177,13 @@ function WorkspaceStory({
   const [threads, setThreads] = useState(workspaceThreads);
   const queryClient = useMemo(() => {
     const client = new QueryClient({
-      defaultOptions: { queries: { enabled: false } },
+      defaultOptions: {
+        queries: {
+          enabled: false,
+          refetchOnMount: false,
+          refetchOnWindowFocus: false,
+        },
+      },
     });
     client.setQueryData(hostsQueryKey(), []);
     for (const thread of threads) {
@@ -509,7 +515,7 @@ function WorkspaceStory({
             <aside
               aria-label="Thread Info"
               className={cn(
-                "flex min-h-0 shrink-0 flex-col [--detail-label-width:112px]",
+                "flex min-h-0 shrink-0 flex-col [--detail-label-width:128px]",
                 surface === "info" ? "w-full" : "w-80 border-l border-border",
               )}
             >
