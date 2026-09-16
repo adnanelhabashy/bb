@@ -10,16 +10,20 @@ export const UNCATEGORIZED_PLUGIN_CATEGORY_ID = "uncategorized";
 export type PluginBrowseSort = "recently-added" | "most-installed";
 export type PluginBrowseSortDirection = "asc" | "desc";
 
-export interface PluginBrowseShelf {
+export interface PluginCollectionShelf<Entry> {
   key: string;
   categoryId?: string;
   label: string;
   description?: string;
-  entries: PluginCatalogSearchEntry[];
+  entries: Entry[];
   kind: "collection" | "category" | "uncategorized";
 }
 
-function isCategorized(entry: PluginCatalogSearchEntry): boolean {
+export type PluginBrowseShelf = PluginCollectionShelf<PluginCatalogSearchEntry>;
+
+type PluginCategory = Pick<PluginCatalogSearchEntry, "categoryId" | "category">;
+
+function isCategorized(entry: PluginCategory): boolean {
   return entry.categoryId !== undefined && entry.category !== undefined;
 }
 
@@ -60,7 +64,14 @@ export function pluginBrowseShelves({
           },
         ];
   });
-  const entriesByCategory = new Map<string, PluginCatalogSearchEntry[]>();
+  return [...shelves, ...pluginCategoryShelves(entries)];
+}
+
+export function pluginCategoryShelves<Entry extends PluginCategory>(
+  entries: readonly Entry[],
+): PluginCollectionShelf<Entry>[] {
+  const shelves: PluginCollectionShelf<Entry>[] = [];
+  const entriesByCategory = new Map<string, Entry[]>();
   const categoryLabels = new Map<string, string>();
   const unknownCategoryOrder: string[] = [];
   for (const entry of entries) {
@@ -114,9 +125,7 @@ export function pluginBrowseShelves({
   return shelves;
 }
 
-export function pluginCategoryFilterId(
-  entry: PluginCatalogSearchEntry,
-): string {
+export function pluginCategoryFilterId(entry: PluginCategory): string {
   return isCategorized(entry)
     ? (entry.categoryId ?? UNCATEGORIZED_PLUGIN_CATEGORY_ID)
     : UNCATEGORIZED_PLUGIN_CATEGORY_ID;

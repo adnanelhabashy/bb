@@ -28,13 +28,18 @@ import {
   usePluginCatalogSearch,
   type PluginCatalogSearchEntry,
 } from "@/hooks/queries/plugin-catalog-queries";
+import { PluginShelfGrid } from "./PluginShelf";
 import { UpdatePluginDialog } from "./UpdatePluginDialog";
 import { PluginLogo, PluginCategoryLabel } from "./plugin-ui";
 
 export function InstalledPluginsTab({
   plugins,
+  showCategory = true,
+  preview = false,
 }: {
   plugins: readonly PluginListItem[];
+  showCategory?: boolean;
+  preview?: boolean;
 }) {
   const catalogQuery = usePluginCatalogSearch("", { enabled: true });
   const [updateTargetId, setUpdateTargetId] = useState<string | null>(null);
@@ -49,21 +54,28 @@ export function InstalledPluginsTab({
     );
   }
 
+  const cards = plugins.map((plugin) => (
+    <InstalledPluginRow
+      key={plugin.id}
+      plugin={plugin}
+      catalogEntry={installedPluginCatalogEntry(
+        plugin,
+        catalogQuery.data?.entries ?? [],
+      )}
+      showCategory={showCategory}
+      onUpdateClick={() => setUpdateTargetId(plugin.id)}
+    />
+  ));
+
   return (
     <>
-      <ResourceBrowseGrid className="w-full grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-2">
-        {plugins.map((plugin) => (
-          <InstalledPluginRow
-            key={plugin.id}
-            plugin={plugin}
-            catalogEntry={installedPluginCatalogEntry(
-              plugin,
-              catalogQuery.data?.entries ?? [],
-            )}
-            onUpdateClick={() => setUpdateTargetId(plugin.id)}
-          />
-        ))}
-      </ResourceBrowseGrid>
+      {preview ? (
+        <PluginShelfGrid>{cards}</PluginShelfGrid>
+      ) : (
+        <ResourceBrowseGrid className="w-full grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-2">
+          {cards}
+        </ResourceBrowseGrid>
+      )}
       {updateTarget !== null ? (
         <UpdatePluginDialog
           plugin={updateTarget}
@@ -81,9 +93,11 @@ export function InstalledPluginRow({
   plugin,
   onUpdateClick,
   catalogEntry,
+  showCategory = true,
 }: {
   plugin: PluginListItem;
   catalogEntry?: PluginCatalogSearchEntry;
+  showCategory?: boolean;
   onUpdateClick: () => void;
 }) {
   const navigate = useNavigate();
@@ -122,7 +136,7 @@ export function InstalledPluginRow({
   const openDetail = () =>
     navigate(
       isPluginsRoutePath(location.pathname)
-        ? `${getPluginDetailRoutePath({ pluginId: plugin.id })}?view=installed`
+        ? `${getPluginDetailRoutePath({ pluginId: plugin.id })}${location.search || "?view=installed"}`
         : getPluginDetailRoutePath({ pluginId: plugin.id, view: "installed" }),
     );
   return (
@@ -160,6 +174,7 @@ export function InstalledPluginRow({
           ) : null
         }
         footerMeta={
+          showCategory &&
           (catalogEntry?.category ?? plugin.category) !== undefined ? (
             <PluginCategoryLabel
               categoryId={catalogEntry?.categoryId ?? plugin.categoryId}
