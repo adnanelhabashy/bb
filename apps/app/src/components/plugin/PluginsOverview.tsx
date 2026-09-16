@@ -156,11 +156,17 @@ export function PluginsOverview({
     </>
   );
 
+  const openPlugin =
+    onOpenPlugin ??
+    ((pluginId: string) =>
+      navigate(
+        getPluginDetailRoutePath({
+          pluginId,
+          view: activeMode === "installed" ? "installed" : undefined,
+        }),
+      ));
   let content: ReactNode;
   if (activeMode === "browse") {
-    const openPlugin =
-      onOpenPlugin ??
-      ((pluginId: string) => navigate(getPluginDetailRoutePath({ pluginId })));
     content =
       authorKey === null ? (
         <BrowsePluginsTab
@@ -237,7 +243,10 @@ export function PluginsOverview({
             />
           ) : (
             <>
-              <InstalledPluginsTab plugins={installedList.items} />
+              <InstalledPluginsTab
+                plugins={installedList.items}
+                onOpenPlugin={openPlugin}
+              />
               <ResourceInfiniteScrollSentinel
                 hasMore={installedList.hasMore}
                 onLoadMore={installedList.loadMore}
