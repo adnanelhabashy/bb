@@ -6,13 +6,7 @@ import {
 } from "react";
 import { useComposedRefs } from "@radix-ui/react-compose-refs";
 import { Icon } from "@bb/shared-ui/icon";
-import { Button } from "@bb/shared-ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@bb/shared-ui/tooltip";
+import { TooltipProvider } from "@bb/shared-ui/tooltip";
 import { useScrollOverflowState } from "@/components/thread/timeline/useScrollOverflowState";
 import { TabPill } from "@/components/ui/tab-pill";
 
@@ -96,29 +90,6 @@ export function PaletteShell({
           <span id={inputDescriptionId} className="sr-only">
             {inputDescription}
           </span>
-          {modeChip === undefined ? null : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="shrink-0 px-2 font-normal text-muted-foreground max-md:pointer-coarse:h-9"
-                  aria-label={modeChip.clearLabel}
-                  onClick={modeChip.onClear}
-                  onKeyDown={(event) => {
-                    if (event.key !== "Escape") return;
-                    event.preventDefault();
-                    event.stopPropagation();
-                    modeChip.onClear();
-                  }}
-                >
-                  Commands
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{modeChip.clearLabel} (Esc)</TooltipContent>
-            </Tooltip>
-          )}
         </div>
       </div>
       <div
@@ -156,7 +127,12 @@ export function PaletteShell({
   );
 }
 
-function PaletteModeChip({ icon, label, onClear }: PaletteModeChipProps) {
+function PaletteModeChip({
+  clearLabel,
+  icon,
+  label,
+  onClear,
+}: PaletteModeChipProps) {
   return (
     <span
       data-palette-mode-chip
@@ -174,7 +150,11 @@ function PaletteModeChip({ icon, label, onClear }: PaletteModeChipProps) {
         isActive
         onSelect={() => undefined}
         leadingVisual={<Icon name={icon} aria-hidden />}
-        closeAction={null}
+        closeAction={{
+          onClose: onClear,
+          closeLabel: clearLabel,
+          tooltip: `${clearLabel} (Esc)`,
+        }}
       />
     </span>
   );

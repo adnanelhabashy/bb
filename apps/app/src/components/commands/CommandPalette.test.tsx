@@ -547,13 +547,10 @@ describe("CommandPalette", () => {
     expect(modeSelect.querySelector('[data-icon="Search"]')).not.toBeNull();
     expectClasses(modeSelect.parentElement, "bg-state-active");
     expectNoClasses(modeSelect.parentElement, "bg-background/70");
-    expectText(
+    expectAttribute(
       screen.getByRole("button", { name: "Return to commands" }),
-      "Commands",
+      "data-tab-pill-close",
     );
-    expect(
-      modeSelect.parentElement?.querySelector("[data-tab-pill-close]"),
-    ).toBeNull();
     expect(screen.queryByRole("button", { name: "Thread scope" })).toBeNull();
     expect(screen.getByRole("button", { name: "Open in split" })).toBeTruthy();
     expect(document.querySelector("[data-palette-footer]")).toBeNull();
@@ -581,7 +578,7 @@ describe("CommandPalette", () => {
     await waitFor(() => expect(screen.queryByRole("combobox")).toBeNull());
   });
 
-  it("shows Commands without hover and returns to the catalog without running an action", async () => {
+  it("keeps the clear control inside the Threads pill without a right-side header action", async () => {
     renderPalette();
     openThreadSearch();
     await waitFor(() =>
@@ -593,8 +590,15 @@ describe("CommandPalette", () => {
     const clearMode = screen.getByRole("button", {
       name: "Return to commands",
     });
-    expectText(clearMode, "Commands");
-    expectNoClasses(clearMode, "opacity-0", "hidden", "invisible");
+    expect(clearMode.querySelector('[data-icon="X"]')).not.toBeNull();
+    expect(clearMode.closest("[data-palette-mode-chip]")).not.toBeNull();
+    const headerButtons = document.querySelectorAll(
+      "[data-palette-input-frame] button",
+    );
+    expect(headerButtons).toHaveLength(2);
+    for (const button of headerButtons) {
+      expect(button.closest("[data-palette-mode-chip]")).not.toBeNull();
+    }
     fireEvent.change(searchField(), { target: { value: "no match" } });
     await screen.findByText("No matching threads");
     fireEvent.click(clearMode);
