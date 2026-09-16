@@ -177,9 +177,7 @@ afterEach(() => {
 describe("SidebarNavigationRegion", () => {
   it("opens the command catalog from its sidebar row and closes compact navigation", () => {
     renderHarness();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Open command palette" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Command palette" }));
     expect(mocks.onSearchThreads).toHaveBeenCalledOnce();
     expect(mocks.dispatch).toHaveBeenCalledExactlyOnceWith(
       "palette.open",

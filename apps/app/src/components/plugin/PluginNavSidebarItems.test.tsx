@@ -358,11 +358,7 @@ describe("PluginNavSidebarItems", () => {
         compactViewport,
         builtInEntries: [
           builtInEntry("new-thread", "New thread"),
-          builtInEntry(
-            "command-palette",
-            "Open command palette",
-            onOpenPalette,
-          ),
+          builtInEntry("command-palette", "Command palette", onOpenPalette),
         ],
         storedOrder: ["__bb__/new-thread", "__bb__/command-palette"],
         storedVisibleKeys: ["__bb__/new-thread"],
@@ -371,7 +367,7 @@ describe("PluginNavSidebarItems", () => {
       else fireEvent.pointerDown(moreTrigger(), { button: 0 });
 
       const item = await screen.findByRole("menuitem", {
-        name: "Open command palette",
+        name: "Command palette",
       });
       expect(item.getAttribute("aria-keyshortcuts")).toBe("Control+Shift+L");
       expect(item.querySelector("kbd")?.textContent).toBe("Ctrl + Shift + L");
@@ -389,13 +385,13 @@ describe("PluginNavSidebarItems", () => {
     const onOpenPalette = vi.fn();
     renderSidebarItems({
       builtInEntries: [
-        builtInEntry("command-palette", "Open command palette", onOpenPalette),
+        builtInEntry("command-palette", "Command palette", onOpenPalette),
       ],
       storedOrder: ["__bb__/command-palette"],
       storedVisibleKeys: [],
     });
     await openMoreMenu();
-    const item = screen.getByRole("menuitem", { name: "Open command palette" });
+    const item = screen.getByRole("menuitem", { name: "Command palette" });
     expect(item.querySelector("kbd")).toBeNull();
     expect(item.hasAttribute("aria-keyshortcuts")).toBe(false);
     fireEvent.click(item);
@@ -407,7 +403,7 @@ describe("PluginNavSidebarItems", () => {
     renderSidebarItems({
       builtInEntries: [
         builtInEntry("new-thread", "New thread"),
-        builtInEntry("command-palette", "Open command palette", onOpenPalette),
+        builtInEntry("command-palette", "Command palette", onOpenPalette),
       ],
     });
     expect(visibleRowKeys()).toEqual([
@@ -415,16 +411,14 @@ describe("PluginNavSidebarItems", () => {
       "__bb__/command-palette",
     ]);
     expect(screen.queryByTestId("sidebar-navigation-more-row")).toBeNull();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Open command palette" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Command palette" }));
     expect(onOpenPalette).toHaveBeenCalledOnce();
   });
 
   it("adds the palette to existing preferences, persists hiding it, and restores it through Customize", async () => {
     const builtInEntries = [
       builtInEntry("new-thread", "New thread"),
-      builtInEntry("command-palette", "Open command palette"),
+      builtInEntry("command-palette", "Command palette"),
     ];
     const view = renderSidebarItems({
       builtInEntries,
@@ -432,7 +426,7 @@ describe("PluginNavSidebarItems", () => {
       storedVisibleKeys: ["__bb__/new-thread"],
     });
     const palette = screen.getByRole("button", {
-      name: "Open command palette",
+      name: "Command palette",
     });
     fireEvent.contextMenu(palette);
     fireEvent.click(
@@ -449,12 +443,12 @@ describe("PluginNavSidebarItems", () => {
     expect(visibleRowKeys()).toEqual(["__bb__/new-thread"]);
     await openMoreMenu();
     expect(
-      screen.getAllByRole("menuitem", { name: "Open command palette" }),
+      screen.getAllByRole("menuitem", { name: "Command palette" }),
     ).toHaveLength(1);
     await openCustomizeFromMore();
     fireEvent.click(
       screen.getByRole("checkbox", {
-        name: "Show Open command palette in sidebar",
+        name: "Show Command palette in sidebar",
       }),
     );
     fireEvent.click(screen.getByRole("button", { name: "Done" }));

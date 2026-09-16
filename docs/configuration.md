@@ -665,7 +665,8 @@ a transient failure.
 
 ## Sidebar preferences
 
-**Open command palette** is a visible sidebar row by default. Use its context
+**Command palette** is a visible sidebar row by default. Its keyboard shortcut
+appears on hover or keyboard focus, matching **Search threads**. Use its context
 menu's **Hide from sidebar**, or clear its checkbox in **Customize sidebar**, to
 move it into **More**. Re-enable the checkbox to restore the row. Its order and
 visibility use the existing navigation preferences and the key

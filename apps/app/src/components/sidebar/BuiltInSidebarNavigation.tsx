@@ -10,8 +10,7 @@ import {
   useAppCommandRunner,
   useAppCommandShortcut,
 } from "@/components/commands/AppCommandProvider";
-import { AppCommandShortcutHint } from "@/components/commands/AppCommandShortcutHint";
-import { getAppCommandMetadata } from "@/lib/app-command-metadata";
+import { AppCommandShortcutPill } from "@/components/commands/AppCommandShortcutHint";
 import { Button } from "@bb/shared-ui/button";
 import { Icon } from "@bb/shared-ui/icon";
 import {
@@ -46,7 +45,7 @@ export function BuiltInSidebarNavigation({
   const navigate = useNavigate();
   const commandRunner = useAppCommandRunner();
   const paletteShortcut = useAppCommandShortcut("palette.open");
-  const paletteLabel = getAppCommandMetadata("palette.open").label;
+  const paletteLabel = "Command palette";
   const paletteDisabled = !commandRunner.isCommandAvailable(
     "palette.open",
     null,
@@ -106,7 +105,7 @@ export function BuiltInSidebarNavigation({
           type="button"
           size="sm"
           variant="ghost"
-          className={`${PROJECT_LIST_ACTION_BUTTON_CLASS} w-full`}
+          className={`${PROJECT_LIST_ACTION_BUTTON_CLASS} group/command-palette w-full pr-1`}
           disabled={paletteDisabled}
           onClick={(event) => openPalette(event.currentTarget)}
           aria-label={
@@ -117,10 +116,16 @@ export function BuiltInSidebarNavigation({
           aria-keyshortcuts={paletteShortcut?.ariaKeyshortcuts}
         >
           <Icon name="Search" aria-hidden="true" />
-          <span className="min-w-0 flex-1 truncate text-left">
-            {paletteLabel}
+          <span className="flex min-w-0 flex-1 items-center gap-1.5">
+            <span className="min-w-0 flex-1 truncate text-left">
+              {paletteLabel}
+            </span>
+            {paletteShortcut ? (
+              <span className="inline-flex shrink-0 opacity-0 transition-opacity group-hover/command-palette:opacity-100 group-focus-visible/command-palette:opacity-100 max-md:pointer-coarse:hidden">
+                <AppCommandShortcutPill shortcut={paletteShortcut} />
+              </span>
+            ) : null}
           </span>
-          <AppCommandShortcutHint shortcut={paletteShortcut} />
         </Button>
       ),
       disabled: paletteDisabled,
