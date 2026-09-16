@@ -240,6 +240,7 @@ const DropdownMenuItem = React.forwardRef<
           disabled={disabled}
           aria-disabled={disabled || undefined}
           aria-checked={ariaChecked}
+          aria-keyshortcuts={domProps["aria-keyshortcuts"]}
           className={cn(
             "relative flex w-full cursor-default select-none items-center gap-2 rounded-sm px-2 py-2 text-left text-xs outline-none transition-colors focus:bg-state-hover focus:text-foreground active:bg-state-active active:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>[data-icon-root]]:size-4 [&>[data-icon-root]]:shrink-0",
             inset && "pl-8",
