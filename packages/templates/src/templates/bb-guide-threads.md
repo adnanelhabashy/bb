@@ -208,6 +208,9 @@ Inspecting:
   on stderr when more events exist beyond the printed page. Human-format --all
   walks a consistent history snapshot and joins paginated group contents.
   Appends stay outside that walk; rerun the command if a history edit invalidates it.
+  Settled command output deltas may have empty text under history retention; their
+  IDs and timing remain. Exports and forks before completion cannot recover that
+  discarded delta text. Completed output retention is unchanged.
 
   bb thread output [id]                    Get the final output of a thread
     --self                                 Target current thread

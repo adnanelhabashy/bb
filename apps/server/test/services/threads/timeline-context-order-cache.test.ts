@@ -155,9 +155,21 @@ describe("timeline grouping context cache", () => {
       const statements = captureStatementSql(testThread.db, () => {
         expect(expectCachedEqualsCold(testThread, maxSeq)).toBe(warm);
       });
-      expect(statements).toEqual([
-        expect.stringContaining('"parent_tool_call_id" is not null'),
-      ]);
+      expect(statements).toHaveLength(4);
+      expect(
+        statements.every((statement) =>
+          statement.includes('"parent_tool_call_id" is not null'),
+        ),
+      ).toBe(true);
+      expect(
+        statements
+          .slice(1)
+          .every(
+            (statement) =>
+              statement.includes('"completed_item_histories"') &&
+              statement.includes("LIMIT ?"),
+          ),
+      ).toBe(true);
     });
   });
 

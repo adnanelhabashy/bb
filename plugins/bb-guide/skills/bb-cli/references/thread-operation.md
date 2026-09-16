@@ -107,6 +107,9 @@ hostId, providerId, projectId, parentThreadId, groupBy })`.
   rerun after a cursor-invalidated error from a history edit. JSON accepts any positive limit. It defaults
   to the oldest 100 raw events and warns when more exist. Page with
   `--after-seq <seq>` or pass `--all`.
+  Settled command deltas may contain empty text under history retention, while
+  retaining IDs and timing. Exports and forks before completion cannot recover
+  discarded delta text; completed output retention is unchanged.
   Grep the `--all` output, not the default page, when checking whether a
   thread ever received a message.
 - Use `bb thread output <thread-id>` to read the latest final output, or

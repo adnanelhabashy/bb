@@ -4,6 +4,11 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import {
   acquireProjectAttachmentOwnership,
+  advanceThreadPruning,
+  completedItemHistories,
+  copyStoredThreadEventsInTransaction,
+  deleteThreadEventSuffixInTransaction,
+  listStoredEventRows,
   claimProjectAttachments,
   createPromptHistoryEntry,
   deleteQueuedThreadMessage,
@@ -25,6 +30,8 @@ import {
   canonicalProjectAttachmentPath,
   projectAttachmentPaths,
   threadScope,
+  turnScope,
+  type ThreadEventType,
   type PromptInput,
 } from "@bb/domain";
 import {
@@ -81,6 +88,137 @@ function ageUploads(h: TestAppHarness, projectId: string) {
 }
 
 describe("project attachment accounting", () => {
+  it("keeps attachment ownership through completed history compaction, prefix rewind and fork", async () => {
+    await withTestHarness(async (h) => {
+      const { project, thread } = seedThreadFixture(h);
+      const file = await upload(h, project.id);
+      const item = {
+        type: "commandExecution" as const,
+        id: "command",
+        command: "cat notes.txt",
+        cwd: "/tmp",
+        status: "pending",
+        approvalStatus: null,
+        aggregatedOutput: "",
+      };
+      const rows: {
+        sequence: number;
+        type: ThreadEventType;
+        data: object;
+        itemId: string | null;
+        itemKind: "commandExecution" | null;
+      }[] = [
+        {
+          sequence: 1,
+          type: "client/turn/requested",
+          data: { input: input(file.path) },
+          itemId: null,
+          itemKind: null,
+        },
+        {
+          sequence: 2,
+          type: "turn/started",
+          data: {},
+          itemId: null,
+          itemKind: null,
+        },
+        {
+          sequence: 3,
+          type: "item/started",
+          data: { item },
+          itemId: item.id,
+          itemKind: item.type,
+        },
+        {
+          sequence: 4,
+          type: "item/commandExecution/outputDelta",
+          data: { itemId: item.id, delta: "notes" },
+          itemId: item.id,
+          itemKind: null,
+        },
+        {
+          sequence: 5,
+          type: "item/completed",
+          data: {
+            item: { ...item, status: "completed", aggregatedOutput: "notes" },
+          },
+          itemId: item.id,
+          itemKind: item.type,
+        },
+        {
+          sequence: 6,
+          type: "turn/completed",
+          data: { status: "completed" },
+          itemId: null,
+          itemKind: null,
+        },
+      ];
+      insertEvents(
+        h.db,
+        h.hub,
+        rows.map((row) => ({
+          ...row,
+          threadId: thread.id,
+          scope: row.sequence === 1 ? threadScope() : turnScope("turn"),
+          environmentId: null,
+          parentToolCallId: null,
+          providerThreadId: "session",
+          data: JSON.stringify({ providerThreadId: "session", ...row.data }),
+        })),
+      );
+      const ownership = h.db.select().from(projectAttachmentThreads).all();
+      expect(ownership).toHaveLength(1);
+      for (
+        let advance = 0;
+        advance < 20 &&
+        h.db.select().from(completedItemHistories).all().length === 0;
+        advance++
+      )
+        advanceThreadPruning(h.db, "completed-items");
+      expect(h.db.select().from(completedItemHistories).all()).toHaveLength(1);
+      expect(h.db.select().from(projectAttachmentThreads).all()).toEqual(
+        ownership,
+      );
+      await completeBackfill(h, project.id);
+      ageUploads(h, project.id);
+      expect(
+        (await pruneProjectAttachments(h.deps, project.id)).reclaimedCount,
+      ).toBe(0);
+      h.db.transaction((tx) =>
+        deleteThreadEventSuffixInTransaction(tx, {
+          threadId: thread.id,
+          cutoffSequence: 5,
+          oldMaxSequence: 6,
+        }),
+      );
+      const prefix = listStoredEventRows(h.db, { threadId: thread.id });
+      expect(prefix.map((row) => row.sequence)).toEqual([1, 2, 3, 4]);
+      const fork = seedThread(h.deps, {
+        projectId: project.id,
+        sourceThreadId: thread.id,
+        originKind: "fork",
+      });
+      h.db.transaction((tx) =>
+        copyStoredThreadEventsInTransaction(tx, {
+          rows: prefix,
+          targetThreadId: fork.id,
+          targetEnvironmentId: null,
+        }),
+      );
+      expect(h.db.select().from(projectAttachmentThreads).all()).toHaveLength(
+        2,
+      );
+      h.db.delete(threads).where(eq(threads.id, thread.id)).run();
+      expect(
+        (await pruneProjectAttachments(h.deps, project.id)).reclaimedCount,
+      ).toBe(0);
+      h.db.delete(threads).where(eq(threads.id, fork.id)).run();
+      expect(
+        (await pruneProjectAttachments(h.deps, project.id)).reclaimedCount,
+      ).toBe(1);
+    });
+  });
+
   it("retries after a failure selecting the next backfill project", async () => {
     await withTestHarness(async (h) => {
       const { project } = seedThreadFixture(h);

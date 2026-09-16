@@ -840,6 +840,65 @@ export const events = sqliteTable(
   ],
 );
 
+export const completedItemHistories = sqliteTable(
+  "completed_item_histories",
+  {
+    completionId: text("completion_id")
+      .primaryKey()
+      .references(() => events.id, { onDelete: "cascade" }),
+    threadId: text("thread_id")
+      .notNull()
+      .references(() => threads.id, { onDelete: "cascade" }),
+    startId: text("start_id"),
+    startSequence: integer("start_sequence"),
+    deltaId: text("delta_id"),
+    deltaSequence: integer("delta_sequence"),
+    deltaType: text("delta_type").$type<ThreadEventType>(),
+    secondDeltaId: text("second_delta_id"),
+    secondDeltaSequence: integer("second_delta_sequence"),
+    secondDeltaType: text("second_delta_type").$type<ThreadEventType>(),
+    data: text("data").notNull(),
+  },
+  (table) => [
+    uniqueIndex("completed_item_histories_start_id_idx")
+      .on(table.startId)
+      .where(sql`${table.startId} IS NOT NULL`),
+    uniqueIndex("completed_item_histories_start_sequence_idx")
+      .on(table.threadId, table.startSequence)
+      .where(sql`${table.startId} IS NOT NULL`),
+    uniqueIndex("completed_item_histories_delta_id_idx")
+      .on(table.deltaId)
+      .where(sql`${table.deltaId} IS NOT NULL`),
+    uniqueIndex("completed_item_histories_delta_sequence_idx")
+      .on(table.threadId, table.deltaSequence)
+      .where(sql`${table.deltaId} IS NOT NULL`),
+    index("completed_item_histories_delta_type_sequence_idx")
+      .on(table.threadId, table.deltaType, table.deltaSequence)
+      .where(sql`${table.deltaId} IS NOT NULL`),
+    uniqueIndex("completed_item_histories_second_delta_id_idx")
+      .on(table.secondDeltaId)
+      .where(sql`${table.secondDeltaId} IS NOT NULL`),
+    uniqueIndex("completed_item_histories_second_delta_sequence_idx")
+      .on(table.threadId, table.secondDeltaSequence)
+      .where(sql`${table.secondDeltaId} IS NOT NULL`),
+    index("completed_item_histories_second_delta_type_sequence_idx")
+      .on(table.threadId, table.secondDeltaType, table.secondDeltaSequence)
+      .where(sql`${table.secondDeltaId} IS NOT NULL`),
+    check(
+      "completed_item_histories_start_shape",
+      sql`(${table.startId} IS NULL) = (${table.startSequence} IS NULL)`,
+    ),
+    check(
+      "completed_item_histories_delta_shape",
+      sql`(${table.deltaId} IS NULL) = (${table.deltaSequence} IS NULL) AND (${table.deltaId} IS NULL) = (${table.deltaType} IS NULL)`,
+    ),
+    check(
+      "completed_item_histories_second_delta_shape",
+      sql`(${table.secondDeltaId} IS NULL) = (${table.secondDeltaSequence} IS NULL) AND (${table.secondDeltaId} IS NULL) = (${table.secondDeltaType} IS NULL)`,
+    ),
+  ],
+);
+
 export const retainedEventOutputs = sqliteTable(
   "retained_event_outputs",
   {

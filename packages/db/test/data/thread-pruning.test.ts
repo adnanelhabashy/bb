@@ -124,10 +124,10 @@ describe("thread pruning", () => {
         "usage",
         "turn-diffs",
         "resolved-items",
+        "completed-items",
         "rate-limits",
         "usage",
         "turn-diffs",
-        "resolved-items",
       ]);
       expect(sequences(f)).toEqual([1, 200, 201]);
       expect(
@@ -484,6 +484,10 @@ describe("thread pruning", () => {
       ).toThrow("database is locked");
       expect(f.db.$client.pragma("busy_timeout", { simple: true })).toBe(5000);
       expect(() => advanceThreadPruning(f.db, "rate-limits")).toThrow(
+        "database is locked",
+      );
+      expect(f.db.$client.pragma("busy_timeout", { simple: true })).toBe(5000);
+      expect(() => advanceThreadPruning(f.db, "completed-items")).toThrow(
         "database is locked",
       );
       expect(f.db.$client.pragma("busy_timeout", { simple: true })).toBe(5000);

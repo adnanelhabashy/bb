@@ -182,7 +182,7 @@ describe("thread pruning sweep", () => {
       );
       expect(steps.length).toBeLessThanOrEqual(64);
       expect(harness.db.select().from(threadPruningCursors).all()).toHaveLength(
-        4,
+        5,
       );
       const before = getNextThreadPruningPolicy(harness.db, new Set());
       expect(before).not.toBeNull();

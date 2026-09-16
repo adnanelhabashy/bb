@@ -1,3 +1,11 @@
+import {
+  hydrateCompactedEventReferences,
+  listCompactedEventReferences,
+  listCompactedStoredRows,
+  mergeHistoryRows,
+  materializeCompactedHistory,
+  restoreCompactedHistoryForLateItem,
+} from "./completed-item-history.js";
 import { isBeforeLatestThreadEvent } from "./event-pruning-guards.js";
 import {
   advanceLiveEventPruning,
@@ -61,6 +69,7 @@ import type { DbNotifier } from "../notifier.js";
 import {
   environments,
   events,
+  completedItemHistories,
   promptHistoryEntries,
   threadDynamicContextFileStates,
   threadSearchSegments,
@@ -347,6 +356,26 @@ export function deleteThreadEventSuffixInTransaction(
   db: DbTransaction,
   args: DeleteThreadEventSuffixArgs,
 ): DeleteThreadEventSuffixResult {
+  const owners = db
+    .select({ completionId: completedItemHistories.completionId })
+    .from(events)
+    .innerJoin(
+      completedItemHistories,
+      eq(completedItemHistories.completionId, events.id),
+    )
+    .where(
+      and(
+        eq(events.threadId, args.threadId),
+        gte(events.sequence, args.cutoffSequence),
+        lte(events.sequence, args.oldMaxSequence),
+      ),
+    )
+    .all();
+  const compactedSuffixRows = materializeCompactedHistory(
+    db,
+    owners.map((row) => row.completionId),
+    args.cutoffSequence,
+  );
   db.delete(promptHistoryEntries)
     .where(
       and(
@@ -381,7 +410,7 @@ export function deleteThreadEventSuffixInTransaction(
   if (result.changes > 0) {
     bumpThreadEventRewriteGeneration(args.threadId);
   }
-  return { deletedEventCount: result.changes };
+  return { deletedEventCount: result.changes + compactedSuffixRows };
 }
 
 export interface ListThreadIdsWithLatestHostDaemonRestartInterruptionArgs {
@@ -424,6 +453,7 @@ function insertStoredEventRow(
   db: DbQueryConnection,
   args: InsertStoredEventRowArgs,
 ): InsertStoredEventRowResult {
+  restoreCompactedHistoryForLateItem(db, args);
   const id = createEventId();
   const prepared = prepareCompletedEventOutputData({
     createdAt: args.createdAt,
@@ -493,6 +523,16 @@ export function insertEvents(
       for (const [index, input] of eventInputs.entries()) {
         const createdAt = input.createdAt ?? Date.now();
         const turnId = getThreadEventScopeTurnId(input.scope) ?? null;
+        if (
+          input.sequence <= (highWaterMarks[input.threadId] ?? 0) &&
+          listCompactedEventReferences(tx, {
+            threadId: input.threadId,
+            afterSequence: input.sequence - 1,
+            beforeSequence: input.sequence + 1,
+            limit: 1,
+          }).length > 0
+        )
+          continue;
         const insertResult = insertStoredEventRow(tx, {
           attachmentOwnership: "required",
           conflict: "ignore",
@@ -1433,27 +1473,33 @@ export interface OpenBackgroundTaskItemRow {
 }
 
 export function listEvents(db: DbConnection, options: ListEventsOptions) {
-  const { threadId, afterSequence, limit } = options;
-
-  if (afterSequence != null) {
-    const q = db
-      .select()
-      .from(events)
-      .where(
-        sql`${events.threadId} = ${threadId} AND ${events.sequence} > ${afterSequence}`,
-      )
-      .orderBy(events.sequence);
-    if (limit) return q.limit(limit).all();
-    return q.all();
-  }
-
-  const q = db
+  const physical = db
     .select()
     .from(events)
-    .where(eq(events.threadId, threadId))
-    .orderBy(events.sequence);
-  if (limit) return q.limit(limit).all();
-  return q.all();
+    .where(
+      and(
+        eq(events.threadId, options.threadId),
+        options.afterSequence === undefined
+          ? undefined
+          : gt(events.sequence, options.afterSequence),
+      ),
+    )
+    .orderBy(events.sequence)
+    .limit(options.limit || Number.MAX_SAFE_INTEGER)
+    .all();
+  const compacted = hydrateCompactedEventReferences(
+    db,
+    listCompactedEventReferences(db, {
+      ...options,
+      limit: options.limit || undefined,
+    }),
+  );
+  return mergeHistoryRows(
+    physical,
+    compacted,
+    "asc",
+    options.limit || undefined,
+  );
 }
 
 export function listStoredEventRows(
@@ -1469,7 +1515,7 @@ export function listStoredEventRows(
   const listTypePage = (
     type: ThreadEventType | undefined,
   ): StoredEventRow[] => {
-    return db
+    const physical = db
       .select(storedEventRowFields)
       .from(events)
       .where(
@@ -1487,6 +1533,17 @@ export function listStoredEventRows(
       .orderBy(order === "desc" ? desc(events.sequence) : events.sequence)
       .limit(limit)
       .all();
+    return mergeHistoryRows(
+      physical,
+      listCompactedStoredRows(db, {
+        ...args,
+        types: type === undefined ? undefined : [type],
+        limit,
+        order,
+      }),
+      order,
+      limit,
+    );
   };
 
   if (args.types === undefined) {
@@ -1673,22 +1730,28 @@ export function findStoredEventRow(
   db: DbQueryConnection,
   args: FindStoredEventRowArgs,
 ): StoredEventRow | null {
+  const physical = db
+    .select(storedEventRowFields)
+    .from(events)
+    .where(
+      and(
+        eq(events.threadId, args.threadId),
+        eq(events.type, args.type),
+        args.afterSequence === undefined
+          ? undefined
+          : gt(events.sequence, args.afterSequence),
+      ),
+    )
+    .orderBy(events.sequence)
+    .limit(1)
+    .all();
   return (
-    db
-      .select(storedEventRowFields)
-      .from(events)
-      .where(
-        args.afterSequence !== undefined
-          ? and(
-              eq(events.threadId, args.threadId),
-              eq(events.type, args.type),
-              gt(events.sequence, args.afterSequence),
-            )
-          : and(eq(events.threadId, args.threadId), eq(events.type, args.type)),
-      )
-      .orderBy(events.sequence)
-      .limit(1)
-      .get() ?? null
+    mergeHistoryRows(
+      physical,
+      listCompactedStoredRows(db, { ...args, types: [args.type], limit: 1 }),
+      "asc",
+      1,
+    )[0] ?? null
   );
 }
 
@@ -1701,7 +1764,7 @@ export function listStoredEventRowsByParentToolCallIds(
     return [];
   }
 
-  return db
+  const physical = db
     .select(storedEventRowSqlFields(args.maxInlineOutputChars))
     .from(
       sql`${events} INDEXED BY events_parent_tool_call_thread_parent_sequence_idx`,
@@ -1709,6 +1772,18 @@ export function listStoredEventRowsByParentToolCallIds(
     .where(and(...conditions, isNotNull(events.parentToolCallId)))
     .orderBy(events.sequence)
     .all();
+  const compacted = listCompactedStoredRows(
+    db,
+    {
+      threadId: args.threadId,
+      parentToolCallIds: args.parentToolCallIds,
+      afterSequence:
+        args.sequenceStart === undefined ? undefined : args.sequenceStart - 1,
+      beforeSequence: args.beforeSequence,
+    },
+    args.maxInlineOutputChars,
+  ).filter((row) => !args.excludedTypes?.includes(row.type));
+  return mergeHistoryRows(physical, compacted);
 }
 
 function storedEventRowsByParentToolCallIdsConditions(
@@ -1783,7 +1858,15 @@ export function isTimelineCursorSequencePresent(
     )
     .limit(1)
     .get();
-  return row !== undefined;
+  return (
+    row !== undefined ||
+    listCompactedEventReferences(db, {
+      threadId: args.threadId,
+      afterSequence: args.sequence - 1,
+      beforeSequence: args.sequence + 1,
+      limit: 1,
+    }).length > 0
+  );
 }
 
 export interface ScopedItemRef {
@@ -1870,7 +1953,7 @@ export function listItemEventSpansByItems(
     return [];
   }
 
-  return db
+  const physical = db
     .select({
       itemId: sql<string>`${events.itemId}`,
       maxSequence: sql<number>`MAX(${events.sequence})`,
@@ -1887,6 +1970,36 @@ export function listItemEventSpansByItems(
     )
     .groupBy(events.scopeKind, events.turnId, events.itemId)
     .all();
+  const compacted = db
+    .select({
+      itemId: sql<string>`${events.itemId}`,
+      scopeKind: events.scopeKind,
+      turnId: events.turnId,
+      minSequence: sql<number>`MIN(MIN(COALESCE(${completedItemHistories.startSequence}, ${events.sequence}), COALESCE(${completedItemHistories.deltaSequence}, ${events.sequence}), COALESCE(${completedItemHistories.secondDeltaSequence}, ${events.sequence})))`,
+    })
+    .from(events)
+    .innerJoin(
+      completedItemHistories,
+      eq(completedItemHistories.completionId, events.id),
+    )
+    .where(
+      scopedItemRefsPredicate(items, [
+        eq(events.threadId, args.threadId),
+        eq(events.type, "item/completed"),
+      ]),
+    )
+    .groupBy(events.scopeKind, events.turnId, events.itemId)
+    .all();
+  const minima = new Map(
+    compacted.map((row) => [scopedItemRefKey(row), row.minSequence]),
+  );
+  return physical.map((row) => ({
+    ...row,
+    minSequence: Math.min(
+      row.minSequence,
+      minima.get(scopedItemRefKey(row)) ?? row.minSequence,
+    ),
+  }));
 }
 
 export interface ListStoredItemLifecycleRowsByItemsArgs {
@@ -1904,7 +2017,7 @@ export function listStoredItemLifecycleRowsByItems(
     return [];
   }
 
-  return db
+  const physical = db
     .select(
       storedEventRowFieldsWithInlineOutputLimit(args.maxInlineOutputChars),
     )
@@ -1918,6 +2031,14 @@ export function listStoredItemLifecycleRowsByItems(
     )
     .orderBy(events.sequence)
     .all();
+  return mergeHistoryRows(
+    physical,
+    listCompactedStoredRows(
+      db,
+      { threadId: args.threadId, items, types: ["item/started"] },
+      args.maxInlineOutputChars,
+    ),
+  );
 }
 
 export interface ListStoredBufferedTextDeltaRowsByItemsArgs {
@@ -1935,7 +2056,7 @@ export function listStoredBufferedTextDeltaRowsByItems(
     return [];
   }
 
-  return db
+  const physical = db
     .select(storedEventRowFields)
     .from(events)
     .where(
@@ -1953,6 +2074,19 @@ export function listStoredBufferedTextDeltaRowsByItems(
     )
     .orderBy(events.sequence)
     .all();
+  return mergeHistoryRows(
+    physical,
+    listCompactedStoredRows(db, {
+      threadId: args.threadId,
+      items,
+      beforeSequence: args.beforeSequence,
+      types: [
+        "item/agentMessage/delta",
+        "item/reasoning/summaryTextDelta",
+        "item/reasoning/textDelta",
+      ],
+    }),
+  );
 }
 
 export function listStoredClientTurnRequestIdsInRange(
@@ -2826,7 +2960,14 @@ export function listStoredConversationOutlineEventRows(
     completedConversationRows,
     structuralRows,
   ).all();
-  return rows.sort((left, right) => left.sequence - right.sequence);
+  return mergeHistoryRows(
+    rows,
+    listCompactedStoredRows(db, {
+      threadId: args.threadId,
+      afterSequence: args.sequenceStart - 1,
+      types: ["item/agentMessage/delta"],
+    }),
+  );
 }
 
 export interface StandardTimelineSegmentAnchorRow {
@@ -2894,6 +3035,22 @@ export interface FindTimelineWindowBudgetFloorSequenceArgs {
   beforeSequence?: number;
 }
 
+const compactedTimelineTypes: readonly ThreadEventType[] = [
+  "item/started",
+  "item/agentMessage/delta",
+  "item/commandExecution/outputDelta",
+  "item/reasoning/summaryTextDelta",
+  "item/reasoning/textDelta",
+];
+
+function compactedTimelineTypeFilter(
+  excludedTypes: readonly ThreadEventType[] | undefined,
+) {
+  return excludedTypes?.some((type) => compactedTimelineTypes.includes(type))
+    ? compactedTimelineTypes.filter((type) => !excludedTypes.includes(type))
+    : undefined;
+}
+
 export function findTimelineWindowBudgetFloorSequence(
   db: DbConnection,
   args: FindTimelineWindowBudgetFloorSequenceArgs,
@@ -2911,15 +3068,24 @@ export function findTimelineWindowBudgetFloorSequence(
     conditions.push(lt(events.sequence, args.beforeSequence));
   }
 
-  const row = db
+  const physical = db
     .select({ sequence: events.sequence })
     .from(events)
     .where(and(...conditions))
     .orderBy(desc(events.sequence))
-    .limit(1)
-    .offset(args.eventBudget)
-    .get();
-  return row?.sequence;
+    .limit(args.eventBudget + 1)
+    .all();
+  const compacted = listCompactedEventReferences(db, {
+    threadId: args.threadId,
+    afterSequence: args.sequenceStart - 1,
+    beforeSequence: args.beforeSequence,
+    types: compactedTimelineTypeFilter(args.excludedTypes),
+    order: "desc",
+    limit: args.eventBudget + 1,
+  });
+  return mergeHistoryRows(physical, compacted, "desc", args.eventBudget + 1)[
+    args.eventBudget
+  ]?.sequence;
 }
 
 export function listTimelineInterruptionRows(
@@ -3001,7 +3167,16 @@ export function hasTimelineGroupingContextRowsInRange(
     )
     .limit(1)
     .get();
-  return row !== undefined;
+  return (
+    row !== undefined ||
+    listCompactedEventReferences(db, {
+      threadId: args.threadId,
+      afterSequence: args.afterSequence,
+      beforeSequence: args.throughSequence + 1,
+      parentedOnly: true,
+      limit: 1,
+    }).length > 0
+  );
 }
 
 export function listStoredEventRowsInSequenceRange(
@@ -3014,7 +3189,7 @@ export function listStoredEventRowsInSequenceRange(
     throughSequence: number;
   },
 ): StoredEventRow[] {
-  return db
+  const physical = db
     .select(storedEventRowSqlFields(args.maxInlineOutputChars))
     .from(sql`${events} INDEXED BY events_thread_sequence_idx`)
     .where(
@@ -3027,12 +3202,51 @@ export function listStoredEventRowsInSequenceRange(
     .orderBy(events.sequence)
     .limit(args.limit)
     .all();
+  return mergeHistoryRows(
+    physical,
+    listCompactedStoredRows(
+      db,
+      {
+        threadId: args.threadId,
+        afterSequence: args.afterSequence,
+        beforeSequence: args.throughSequence + 1,
+        limit: args.limit,
+      },
+      args.maxInlineOutputChars,
+    ),
+    "asc",
+    args.limit,
+  );
 }
 
 export function getFirstParentedTimelineBoundarySequence(
   db: DbConnection,
   args: { threadId: string; sequenceStart: number; maxSeq: number },
 ): number | null {
+  const virtualChildren = sql.join(
+    [
+      {
+        id: completedItemHistories.startId,
+        sequence: completedItemHistories.startSequence,
+      },
+      {
+        id: completedItemHistories.deltaId,
+        sequence: completedItemHistories.deltaSequence,
+      },
+      {
+        id: completedItemHistories.secondDeltaId,
+        sequence: completedItemHistories.secondDeltaSequence,
+      },
+    ].map(
+      (
+        slot,
+      ) => sql`SELECT ${slot.sequence} AS sequence FROM events AS child INDEXED BY events_parent_tool_call_thread_parent_sequence_idx
+    CROSS JOIN ${completedItemHistories} ON ${completedItemHistories.completionId} = child.id
+    WHERE child.thread_id = ${args.threadId} AND child.parent_tool_call_id IS NOT NULL
+      AND child.parent_tool_call_id = parents.item_id AND child.sequence > ${args.maxSeq} AND ${slot.id} IS NOT NULL AND ${slot.sequence} <= ${args.maxSeq}`,
+    ),
+    sql` UNION ALL `,
+  );
   const result = db.get<{ sequence: number | null }>(sql`
     WITH parents AS MATERIALIZED (
       SELECT item_id, turn_id, min(sequence) AS start
@@ -3052,12 +3266,15 @@ export function getFirstParentedTimelineBoundarySequence(
       GROUP BY item_id, turn_id
     ), spans AS MATERIALIZED (
       SELECT start, (
-        SELECT max(child.sequence)
+        SELECT max(sequence) FROM (
+        SELECT max(child.sequence) AS sequence
         FROM events AS child INDEXED BY events_parent_tool_call_thread_parent_sequence_idx
         WHERE child.thread_id = ${args.threadId}
           AND child.parent_tool_call_id IS NOT NULL
           AND child.parent_tool_call_id = parents.item_id
           AND child.sequence <= ${args.maxSeq}
+        UNION ALL ${virtualChildren}
+        )
       ) AS end FROM parents
     )
     SELECT min(${events.sequence}) AS sequence
@@ -3155,7 +3372,56 @@ export function findStoredTimelineWindowByteBudgetFloor(
     { kind: "single-event-too-large" }
   > | null = null;
 
-  for (const row of statement.iterate(...query.params)) {
+  function* compactedBudgetRows() {
+    let beforeSequence = args.beforeSequence;
+    for (;;) {
+      const rows = listCompactedStoredRows(
+        db,
+        {
+          threadId: args.threadId,
+          afterSequence: args.sequenceStart - 1,
+          beforeSequence,
+          types: compactedTimelineTypeFilter(args.excludedTypes),
+          order: "desc",
+          limit: 32,
+        },
+        args.maxInlineOutputChars,
+      );
+      for (const row of rows)
+        yield {
+          created_at: row.createdAt,
+          data_bytes: Buffer.byteLength(row.data),
+          sequence: row.sequence,
+          turn_id: row.turnId,
+        };
+      if (rows.length < 32) return;
+      beforeSequence = rows.at(-1)?.sequence;
+    }
+  }
+  function* budgetRows() {
+    const physical = statement.iterate(...query.params);
+    const compacted = compactedBudgetRows();
+    try {
+      let left = physical.next();
+      let right = compacted.next();
+      while (!left.done || !right.done) {
+        if (
+          !left.done &&
+          (right.done || left.value.sequence > right.value.sequence)
+        ) {
+          yield left.value;
+          left = physical.next();
+        } else if (!right.done) {
+          yield right.value;
+          right = compacted.next();
+        }
+      }
+    } finally {
+      physical.return?.();
+      compacted.return();
+    }
+  }
+  for (const row of budgetRows()) {
     if (oversizedEvent !== null) {
       oversizedEvent.hasOlderRows = true;
       result = oversizedEvent;
@@ -3198,7 +3464,7 @@ export function listStoredTimelineTurnEventRows(
   args: ListStoredTimelineWindowEventRowsArgs & { turnIds: readonly string[] },
 ): StoredEventRow[] {
   if (args.turnIds.length === 0) return [];
-  return queryInSqliteVariableBatches({
+  const physical = queryInSqliteVariableBatches({
     values: args.turnIds,
     variableCountPerValue: 1,
     dedupeKey: (turnId) => turnId,
@@ -3217,13 +3483,24 @@ export function listStoredTimelineTurnEventRows(
         )
         .all(),
   }).sort((left, right) => left.sequence - right.sequence);
+  const compacted = listCompactedStoredRows(
+    db,
+    {
+      threadId: args.threadId,
+      turnIds: args.turnIds,
+      afterSequence: args.sequenceStart - 1,
+      beforeSequence: args.beforeSequence,
+    },
+    args.maxInlineOutputChars,
+  ).filter((row) => !args.excludedTypes?.includes(row.type));
+  return mergeHistoryRows(physical, compacted);
 }
 
 export function listTimelineRootWindowTurnIds(
   db: DbConnection,
   args: ListStoredTimelineWindowEventRowsArgs,
 ): string[] {
-  return db
+  const physical = db
     .selectDistinct({ turnId: sql<string>`${events.turnId}` })
     .from(events)
     .where(
@@ -3240,6 +3517,53 @@ export function listTimelineRootWindowTurnIds(
     )
     .all()
     .map((row) => row.turnId);
+  const compacted: string[] = [];
+  for (const slot of [
+    {
+      id: completedItemHistories.startId,
+      position: completedItemHistories.startSequence,
+      type: sql`'item/started'`,
+    },
+    {
+      id: completedItemHistories.deltaId,
+      position: completedItemHistories.deltaSequence,
+      type: sql`${completedItemHistories.deltaType}`,
+    },
+    {
+      id: completedItemHistories.secondDeltaId,
+      position: completedItemHistories.secondDeltaSequence,
+      type: sql`${completedItemHistories.secondDeltaType}`,
+    },
+  ]) {
+    compacted.push(
+      ...db
+        .selectDistinct({ turnId: sql<string>`${events.turnId}` })
+        .from(completedItemHistories)
+        .innerJoin(events, eq(events.id, completedItemHistories.completionId))
+        .where(
+          and(
+            eq(completedItemHistories.threadId, args.threadId),
+            isNotNull(slot.id),
+            gte(slot.position, args.sequenceStart),
+            args.beforeSequence === undefined
+              ? undefined
+              : lt(slot.position, args.beforeSequence),
+            args.excludedTypes?.length
+              ? sql`${slot.type} NOT IN (${sql.join(
+                  args.excludedTypes.map((type) => sql`${type}`),
+                  sql`, `,
+                )})`
+              : undefined,
+            isNull(events.parentToolCallId),
+            isNotNull(events.turnId),
+            sql`EXISTS (SELECT 1 FROM events AS root_start WHERE root_start.thread_id = ${events.threadId} AND root_start.turn_id = ${events.turnId} AND root_start.type = 'turn/started' AND root_start.parent_tool_call_id IS NULL)`,
+          ),
+        )
+        .all()
+        .map((row) => row.turnId),
+    );
+  }
+  return [...new Set([...physical, ...compacted])];
 }
 
 export function listStoredTimelineThreadWindowEventRows(
@@ -3260,7 +3584,7 @@ export function listStoredTimelineWindowEventRows(
   db: DbConnection,
   args: ListStoredTimelineWindowEventRowsArgs,
 ): StoredEventRow[] {
-  return db
+  const physical = db
     .select(
       storedEventRowFieldsWithInlineOutputLimit(args.maxInlineOutputChars),
     )
@@ -3268,6 +3592,16 @@ export function listStoredTimelineWindowEventRows(
     .where(and(...storedTimelineWindowConditions(args)))
     .orderBy(events.sequence)
     .all();
+  const compacted = listCompactedStoredRows(
+    db,
+    {
+      threadId: args.threadId,
+      afterSequence: args.sequenceStart - 1,
+      beforeSequence: args.beforeSequence,
+    },
+    args.maxInlineOutputChars,
+  ).filter((row) => !args.excludedTypes?.includes(row.type));
+  return mergeHistoryRows(physical, compacted);
 }
 
 function listLatestRowsForContextWindowUsage(

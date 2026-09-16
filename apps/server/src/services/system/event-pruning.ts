@@ -46,6 +46,8 @@ const ACTIVE_PRUNE_TRIGGER_THREAD_EVENT_TYPES: readonly ThreadEventType[] = [
   ...SNAPSHOT_THREAD_EVENT_TYPES,
   "provider/rateLimits/updated",
   "item/backgroundTask/progress",
+  "item/completed",
+  "turn/completed",
 ] as const;
 
 const activePruneTriggerThreadEventTypeSet = new Set<ThreadEventType>(
