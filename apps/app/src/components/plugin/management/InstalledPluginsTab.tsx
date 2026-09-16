@@ -152,9 +152,7 @@ export function InstalledPluginRow({
         title={plugin.name ?? plugin.id}
         byline={
           plugin.source.startsWith("path:") ? (
-            <span className="font-mono text-2xs" title={plugin.source.slice(5)}>
-              {plugin.sourceDisplay}
-            </span>
+            "Local"
           ) : catalogEntry !== undefined ? (
             <PluginCardAuthor entry={catalogEntry} />
           ) : plugin.publisherLabel !== null ? (
