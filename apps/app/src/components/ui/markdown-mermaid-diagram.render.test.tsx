@@ -167,6 +167,107 @@ describe("MarkdownMermaidDiagram render gating", () => {
     ).not.toBeNull();
   });
 
+  it("keeps the mounted SVG while Mermaid prepares a replacement", async () => {
+    mermaidRender.mockImplementationOnce(async (id) => ({
+      svg: `<svg id="${id}" data-version="old"></svg>`,
+      bindFunctions: undefined,
+    }));
+    const view = render(
+      <MarkdownMermaidDiagram
+        preferredTheme="light"
+        source="graph TD; First"
+      />,
+    );
+    act(() => enterViewport(diagramContainer(view.container)));
+    await flushRenders();
+    const previousSvg = view.container.querySelector('svg[data-version="old"]');
+    expect(previousSvg).not.toBeNull();
+    let finish:
+      | ((value: { svg: string; bindFunctions: undefined }) => void)
+      | undefined;
+    mermaidRender.mockImplementationOnce((id) => {
+      document.getElementById(id)?.remove();
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    });
+    view.rerender(
+      <MarkdownMermaidDiagram
+        preferredTheme="light"
+        source="graph TD; First-->Second"
+      />,
+    );
+    await act(async () =>
+      vi.advanceTimersByTime(MERMAID_SOURCE_RENDER_DEBOUNCE_MS),
+    );
+    await flushRenders();
+    expect(
+      view.container.querySelector('svg[data-version="old"]')?.outerHTML,
+    ).toBe(previousSvg?.outerHTML);
+    await act(async () =>
+      finish?.({
+        svg: '<svg data-version="new"></svg>',
+        bindFunctions: undefined,
+      }),
+    );
+    expect(
+      view.container.querySelector('svg[data-version="new"]'),
+    ).not.toBeNull();
+  });
+
+  it("retains a successful preview after rejection and accepts the next result", async () => {
+    const view = render(
+      <MarkdownMermaidDiagram
+        preferredTheme="light"
+        source="graph TD; Initial"
+      />,
+    );
+    act(() => enterViewport(diagramContainer(view.container)));
+    await flushRenders();
+    const previousSvg = view.container.querySelector("svg[data-source]");
+    expect(previousSvg).not.toBeNull();
+    mermaidRender.mockRejectedValueOnce(new Error("incomplete graph"));
+    view.rerender(
+      <MarkdownMermaidDiagram
+        preferredTheme="light"
+        source="graph TD; Initial-->"
+      />,
+    );
+    await act(async () =>
+      vi.advanceTimersByTime(MERMAID_SOURCE_RENDER_DEBOUNCE_MS),
+    );
+    await flushRenders();
+    expect(view.container.querySelector("svg[data-source]")?.outerHTML).toBe(
+      previousSvg?.outerHTML,
+    );
+    view.rerender(
+      <MarkdownMermaidDiagram
+        preferredTheme="light"
+        source="graph TD; Initial-->Final"
+      />,
+    );
+    await act(async () =>
+      vi.advanceTimersByTime(MERMAID_SOURCE_RENDER_DEBOUNCE_MS),
+    );
+    await flushRenders();
+    expect(
+      view.container.querySelector(
+        'svg[data-source="graph TD; Initial-->Final"]',
+      ),
+    ).not.toBeNull();
+  });
+
+  it("shows source when the first render rejects", async () => {
+    mermaidRender.mockRejectedValueOnce(new Error("invalid graph"));
+    const view = render(
+      <MarkdownMermaidDiagram preferredTheme="light" source="not a diagram" />,
+    );
+    act(() => enterViewport(diagramContainer(view.container)));
+    await flushRenders();
+    expect(view.container.querySelector("svg[data-source]")).toBeNull();
+    expect(view.container.textContent).toContain("not a diagram");
+  });
+
   it("serves a remounted diagram from the render cache without calling mermaid again", async () => {
     const view = render(
       <MarkdownMermaidDiagram preferredTheme="dark" source="graph TD; X-->Y" />,

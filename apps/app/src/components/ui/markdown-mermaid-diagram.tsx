@@ -967,6 +967,7 @@ export function MarkdownMermaidDiagram({
   source,
 }: MarkdownMermaidDiagramProps) {
   const reactId = useId();
+  const renderAttemptRef = useRef(0);
   const containerElementRef = useRef<HTMLDivElement>(null);
   const diagramElementRef = useRef<HTMLDivElement>(null);
   const renderId = useMemo(() => buildMermaidRenderId(reactId), [reactId]);
@@ -1034,7 +1035,11 @@ export function MarkdownMermaidDiagram({
             return null;
           }
           mermaid.initialize(buildMermaidConfig(preferredTheme));
-          return mermaid.render(renderId, source);
+          renderAttemptRef.current += 1;
+          return mermaid.render(
+            `${renderId}-${renderAttemptRef.current}`,
+            source,
+          );
         })
         .then((renderResult) => {
           if (!isCurrentRender || renderResult === null) {
@@ -1051,7 +1056,11 @@ export function MarkdownMermaidDiagram({
           if (!isCurrentRender) {
             return;
           }
-          setRenderState({ kind: "source" });
+          setRenderState((currentState) =>
+            currentState.kind === "rendered"
+              ? currentState
+              : { kind: "source" },
+          );
         });
     };
 
