@@ -58,6 +58,18 @@ import {
   type SplitLayout,
 } from "@/lib/split-layout";
 import { usePublishPluginDetailOpener } from "./plugin-detail-opener";
+import type { AppShortcutPresentation } from "@/lib/app-keybindings";
+
+const paletteCommandState = vi.hoisted(() => ({
+  shortcut: null as AppShortcutPresentation | null,
+}));
+
+vi.mock("@/components/commands/AppCommandProvider", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/components/commands/AppCommandProvider")
+  >()),
+  useAppCommandShortcut: () => paletteCommandState.shortcut,
+}));
 vi.mock("@/components/ui/app-toast", () => ({
   appToast: {
     dismiss: vi.fn(),
@@ -151,6 +163,7 @@ interface RenderSidebarItemsOptions {
   initialEntries?: string[];
   initialLayout?: SplitLayout;
   onCompactCustomizeModeChange?: (isCustomizing: boolean) => void;
+  onOpenPalette?: () => void;
   splitEnabled?: boolean;
 }
 
@@ -176,6 +189,7 @@ function PluginNavSidebarItemsHarness({
     <PluginNavSidebarItems
       builtInEntries={options.builtInEntries}
       splitEnabled={options.splitEnabled}
+      onOpenPalette={options.onOpenPalette}
       {...compactControlProps}
     />
   );
@@ -309,6 +323,7 @@ async function openCustomizeFromContextMenu(
 }
 
 beforeEach(() => {
+  paletteCommandState.shortcut = null;
   vi.clearAllMocks();
   resetPluginFrontendBootStateForTest();
   markPluginFrontendsSettled();
@@ -329,6 +344,48 @@ afterEach(() => {
 });
 
 describe("PluginNavSidebarItems", () => {
+  it.each([false, true])(
+    "offers the palette with its configured shortcut when no rows are hidden (compact: %s)",
+    async (compactViewport) => {
+      const onOpenPalette = vi.fn();
+      paletteCommandState.shortcut = {
+        label: "Ctrl + Shift + L",
+        ariaKeyshortcuts: "Control+Shift+L",
+      };
+      renderSidebarItems({
+        compactViewport,
+        onOpenPalette,
+        builtInEntries: [builtInEntry("new-thread", "New thread")],
+      });
+      if (compactViewport) fireEvent.click(moreTrigger());
+      else fireEvent.pointerDown(moreTrigger(), { button: 0 });
+
+      const item = await screen.findByRole("menuitem", {
+        name: "Open quick palette",
+      });
+      expect(item.getAttribute("aria-keyshortcuts")).toBe("Control+Shift+L");
+      expect(item.querySelector("kbd")?.textContent).toBe("Ctrl + Shift + L");
+      fireEvent.click(item);
+
+      expect(onOpenPalette).toHaveBeenCalledOnce();
+      await waitFor(() =>
+        expect(moreTrigger().getAttribute("aria-expanded")).toBe("false"),
+      );
+      expect(screen.getByRole("button", { name: "New thread" })).toBeTruthy();
+    },
+  );
+
+  it("keeps the menu command available without an assigned shortcut", async () => {
+    const onOpenPalette = vi.fn();
+    renderSidebarItems({ onOpenPalette });
+    await openMoreMenu();
+    const item = screen.getByRole("menuitem", { name: "Open quick palette" });
+    expect(item.querySelector("kbd")).toBeNull();
+    expect(item.hasAttribute("aria-keyshortcuts")).toBe(false);
+    fireEvent.click(item);
+    expect(onOpenPalette).toHaveBeenCalledOnce();
+  });
+
   it("keeps built-in actions visible without placeholders during startup", () => {
     resetPluginFrontendBootStateForTest();
     renderSidebarItems({

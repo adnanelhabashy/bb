@@ -131,6 +131,10 @@ export function BuiltInSidebarNavigation({
           leadingOrderKeys={DEFAULT_BUILT_IN_SIDEBAR_NAVIGATION_ORDER}
           onCompactCustomizeModeChange={onCompactCustomizeModeChange}
           onNavigate={onNavigate}
+          onOpenPalette={() => {
+            onSearchThreads?.();
+            commandRunner.dispatch("palette.open", null);
+          }}
           splitEnabled={splitEnabled}
         />
       </div>

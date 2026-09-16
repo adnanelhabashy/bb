@@ -18,6 +18,9 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { Button } from "@bb/shared-ui/button";
+import { useAppCommandShortcut } from "@/components/commands/AppCommandProvider";
+import { AppCommandShortcutPill } from "@/components/commands/AppCommandShortcutHint";
+import { getAppCommandMetadata } from "@/lib/app-command-metadata";
 import { Checkbox } from "@bb/shared-ui/checkbox";
 import { Icon, type IconName } from "@bb/shared-ui/icon";
 import {
@@ -141,6 +144,7 @@ export function PluginNavSidebarItems(props: {
   leadingOrderKeys?: readonly string[];
   onCompactCustomizeModeChange?: (isCustomizing: boolean) => void;
   onNavigate?: () => void;
+  onOpenPalette?: () => void;
   splitEnabled?: boolean;
 }) {
   const entries = usePluginNavPanelChrome();
@@ -168,7 +172,7 @@ export function PluginNavSidebarItems(props: {
       (props.builtInEntries ?? []).map(getPluginNavPanelKey),
     [props.builtInEntries, props.leadingOrderKeys],
   );
-  if (rows.length === 0) return null;
+  if (rows.length === 0 && props.onOpenPalette === undefined) return null;
   return (
     <PluginNavSidebarItemList
       rows={rows}
@@ -183,6 +187,7 @@ export function PluginNavSidebarItems(props: {
           }
         : {})}
       {...(props.onNavigate ? { onNavigate: props.onNavigate } : {})}
+      {...(props.onOpenPalette ? { onOpenPalette: props.onOpenPalette } : {})}
     />
   );
 }
@@ -192,6 +197,7 @@ function PluginNavSidebarItemList({
   leadingOrderKeys,
   onCompactCustomizeModeChange,
   onNavigate,
+  onOpenPalette,
   rows,
   splitEnabled = false,
 }: {
@@ -199,6 +205,7 @@ function PluginNavSidebarItemList({
   leadingOrderKeys: readonly string[];
   onCompactCustomizeModeChange?: (isCustomizing: boolean) => void;
   onNavigate?: () => void;
+  onOpenPalette?: () => void;
   rows: readonly SidebarNavRow[];
   splitEnabled?: boolean;
 }) {
@@ -489,11 +496,12 @@ function PluginNavSidebarItemList({
           )}
         </SortableContext>
       </DndContext>
-      {hidden.length > 0 ? (
+      {hidden.length > 0 || onOpenPalette !== undefined ? (
         <SidebarNavigationMoreRow
           hiddenRows={hidden}
           onActivate={handleActivate}
           onCustomize={openCustomize}
+          onOpenPalette={onOpenPalette}
         />
       ) : null}
     </div>
@@ -504,6 +512,7 @@ function SidebarNavigationMoreRow({
   hiddenRows,
   onActivate,
   onCustomize,
+  onOpenPalette,
 }: {
   hiddenRows: readonly SidebarNavRow[];
   onActivate: (
@@ -511,8 +520,11 @@ function SidebarNavigationMoreRow({
     event: SidebarNavActivationModifiers,
   ) => void;
   onCustomize: () => void;
+  onOpenPalette: (() => void) | undefined;
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const paletteShortcut = useAppCommandShortcut("palette.open");
+  const paletteSelectedRef = useRef(false);
   const modifiersRef = useRef<SidebarNavActivationModifiers>({
     metaKey: false,
     ctrlKey: false,
@@ -545,6 +557,11 @@ function SidebarNavigationMoreRow({
               align="start"
               sideOffset={8}
               mobileTitle="More"
+              onCloseAutoFocus={(event) => {
+                if (!paletteSelectedRef.current) return;
+                event.preventDefault();
+                paletteSelectedRef.current = false;
+              }}
             >
               {hiddenRows.map((row) => (
                 <DropdownMenuItem
@@ -576,6 +593,23 @@ function SidebarNavigationMoreRow({
                   <span className="min-w-0 flex-1 truncate">{row.title}</span>
                 </DropdownMenuItem>
               ))}
+              {onOpenPalette === undefined ? null : (
+                <DropdownMenuItem
+                  aria-keyshortcuts={paletteShortcut?.ariaKeyshortcuts}
+                  onSelect={() => {
+                    paletteSelectedRef.current = true;
+                    onOpenPalette();
+                  }}
+                >
+                  <Icon name="Search" aria-hidden="true" />
+                  <span className="flex-1">
+                    {getAppCommandMetadata("palette.open").label}
+                  </span>
+                  {paletteShortcut === null ? null : (
+                    <AppCommandShortcutPill shortcut={paletteShortcut} />
+                  )}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 data-testid="sidebar-navigation-customize-trigger"

@@ -37,12 +37,14 @@ vi.mock("@/components/plugin/PluginNavSidebarItems", () => ({
   ResourceNavSidebarItem: () => <div />,
   PluginNavSidebarItems: ({
     builtInEntries = [],
+    onOpenPalette,
   }: {
     builtInEntries?: Array<{
       id: string;
       title: string;
       onActivate: MouseEventHandler<HTMLButtonElement>;
     }>;
+    onOpenPalette?: () => void;
   }) => (
     <div>
       {builtInEntries.map((entry) => (
@@ -50,6 +52,9 @@ vi.mock("@/components/plugin/PluginNavSidebarItems", () => ({
           {entry.title}
         </button>
       ))}
+      <button type="button" onClick={onOpenPalette}>
+        Open quick palette
+      </button>
     </div>
   ),
 }));
@@ -175,6 +180,16 @@ afterEach(() => {
 });
 
 describe("SidebarNavigationRegion", () => {
+  it("opens the command catalog from the ordinary menu and closes compact navigation", () => {
+    renderHarness();
+    fireEvent.click(screen.getByRole("button", { name: "Open quick palette" }));
+    expect(mocks.onSearchThreads).toHaveBeenCalledOnce();
+    expect(mocks.dispatch).toHaveBeenCalledExactlyOnceWith(
+      "palette.open",
+      null,
+    );
+  });
+
   it("preserves modifier-click for New thread in BB navigation", () => {
     renderHarness();
 
@@ -226,9 +241,7 @@ describe("SidebarNavigationRegion", () => {
     ).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Plugins" }));
-    expect(screen.getByTestId("pathname").textContent).toBe(
-      "/plugins",
-    );
+    expect(screen.getByTestId("pathname").textContent).toBe("/plugins");
     expect(
       screen
         .getByRole("button", { name: "Plugins" })
@@ -236,9 +249,7 @@ describe("SidebarNavigationRegion", () => {
     ).toBe("page");
 
     fireEvent.click(screen.getByRole("button", { name: "Skills" }));
-    expect(screen.getByTestId("pathname").textContent).toBe(
-      "/skills",
-    );
+    expect(screen.getByTestId("pathname").textContent).toBe("/skills");
   });
 
   it("delegates and falls back after a crash without owner remounts", () => {

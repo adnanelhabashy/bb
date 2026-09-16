@@ -547,10 +547,13 @@ describe("CommandPalette", () => {
     expect(modeSelect.querySelector('[data-icon="Search"]')).not.toBeNull();
     expectClasses(modeSelect.parentElement, "bg-state-active");
     expectNoClasses(modeSelect.parentElement, "bg-background/70");
-    expectAttribute(
+    expectText(
       screen.getByRole("button", { name: "Return to commands" }),
-      "data-tab-pill-close",
+      "Commands",
     );
+    expect(
+      modeSelect.parentElement?.querySelector("[data-tab-pill-close]"),
+    ).toBeNull();
     expect(screen.queryByRole("button", { name: "Thread scope" })).toBeNull();
     expect(screen.getByRole("button", { name: "Open in split" })).toBeTruthy();
     expect(document.querySelector("[data-palette-footer]")).toBeNull();
@@ -578,7 +581,7 @@ describe("CommandPalette", () => {
     await waitFor(() => expect(screen.queryByRole("combobox")).toBeNull());
   });
 
-  it("uses the shared tab-pill clear affordance without running the mode command", async () => {
+  it("shows Commands without hover and returns to the catalog without running an action", async () => {
     renderPalette();
     openThreadSearch();
     await waitFor(() =>
@@ -590,19 +593,18 @@ describe("CommandPalette", () => {
     const clearMode = screen.getByRole("button", {
       name: "Return to commands",
     });
-    expect(clearMode.querySelector('[data-icon="X"]')).not.toBeNull();
-    expectClasses(
-      clearMode,
-      "opacity-0",
-      "group-hover/tab-pill:opacity-100",
-      "focus-visible:opacity-100",
-    );
+    expectText(clearMode, "Commands");
+    expectNoClasses(clearMode, "opacity-0", "hidden", "invisible");
+    fireEvent.change(searchField(), { target: { value: "no match" } });
+    await screen.findByText("No matching threads");
     fireEvent.click(clearMode);
     await waitFor(() =>
       expect(
         screen.getByRole("combobox", { name: "Search commands" }),
       ).toBeTruthy(),
     );
+    expect((searchField() as HTMLInputElement).value).toBe("");
+    expect(document.activeElement).toBe(searchField());
     expect(testState.calls).toEqual([]);
     const commandsAfterExit = optionTitles();
     expect(commandsAfterExit).toEqual(
