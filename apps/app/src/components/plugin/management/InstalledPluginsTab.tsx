@@ -29,7 +29,7 @@ import {
   type PluginCatalogSearchEntry,
 } from "@/hooks/queries/plugin-catalog-queries";
 import { UpdatePluginDialog } from "./UpdatePluginDialog";
-import { PluginLogo, PluginCategoryLabel } from "./plugin-ui";
+import { PluginLogo } from "./plugin-ui";
 
 export function InstalledPluginsTab({
   plugins,
@@ -104,6 +104,8 @@ export function InstalledPluginRow({
     onSettled: () => invalidatePluginList({ queryClient }),
   });
   const enabled = toggle.isPending ? toggle.variables : plugin.enabled;
+  const isLocal = plugin.source.startsWith("path:");
+  const category = catalogEntry?.category ?? plugin.category;
   const signal = pluginRowSignal(plugin);
   const statusSignal = signal?.kind === "status" ? signal : null;
   const updateSignal = signal?.kind === "update" ? signal : null;
@@ -137,9 +139,7 @@ export function InstalledPluginRow({
         }
         title={plugin.name ?? plugin.id}
         byline={
-          plugin.source.startsWith("path:") ? (
-            "Local"
-          ) : catalogEntry !== undefined ? (
+          isLocal ? null : catalogEntry !== undefined ? (
             <PluginCardAuthor entry={catalogEntry} />
           ) : plugin.publisherLabel !== null ? (
             <PluginAuthorByline
@@ -157,13 +157,16 @@ export function InstalledPluginRow({
             </PluginAuthorByline>
           ) : null
         }
-        footerMeta={
-          (catalogEntry?.category ?? plugin.category) !== undefined ? (
-            <PluginCategoryLabel
-              categoryId={catalogEntry?.categoryId ?? plugin.categoryId}
-              label={catalogEntry?.category ?? plugin.category ?? ""}
-            />
-          ) : null
+        badge={
+          isLocal
+            ? { kind: "local" }
+            : category === undefined
+              ? null
+              : {
+                  kind: "category",
+                  categoryId: catalogEntry?.categoryId ?? plugin.categoryId,
+                  label: category,
+                }
         }
         description={
           runtimeStatus === null ? (

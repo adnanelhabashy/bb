@@ -49,7 +49,6 @@ import {
 } from "./plugin-browse-discovery";
 import {
   CatalogEntryIconChip,
-  PluginCategoryLabel,
   pluginCatalogCategoryMutedAccentStyle,
   pluginInstallCountPresentation,
 } from "./plugin-ui";
@@ -529,13 +528,14 @@ function PluginCatalogCard({
       title={entry.displayName}
       description={entry.description || undefined}
       byline={<PluginCardAuthor entry={entry} />}
-      footerMeta={
-        showCategory && entry.category !== undefined ? (
-          <PluginCategoryLabel
-            categoryId={entry.categoryId}
-            label={entry.category}
-          />
-        ) : undefined
+      badge={
+        showCategory && entry.category !== undefined
+          ? {
+              kind: "category",
+              categoryId: entry.categoryId,
+              label: entry.category,
+            }
+          : null
       }
       headerAction={
         entry.installed ? (

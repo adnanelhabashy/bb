@@ -4,19 +4,23 @@ import type { PluginCatalogSearchEntry } from "@/hooks/queries/plugin-catalog-qu
 import { PluginAuthorAvatar } from "./PluginAuthorAvatar";
 import { PluginAuthorLink } from "./PluginAuthorLink";
 import { pluginAuthorGithub } from "./plugin-marketplace-author";
+import { PluginCategoryLabel } from "./plugin-ui";
 
 interface PluginCardProps {
   title: string;
   description: ReactNode;
   leading: ReactNode;
   byline: ReactNode;
-  footerMeta: ReactNode;
+  badge:
+    | { kind: "category"; categoryId: string | undefined; label: string }
+    | { kind: "local" }
+    | null;
   headerAction: ReactNode;
   openLabel: string;
   onOpen: (trigger: HTMLButtonElement) => void;
 }
 
-export function PluginCard(props: PluginCardProps) {
+export function PluginCard({ badge, ...props }: PluginCardProps) {
   return (
     <ResourceBrowseCard
       {...props}
@@ -24,6 +28,16 @@ export function PluginCard(props: PluginCardProps) {
       leadingClassName="size-6"
       title={
         <span className="line-clamp-2 whitespace-normal">{props.title}</span>
+      }
+      footerMeta={
+        badge === null ? null : (
+          <PluginCategoryLabel
+            categoryId={
+              badge.kind === "category" ? badge.categoryId : undefined
+            }
+            label={badge.kind === "category" ? badge.label : "Local"}
+          />
+        )
       }
     />
   );
