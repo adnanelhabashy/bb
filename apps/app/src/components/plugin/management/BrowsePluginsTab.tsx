@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@bb/shared-ui/dropdown-menu";
 import { Icon } from "@bb/shared-ui/icon";
+import bbLogoUrl from "../../../../../../assets/bb-logo.svg";
 import { OpenPluginGuideButton } from "./OpenPluginGuideButton";
 import { cn } from "@bb/shared-ui/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -18,6 +19,8 @@ import {
   ResourceInstallControl,
   ResourceInstalledControl,
   ResourceListState,
+  ResourceShelfAction,
+  ResourceSourceShelf,
   useResourceRouteLabel,
 } from "@bb/shared-ui/resource-list";
 import { BrowseArchetypeCards } from "@/components/plugin/browse-hero/BrowseArchetypeCards";
@@ -51,11 +54,7 @@ import {
   pluginInstallCountPresentation,
 } from "./plugin-ui";
 
-import {
-  PluginShelf,
-  PluginShelfGrid,
-  PLUGIN_SHELF_ENTRY_LIMIT,
-} from "./PluginShelf";
+const SHELF_ENTRY_LIMIT = 6;
 
 export function BrowsePluginsTab({
   onInstall,
@@ -356,7 +355,7 @@ export function BrowsePluginsTab({
 }
 
 export function pluginCategoryFilterOptions(
-  entries: readonly Pick<PluginCatalogSearchEntry, "categoryId" | "category">[],
+  entries: readonly PluginCatalogSearchEntry[],
   selected: readonly string[],
 ): PluginBrowseCategoryOption[] {
   const labels = new Map<string, string>();
@@ -421,35 +420,68 @@ function BrowseShelf({
   const [searchParams] = useSearchParams();
   const shelfParams = new URLSearchParams(searchParams);
   shelfParams.set("shelf", shelf.key);
-  const visible = shelf.entries.slice(0, PLUGIN_SHELF_ENTRY_LIMIT);
+  const visible = shelf.entries.slice(0, SHELF_ENTRY_LIMIT);
   return (
-    <PluginShelf
-      shelf={shelf}
-      entryCount={shelf.entries.length}
-      seeAllLink={
-        <Link
-          to={{
-            pathname: getPluginsRoutePath(),
-            search: shelfParams.toString(),
-          }}
-          aria-label={`See all ${shelf.label}`}
-        >
-          See all
-        </Link>
+    <ResourceSourceShelf
+      label={shelf.label}
+      description={shelf.description}
+      hideDescriptionOnMobile
+      leading={
+        shelf.key === "collection:bb-official" ? (
+          <span
+            className="size-4 shrink-0 bg-current text-foreground"
+            style={{ mask: `url(${bbLogoUrl}) center / contain no-repeat` }}
+            aria-hidden
+          />
+        ) : shelf.key === "collection:new-and-notable" ? (
+          <Icon name="News01" className="size-4 text-foreground" aria-hidden />
+        ) : (
+          <span
+            className="size-2 rounded-full"
+            style={pluginCatalogCategoryMutedAccentStyle(shelf.categoryId)}
+            aria-hidden
+          />
+        )
+      }
+      browseAction={
+        shelf.entries.length > 2 ? (
+          <ResourceShelfAction
+            asChild
+            className={cn(
+              "underline underline-offset-4",
+              shelf.entries.length <= SHELF_ENTRY_LIMIT && "sm:hidden",
+            )}
+          >
+            <Link
+              to={{
+                pathname: getPluginsRoutePath(),
+                search: shelfParams.toString(),
+              }}
+              aria-label={`See all ${shelf.label}`}
+            >
+              See all
+            </Link>
+          </ResourceShelfAction>
+        ) : undefined
       }
     >
-      <PluginShelfGrid>
-        {visible.map((entry) => (
-          <PluginCatalogCard
-            key={`${entry.marketplace}/${entry.entryId}`}
-            entry={entry}
-            showCategory={false}
-            onInstall={onInstall}
-            onOpenPlugin={onOpenPlugin}
-          />
-        ))}
-      </PluginShelfGrid>
-    </PluginShelf>
+      <div data-plugin-shelf>
+        <div
+          data-plugin-shelf-grid
+          className="grid gap-2 max-sm:[&>*:nth-child(n+3)]:hidden"
+        >
+          {visible.map((entry) => (
+            <PluginCatalogCard
+              key={`${entry.marketplace}/${entry.entryId}`}
+              entry={entry}
+              showCategory={false}
+              onInstall={onInstall}
+              onOpenPlugin={onOpenPlugin}
+            />
+          ))}
+        </div>
+      </div>
+    </ResourceSourceShelf>
   );
 }
 
