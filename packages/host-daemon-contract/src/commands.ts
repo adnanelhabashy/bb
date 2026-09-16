@@ -3,6 +3,10 @@ import {
   desktopBrowserResultSchemas,
 } from "./desktop-browser.js";
 import {
+  serverMoveCommandSchemas,
+  serverMoveResultSchemas,
+} from "./server-move.js";
+import {
   availableModelSchema,
   discoveredWorkspacePropertiesSchema,
   dynamicToolSchema,
@@ -355,6 +359,10 @@ export const threadStopCommandSchema = hostDaemonThreadTargetSchema
     intent: threadStopIntentSchema,
   })
   .strict();
+
+const threadStorageDeleteCommandSchema = hostDaemonThreadTargetSchema.extend({
+  type: z.literal("thread.storage.delete"),
+});
 
 const threadGoalClearCommandSchema = hostDaemonThreadTargetSchema
   .extend({
@@ -1445,6 +1453,15 @@ export const hostDaemonCommandRegistry = {
     flushEventsBeforeResult: true,
     envLane: null,
   }),
+  "thread.storage.delete": defineHostDaemonCommandDescriptor({
+    type: "thread.storage.delete",
+    schema: threadStorageDeleteCommandSchema,
+    resultSchema: threadStopResultSchema,
+    transport: "settled",
+    retryable: false,
+    flushEventsBeforeResult: true,
+    envLane: null,
+  }),
   "thread.goal.clear": defineHostDaemonCommandDescriptor({
     type: "thread.goal.clear",
     schema: threadGoalClearCommandSchema,
@@ -1885,6 +1902,60 @@ export const hostDaemonCommandRegistry = {
     resultSchema: workspacePullRequestResultSchema,
     transport: "onlineRpc",
     retryable: true,
+    flushEventsBeforeResult: false,
+    envLane: null,
+  }),
+  "server_move.inspect": defineHostDaemonCommandDescriptor({
+    type: "server_move.inspect",
+    schema: serverMoveCommandSchemas["server_move.inspect"],
+    resultSchema: serverMoveResultSchemas["server_move.inspect"],
+    transport: "onlineRpc",
+    retryable: true,
+    flushEventsBeforeResult: false,
+    envLane: null,
+  }),
+  "server_move.probe": defineHostDaemonCommandDescriptor({
+    type: "server_move.probe",
+    schema: serverMoveCommandSchemas["server_move.probe"],
+    resultSchema: serverMoveResultSchemas["server_move.probe"],
+    transport: "onlineRpc",
+    retryable: true,
+    flushEventsBeforeResult: false,
+    envLane: null,
+  }),
+  "server_move.prepare": defineHostDaemonCommandDescriptor({
+    type: "server_move.prepare",
+    schema: serverMoveCommandSchemas["server_move.prepare"],
+    resultSchema: serverMoveResultSchemas["server_move.prepare"],
+    transport: "onlineRpc",
+    retryable: false,
+    flushEventsBeforeResult: false,
+    envLane: null,
+  }),
+  "server_move.activate": defineHostDaemonCommandDescriptor({
+    type: "server_move.activate",
+    schema: serverMoveCommandSchemas["server_move.activate"],
+    resultSchema: serverMoveResultSchemas["server_move.activate"],
+    transport: "onlineRpc",
+    retryable: false,
+    flushEventsBeforeResult: false,
+    envLane: null,
+  }),
+  "server_move.abort": defineHostDaemonCommandDescriptor({
+    type: "server_move.abort",
+    schema: serverMoveCommandSchemas["server_move.abort"],
+    resultSchema: serverMoveResultSchemas["server_move.abort"],
+    transport: "onlineRpc",
+    retryable: false,
+    flushEventsBeforeResult: false,
+    envLane: null,
+  }),
+  "server_move.delete_old_copy": defineHostDaemonCommandDescriptor({
+    type: "server_move.delete_old_copy",
+    schema: serverMoveCommandSchemas["server_move.delete_old_copy"],
+    resultSchema: serverMoveResultSchemas["server_move.delete_old_copy"],
+    transport: "onlineRpc",
+    retryable: false,
     flushEventsBeforeResult: false,
     envLane: null,
   }),

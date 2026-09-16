@@ -67,9 +67,13 @@ export function BrowsePluginsTab({
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const shelfKey = searchParams.get("shelf");
+  const isCategoryShelf = shelfKey?.startsWith("category:") ?? false;
   const query = searchParams.get("query") ?? "";
   const creationViewActive = searchParams.get("view") === "create";
-  const selectedCategories = searchParams.getAll("category");
+  const selectedCategories = useMemo(
+    () => (isCategoryShelf ? [] : searchParams.getAll("category")),
+    [isCategoryShelf, searchParams],
+  );
   const requestedSort = pluginBrowseSort(searchParams.get("sort"));
   const sortDirection =
     pluginBrowseSortDirection(searchParams.get("direction")) ?? "desc";
@@ -265,10 +269,12 @@ export function BrowsePluginsTab({
               </div>
             </div>
 
-            <BrowseHeroCarousel
-              openRequest={heroRequest}
-              onComposingChange={setComposing}
-            />
+            <div className={cn(!composing && "hidden sm:block")}>
+              <BrowseHeroCarousel
+                openRequest={heroRequest}
+                onComposingChange={setComposing}
+              />
+            </div>
           </>
         )}
 
@@ -280,6 +286,7 @@ export function BrowsePluginsTab({
               query={query}
               selectedCategories={selectedCategories}
               categoryOptions={categoryOptions}
+              showCategoryFilter={!isCategoryShelf}
               sort={sort}
               sortDirection={sortDirection}
               installsKnown={installsKnown}
@@ -335,7 +342,7 @@ export function BrowsePluginsTab({
             ) : (
               <PluginCatalogGrid
                 entries={flatEntries}
-                showCategory={!selectedShelf?.key.startsWith("category:")}
+                showCategory={!isCategoryShelf}
                 onInstall={onInstall}
                 onOpenPlugin={onOpenPlugin}
               />

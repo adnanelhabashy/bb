@@ -13,6 +13,10 @@ import {
 } from "@bb/domain/plugin-interaction-limits";
 import { PROVIDER_FORK_VALUES } from "@bb/domain/provider-fork";
 import {
+  COMPLETED_TURN_DISPLAY_VALUES,
+  DEFAULT_COMPLETED_TURN_DISPLAY,
+} from "@bb/domain/completed-turn-display";
+import {
   jsonValueSchema,
   normalizeProviderNativeRoots,
   providerNativeRootsInputSchema,
@@ -41,6 +45,7 @@ import type {
   ServerAccessProviderDeclaration,
   PluginProviderCapabilities,
   PluginProviderComposerAction,
+  PluginProviderCompletedTurnDisplay,
   PluginProviderDeclaration,
   ExperimentalPluginProviderEnvEntry,
   PluginProviderExtensionKindDeclaration,
@@ -958,6 +963,27 @@ function validateProviderModelCatalogScope(
   return value as PluginProviderModelCatalogScope;
 }
 
+const PROVIDER_COMPLETED_TURN_DISPLAYS =
+  COMPLETED_TURN_DISPLAY_VALUES satisfies readonly PluginProviderCompletedTurnDisplay[];
+
+function validateProviderCompletedTurnDisplay(
+  providerId: string,
+  value: unknown,
+): PluginProviderCompletedTurnDisplay {
+  if (value === undefined) {
+    return DEFAULT_COMPLETED_TURN_DISPLAY;
+  }
+  if (
+    typeof value !== "string" ||
+    !(PROVIDER_COMPLETED_TURN_DISPLAYS as readonly string[]).includes(value)
+  ) {
+    throw new Error(
+      `provider "${providerId}" completedTurnDisplay must be one of ${PROVIDER_COMPLETED_TURN_DISPLAYS.join(", ")}`,
+    );
+  }
+  return value as PluginProviderCompletedTurnDisplay;
+}
+
 /**
  * Returns undefined when the declaration carries `models` for a
  * reason other than a fallback list — `scope` alone is a valid declaration.
@@ -1283,6 +1309,7 @@ export type NormalizedPluginProviderDeclaration = Omit<
   readonly experimental_nativeSkillRoots?: ProviderNativeRoots;
   readonly experimental_nativeCommandRoots?: ProviderNativeRoots;
   readonly experimental_resolvesNativeRoots: boolean;
+  readonly completedTurnDisplay: PluginProviderCompletedTurnDisplay;
   readonly maintenance: {
     readonly health: boolean;
     readonly usage: boolean;
@@ -1523,6 +1550,10 @@ export function validatePluginProviderDeclaration(
     allowed: PLUGIN_PROVIDER_COMPOSER_ACTION_VALUES,
     requireNonEmpty: false,
   });
+  const completedTurnDisplay = validateProviderCompletedTurnDisplay(
+    id,
+    declaration.completedTurnDisplay,
+  );
   const bridgeOptions =
     declaration.experimental_bridgeOptions === undefined
       ? undefined
@@ -1627,6 +1658,7 @@ export function validatePluginProviderDeclaration(
     maintenance: normalizedMaintenance,
     capabilities: normalizedCapabilities,
     composerActions,
+    completedTurnDisplay,
     ...(strings === undefined ? {} : { strings: strings }),
     ...(serviceTiers === undefined ? {} : { serviceTiers: serviceTiers }),
     ...(reasoningLevels === undefined
@@ -1688,6 +1720,20 @@ export function isStandardSchema(value: unknown): value is StandardSchemaV1 {
   );
 }
 
+const rpcDescriptionSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(4096)
+  .optional()
+  .transform((value) => value ?? null);
+const rpcPublicationOptionsSchema = z
+  .object({
+    experimental_discoverable: z.boolean().default(false),
+    experimental_description: rpcDescriptionSchema,
+  })
+  .strict();
+
 function readRpcMethodContract(
   method: string,
   value: unknown,
@@ -1709,7 +1755,80 @@ function readRpcMethodContract(
       `rpc method "${method}" output must be a Standard Schema v1 validator`,
     );
   }
-  return { input, output };
+  const description = rpcDescriptionSchema.parse(
+    Reflect.get(value, "experimental_description"),
+  );
+  return description === null
+    ? { input, output }
+    : { input, output, experimental_description: description };
+}
+
+export function readRpcPublicationOptions(value: unknown) {
+  return rpcPublicationOptionsSchema.parse(value ?? {});
+}
+
+function publishedRpcSchema(
+  schema: StandardSchemaV1,
+  direction: "input" | "output",
+) {
+  const converter = schema["~standard"].jsonSchema;
+  if (converter === undefined || typeof converter[direction] !== "function") {
+    throw new Error(
+      "discoverable RPC requires Standard JSON Schema export support",
+    );
+  }
+  const serialized = JSON.stringify(
+    converter[direction]({ target: "draft-2020-12" }),
+  );
+  if (
+    serialized === undefined ||
+    new TextEncoder().encode(serialized).byteLength > 128 * 1024
+  ) {
+    throw new Error("published RPC schema must be JSON and at most 128 KiB");
+  }
+  const result = z
+    .record(z.string(), jsonValueSchema)
+    .parse(JSON.parse(serialized));
+  const inspect = (value: JsonValue): void => {
+    if (value === null || typeof value !== "object") return;
+    if (Array.isArray(value)) {
+      for (const item of value) inspect(item);
+      return;
+    }
+    for (const [key, item] of Object.entries(value)) {
+      if (
+        (key === "$ref" || key === "$dynamicRef") &&
+        typeof item === "string" &&
+        !item.startsWith("#")
+      ) {
+        throw new Error("published RPC schemas must use local references");
+      }
+      inspect(item);
+    }
+  };
+  inspect(result);
+  return result;
+}
+
+export function publishRpcMethod(
+  method: string,
+  contract: PluginRpcMethodContract,
+  options: ReturnType<typeof readRpcPublicationOptions>,
+) {
+  if (!options.experimental_discoverable) return null;
+  try {
+    return {
+      method,
+      registrationDescription: options.experimental_description,
+      methodDescription: contract.experimental_description ?? null,
+      inputSchema: publishedRpcSchema(contract.input, "input"),
+      outputSchema: publishedRpcSchema(contract.output, "output"),
+    };
+  } catch (error) {
+    throw new Error(
+      `rpc method "${method}" cannot be published: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 
 /** Duck-typed zod detection: plugin sources may carry their own zod copy,
@@ -2792,6 +2911,7 @@ export function normalizeWebSocketRouteRegistration(
 }
 
 type RpcRegistrationRecord = {
+  publication: ReturnType<typeof publishRpcMethod>;
   inputSchema: StandardSchemaV1;
   outputSchema: StandardSchemaV1;
   handler: (input: unknown) => unknown;
@@ -2801,6 +2921,7 @@ export function normalizeRpcRegistration(
   contract: unknown,
   handlers: unknown,
   registered: ReadonlyMap<string, unknown>,
+  options: unknown,
 ): Array<[string, RpcRegistrationRecord]> {
   if (
     typeof contract !== "object" ||
@@ -2816,6 +2937,7 @@ export function normalizeRpcRegistration(
   ) {
     throw new Error("rpc.register handlers must be an object");
   }
+  const publicationOptions = readRpcPublicationOptions(options);
   const pending: Array<[string, RpcRegistrationRecord]> = [];
   const contractEntries = Object.entries(contract);
   const contractNames = new Set(contractEntries.map(([name]) => name));
@@ -2843,6 +2965,7 @@ export function normalizeRpcRegistration(
     pending.push([
       name,
       {
+        publication: publishRpcMethod(name, methodContract, publicationOptions),
         inputSchema: methodContract.input,
         outputSchema: methodContract.output,
         handler,

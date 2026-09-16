@@ -1,3 +1,4 @@
+import { useInitialPromptDraft } from "@/components/promptbox/mentions/initial-prompt-draft";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -547,6 +548,7 @@ export function RootComposeView() {
               input: request.input,
               model: request.model,
               permissionMode: request.permissionMode,
+              pluginSubmission: request.pluginSubmission,
               providerSupportsFork:
                 findCachedProviderInfo(queryClient, forkSeed.providerId)
                   ?.capabilities.supportsFork ?? false,
@@ -555,7 +557,12 @@ export function RootComposeView() {
             });
       if (createRequest === null) return;
       const thread = await createThread.mutateAsync(
-        sendAt === undefined ? createRequest : { ...createRequest, sendAt },
+        sendAt === undefined
+          ? createRequest
+          : {
+              ...createRequest,
+              ...(sendAt === undefined ? {} : { sendAt }),
+            },
       );
       setLastCreatedThreadId(thread.id);
       setForkSeed(null);
@@ -716,14 +723,18 @@ function RootComposeSurface({
     [focusPromptBox, promptDraft, setStartedComposing],
   );
 
+  const searchInitialPrompt = readInitialPromptFromSearch(location.search);
+  const stateInitialPrompt = readInitialPromptFromLocationState(location.state);
+  const searchInitialDraft = useInitialPromptDraft(searchInitialPrompt);
+  const stateInitialDraft = useInitialPromptDraft(stateInitialPrompt);
   const setPromptDraft = promptDraft.setDraft;
   const restorePromptDraftIfEmpty = promptDraft.restoreIfEmpty;
 
   useEffect(() => {
     const initialPrompt = readInitialPromptFromSearch(location.search);
-    if (initialPrompt === null) return;
+    if (initialPrompt === null || searchInitialDraft === undefined) return;
     setStartedComposing(true);
-    setPromptDraft({ text: initialPrompt, mentions: [], attachments: [] });
+    setPromptDraft(searchInitialDraft);
     navigate(
       getRootComposeRoutePath() + stripInitialPromptFromSearch(location.search),
       { replace: true, state: location.state },
@@ -734,8 +745,10 @@ function RootComposeSurface({
     navigate,
     setPromptDraft,
     setStartedComposing,
+    searchInitialDraft,
   ]);
   useEffect(() => {
+    if (stateInitialPrompt !== null && stateInitialDraft === undefined) return;
     const sectionTarget = readRootComposeSectionTargetFromLocationState(
       location.state,
     );
@@ -783,11 +796,13 @@ function RootComposeSurface({
     setRootComposeSectionId,
     setServiceTier,
     setStartedComposing,
+    stateInitialPrompt,
+    stateInitialDraft,
   ]);
   useEffect(() => {
     const initialPrompt = readInitialPromptFromLocationState(location.state);
-    if (initialPrompt === null) return;
-    const nextDraft = { text: initialPrompt, mentions: [], attachments: [] };
+    if (initialPrompt === null || stateInitialDraft === undefined) return;
+    const nextDraft = stateInitialDraft;
     if (shouldReplaceInitialPromptFromLocationState(location.state)) {
       setPromptDraft(nextDraft);
     } else {
@@ -803,6 +818,7 @@ function RootComposeSurface({
     navigate,
     restorePromptDraftIfEmpty,
     setPromptDraft,
+    stateInitialDraft,
   ]);
   const shouldFocusPrompt =
     typeof location.state === "object" &&
