@@ -18,7 +18,7 @@ panel's file search, and `bb thread open`.
   path, expand and collapse directories, and jump to another file. It opens
   with the current file revealed. Right-click any row to copy its absolute
   path, relative path, or filename.
-- **Quick palette commands.** Open the quick palette (<kbd>⌘⇧P</kbd>) and
+- **Command palette commands.** Open the command palette (<kbd>⌘⇧P</kbd>) and
   type "fold", "sort", or "copy" to reach *fold level 1–5*, *fold
   recursively*, *unfold all*, *unfold recursively*, *unfold at cursor*,
   *sort selected lines ascending/descending*, and *copy the path / relative

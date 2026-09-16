@@ -2207,7 +2207,7 @@ plugin receives semantic items, split-drag bindings, and one host activation cal
 BB retains the drawer, thread list, footer, resize handle, and hidden-body
 shortcut policy.
 
-Search activation opens the quick palette. The removed inline sidebar search
+Search activation opens the command palette. The removed inline sidebar search
 field, query state, combobox, and result list do not form part of this API.
 `experimental_Original` bypasses replacement resolution. A crash restores only
 the bounded controls and leaves the retained sidebar regions mounted.
@@ -2221,7 +2221,7 @@ the bounded controls and leaves the retained sidebar regions mounted.
 3. **Split contract.** Audit `experimental_splitProps` and
    `experimental_activate(..., { openInSplit })` for pointer, keyboard,
    modifier-click, pane-cap, and compact behavior.
-4. **Search action.** Confirm a semantic quick-palette action remains useful
+4. **Search action.** Confirm a semantic command-palette action remains useful
    without the former inline query and result UI.
 5. **Crash and delegation.** Verify `experimental_Original` and crash fallback
    never recurse or remount the thread list and footer.

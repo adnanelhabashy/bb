@@ -45,7 +45,7 @@ export const APP_COMMAND_GROUPS: readonly AppCommandGroup[] = [
       command(
         "thread.search",
         "Search threads",
-        "Search threads in the quick palette.",
+        "Search threads in the command palette.",
       ),
       command("thread.rename", "Rename thread", "Rename the focused thread."),
       command(
@@ -77,7 +77,7 @@ export const APP_COMMAND_GROUPS: readonly AppCommandGroup[] = [
     commands: [
       paletteHiddenCommand(
         "palette.open",
-        "Open quick palette",
+        "Open command palette",
         "Search and run bb commands from the keyboard.",
       ),
       command("window.new", "New window", "Open another bb desktop window."),

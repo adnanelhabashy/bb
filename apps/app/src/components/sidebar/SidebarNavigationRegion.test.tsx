@@ -53,7 +53,7 @@ vi.mock("@/components/plugin/PluginNavSidebarItems", () => ({
         </button>
       ))}
       <button type="button" onClick={onOpenPalette}>
-        Open quick palette
+        Open command palette
       </button>
     </div>
   ),
@@ -182,7 +182,9 @@ afterEach(() => {
 describe("SidebarNavigationRegion", () => {
   it("opens the command catalog from the ordinary menu and closes compact navigation", () => {
     renderHarness();
-    fireEvent.click(screen.getByRole("button", { name: "Open quick palette" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open command palette" }),
+    );
     expect(mocks.onSearchThreads).toHaveBeenCalledOnce();
     expect(mocks.dispatch).toHaveBeenCalledExactlyOnceWith(
       "palette.open",
@@ -200,7 +202,7 @@ describe("SidebarNavigationRegion", () => {
     expect(mocks.openNewThreadInSplit).toHaveBeenCalledOnce();
   });
 
-  it("routes Search through the quick palette without inline search UI", () => {
+  it("routes Search through the command palette without inline search UI", () => {
     registerFixture();
     renderHarness();
 

@@ -321,7 +321,7 @@ Always end font stacks with a generic fallback such as `sans-serif` or
 
 ## Keyboard Shortcuts
 
-`Mod+Shift+P` opens the quick palette: type to filter, then run a command with
+`Mod+Shift+P` opens the command palette: type to filter, then run a command with
 Enter. It lists only commands that apply on the current surface, shows each
 one's shortcut, and offers recently run commands first. The numbered
 accelerator families and the relative cycle commands stay rebindable but
@@ -365,7 +365,7 @@ delayed shortcut badges without disabling any shortcuts.
 
 | Area      | Command                                   | Default                           | Availability             |
 | --------- | ----------------------------------------- | --------------------------------- | ------------------------ |
-| Palette   | Quick palette                             | `Mod+Shift+P`                     | All clients              |
+| Palette   | Open command palette                      | `Mod+Shift+P`                     | All clients              |
 | Threads   | New thread                                | `Mod+N` / `Mod+Shift+O`           | Desktop / web            |
 | Threads   | Search threads                            | `Mod+K`                           | All clients              |
 | Threads   | Rename focused thread                     | Unassigned                        | Thread view              |

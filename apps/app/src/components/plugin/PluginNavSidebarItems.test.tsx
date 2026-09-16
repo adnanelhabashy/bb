@@ -361,7 +361,7 @@ describe("PluginNavSidebarItems", () => {
       else fireEvent.pointerDown(moreTrigger(), { button: 0 });
 
       const item = await screen.findByRole("menuitem", {
-        name: "Open quick palette",
+        name: "Open command palette",
       });
       expect(item.getAttribute("aria-keyshortcuts")).toBe("Control+Shift+L");
       expect(item.querySelector("kbd")?.textContent).toBe("Ctrl + Shift + L");
@@ -379,7 +379,7 @@ describe("PluginNavSidebarItems", () => {
     const onOpenPalette = vi.fn();
     renderSidebarItems({ onOpenPalette });
     await openMoreMenu();
-    const item = screen.getByRole("menuitem", { name: "Open quick palette" });
+    const item = screen.getByRole("menuitem", { name: "Open command palette" });
     expect(item.querySelector("kbd")).toBeNull();
     expect(item.hasAttribute("aria-keyshortcuts")).toBe(false);
     fireEvent.click(item);

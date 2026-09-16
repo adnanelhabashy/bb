@@ -414,6 +414,9 @@ describe("CommandPalette", () => {
     renderPalette();
     const event = openPalette();
     await waitFor(() => expect(searchField()).toBeTruthy());
+    expect(
+      screen.getByRole("dialog", { name: "Command palette" }),
+    ).toBeTruthy();
     expect(event.defaultPrevented).toBe(true);
     const titles = optionTitles();
     expect(titles?.[0]).toContain("New thread");

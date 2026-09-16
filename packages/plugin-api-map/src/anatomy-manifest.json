@@ -17,7 +17,7 @@
       "responsiveStrategy": "scale-together",
       "requiredStates": ["anchor", "triggered", "outcome"],
       "labels": {
-        "anchor": ["Quick palette", "⇧⌘P"],
+        "anchor": ["Command palette", "⇧⌘P"],
         "triggered": ["Search commands", "Plugins", "Run release checklist"],
         "outcome": ["Release checklist"]
       },
@@ -100,7 +100,7 @@
         {
           "path": "apps/app/src/components/sidebar/SidebarNavigationRegion.test.tsx",
           "anchors": [
-            "routes Search through the quick palette without inline search UI",
+            "routes Search through the command palette without inline search UI",
             "delegates and falls back after a crash without owner remounts"
           ]
         }

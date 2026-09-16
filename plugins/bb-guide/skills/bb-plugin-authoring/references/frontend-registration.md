@@ -196,7 +196,7 @@ Each item has an `id`, `label`, semantic `icon`, host `action`, disabled state,
 shortcut metadata, and `experimental_splitProps`. Spread the split props onto
 the interactive element. Call
 `experimental_activate(item.id, { openInSplit })` for activation. Search opens
-the host quick palette. The former inline sidebar search field and query state
+the host command palette. The former inline sidebar search field and query state
 are not part of this API.
 
 The component also receives `experimental_Original`. Render it to delegate to

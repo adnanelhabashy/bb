@@ -787,12 +787,12 @@ export function CommandPaletteWireframe() {
                 <button
                   type="button"
                   onClick={openPalette}
-                  aria-label="Open Quick palette (Shift Command P)"
+                  aria-label="Open command palette (Shift Command P)"
                   data-guide-fixture="command-palette-shortcut"
                   className="flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-border-hairline px-2 text-subtle-foreground hover:bg-state-hover hover:text-foreground"
                 >
                   <MiniIcon icon={Search01Icon} className="size-3.5" />
-                  <span>Quick palette</span>
+                  <span>Command palette</span>
                   <kbd className="rounded bg-surface-recessed px-1.5 py-0.5 font-mono text-2xs text-foreground">
                     ⇧⌘P
                   </kbd>
@@ -922,7 +922,7 @@ export function CommandPaletteWireframe() {
                 </div>
                 <MeasuredBadge
                   id="command-palette-actions"
-                  label="Plugin actions in bb's quick command palette"
+                  label="Plugin actions in bb's command palette"
                   anchor='[data-guide-region="command-palette-actions"]'
                   at="start"
                   flush

@@ -364,7 +364,7 @@ export function CommandPalette({ threadId, projectId }: CommandPaletteProps) {
         }}
         data-testid="command-palette"
       >
-        <DialogTitle className="sr-only">Quick palette</DialogTitle>
+        <DialogTitle className="sr-only">Command palette</DialogTitle>
         {activeMode === undefined ? (
           <PaletteShell
             activeDescendantId={

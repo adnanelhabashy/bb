@@ -235,7 +235,7 @@ target? })`. Inside the fixed-tab component,
   `{ id, title, description?, component }`. The component receives semantic
   host items, the active item id, the compact-viewport state,
   `experimental_activate`, and `experimental_Original`. Search activation opens
-  the quick palette. No inline search field or query state exists. BB keeps the
+  the command palette. No inline search field or query state exists. BB keeps the
   drawer, thread list, footer, resize handle, and shortcut ownership.
 - `fileOpener` → `{ path: string, source, experimental_lineRange?, Original }` — register as a viewer/editor
   for file extensions: `{ id, title, extensions: ["md"], component }`.

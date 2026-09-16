@@ -195,9 +195,9 @@ export interface PluginThreadListProps {
   onNavigate: () => void;
   /**
    * Compatibility value for the former sidebar search field. BB now searches
-   * threads in the quick palette, so the host always supplies "".
+   * threads in the command palette, so the host always supplies "".
    *
-   * @deprecated The quick palette owns thread search. Ignore this value.
+   * @deprecated The command palette owns thread search. Ignore this value.
    */
   searchQuery: string;
   /**

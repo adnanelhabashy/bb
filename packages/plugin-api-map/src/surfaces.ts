@@ -313,7 +313,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
         id: "command-palette-actions",
         title: "Command palette actions",
         summary:
-          "Registers a command with app.commands.register and adds a row under Plugins in bb's quick command palette. With this, a plugin can:",
+          "Registers a command with app.commands.register and adds a row under Plugins in bb's command palette. With this, a plugin can:",
         bullets: [
           "Supply the row's label and run behavior; bb owns matching, ordering, and recency",
           "Offer a defaultShortcut with key and optional mod, meta, control, alt, and shift modifiers; mod means Command on macOS and Control elsewhere",
