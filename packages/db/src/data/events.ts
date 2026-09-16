@@ -2885,6 +2885,12 @@ export interface ListTimelineSegmentAnchorsDescendingArgs {
   sequenceStart: number;
 }
 
+export interface ListTimelineSegmentAnchorSequencesArgs {
+  threadId: string;
+  beforeSequence: number;
+  sequenceStart: number;
+}
+
 export interface FindTimelineWindowBudgetFloorSequenceArgs {
   excludeDiagnosticEvents?: boolean;
   excludedTypes: readonly ThreadEventType[];
@@ -3089,6 +3095,25 @@ export function listTimelineSegmentAnchorsDescending(
     .orderBy(desc(events.sequence))
     .limit(args.limit)
     .all();
+}
+
+export function listTimelineSegmentAnchorSequences(
+  db: DbConnection,
+  args: ListTimelineSegmentAnchorSequencesArgs,
+): number[] {
+  return db
+    .select({ sequence: events.sequence })
+    .from(events)
+    .where(
+      and(
+        timelineSegmentAnchorConditions(args.threadId),
+        gte(events.sequence, args.sequenceStart),
+        lt(events.sequence, args.beforeSequence),
+      ),
+    )
+    .orderBy(events.sequence)
+    .all()
+    .map((row) => row.sequence);
 }
 
 export interface TimelineSegmentAnchorLookupArgs {

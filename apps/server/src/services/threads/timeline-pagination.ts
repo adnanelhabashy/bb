@@ -42,18 +42,6 @@ interface PaginatedTimelineRowsResult {
   rows: TimelineRow[];
 }
 
-function isTimelineSegmentAnchorRow(
-  row: TimelineRow,
-  contextBoundarySeq: number | null,
-): boolean {
-  return (
-    row.sourceSeqStart === contextBoundarySeq ||
-    (row.kind === "conversation" &&
-      row.role === "user" &&
-      row.turnRequest.kind === "message")
-  );
-}
-
 function buildTimelineLogicalSegment(
   anchorRow: TimelineRow | null,
   rows: TimelineRow[],
@@ -75,13 +63,17 @@ function buildTimelineLogicalSegment(
 function buildTimelineLogicalSegments(
   rows: readonly TimelineRow[],
   contextBoundarySeq: number | null,
+  segmentAnchorSequences: ReadonlySet<number>,
 ): TimelineLogicalSegment[] {
   const segments: TimelineLogicalSegment[] = [];
   let currentRows: TimelineRow[] = [];
   let anchorRow: TimelineRow | null = null;
 
   for (const row of rows) {
-    if (isTimelineSegmentAnchorRow(row, contextBoundarySeq)) {
+    if (
+      row.sourceSeqStart === contextBoundarySeq ||
+      segmentAnchorSequences.has(row.sourceSeqStart)
+    ) {
       if (
         anchorRow === null &&
         currentRows.every(
@@ -111,7 +103,7 @@ function buildTimelineLogicalSegments(
   return segments;
 }
 
-interface PaginateTimelineRowsArgs {
+export interface PaginateTimelineRowsArgs {
   contentCursor?: TimelineContentCursor;
   maxLeaves: number;
   maxBytes: number;
@@ -121,6 +113,7 @@ interface PaginateTimelineRowsArgs {
   knownHasOlderSegments: boolean | null;
   page: ThreadTimelinePageRequest;
   rows: readonly TimelineRow[];
+  segmentAnchorSequences: ReadonlySet<number>;
 }
 
 export function paginateTimelineRows(
@@ -130,6 +123,7 @@ export function paginateTimelineRows(
   const logicalSegments = buildTimelineLogicalSegments(
     rows,
     contextBoundarySeq,
+    args.segmentAnchorSequences,
   );
   const returnedSegments = new Set<TimelineLogicalSegment>();
   const olderRowsSourceSeqEnd = (
@@ -146,16 +140,16 @@ export function paginateTimelineRows(
         (sourceSeqEnd, row) => Math.max(sourceSeqEnd ?? 0, row.sourceSeqEnd),
         omittedContentSourceSeqEnd,
       );
-  const segments = logicalSegments.filter(
+  const ownedSegments = logicalSegments.filter(
     (segment) =>
       segment.cursor.anchorSeq >= args.ownedSequenceStart &&
       segment.cursor.anchorSeq < args.ownedSequenceEnd,
   );
+  const segments = ownedSegments.length > 0 ? ownedSegments : logicalSegments;
   const selectedSegments = segments.slice(-page.segmentLimit);
   if (selectedSegments.length === 0) {
     return {
-      hasOlderRows:
-        knownHasOlderSegments ?? segments.length > selectedSegments.length,
+      hasOlderRows: false,
       olderCursor: null,
       olderRowsSourceSeqEnd: olderRowsSourceSeqEnd(null),
       returnedSegmentCount: 0,

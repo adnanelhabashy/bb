@@ -26,6 +26,7 @@ export interface TimelineEventRowSelection {
   paginationPage: ThreadTimelinePageRequest;
   responsePageKind: ThreadTimelinePageKind;
   rows: StoredEventRow[];
+  segmentAnchorSequences: readonly number[];
   strategy: ThreadTimelineEventSelectionStrategy;
 }
 

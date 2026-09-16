@@ -294,6 +294,7 @@ export {
   listEvents,
   listStoredConversationOutlineEventRows,
   listTimelineSegmentAnchorsDescending,
+  listTimelineSegmentAnchorSequences,
   getFirstParentedTimelineBoundarySequence,
   hasTimelineGroupingContextRowsInRange,
   listStoredEventRowsInSequenceRange,

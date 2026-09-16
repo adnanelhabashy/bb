@@ -70,6 +70,7 @@ import {
   listStoredTurnRejectedRowsByClientRequestIds,
   listStoredTurnStartedRowsByTurnIdsUpToSequence,
   listTimelineSegmentAnchorsDescending,
+  listTimelineSegmentAnchorSequences,
   scopedItemRefKey,
   upsertThreadConversationOutlineRecord,
 } from "@bb/db";
@@ -1180,6 +1181,11 @@ function selectStandardTimelineEventRows(
       orderingBoundarySequence: groupingContext.orderingBoundarySequence,
       ownedSequenceStart: sequenceStart,
       ownedSequenceEnd: beforeSequence,
+      segmentAnchorSequences: listTimelineSegmentAnchorSequences(db, {
+        threadId: thread.id,
+        sequenceStart,
+        beforeSequence,
+      }),
       knownHasOlderSegments: (
         contentCursor === undefined
           ? hasOlder
@@ -1470,6 +1476,7 @@ function buildThreadTimelineInternal(
         knownHasOlderSegments: eventSelection.knownHasOlderSegments,
         page: eventSelection.paginationPage,
         rows: projectedTimelineRows,
+        segmentAnchorSequences: new Set(eventSelection.segmentAnchorSequences),
       }),
   );
   profile.responseRowCount = paginatedTimeline.rows.length;
