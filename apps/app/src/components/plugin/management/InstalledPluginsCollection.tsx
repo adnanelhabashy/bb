@@ -1,4 +1,11 @@
-import { useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   Link,
   useLocation,
@@ -69,6 +76,8 @@ export function InstalledPluginsCollection({
   );
   const shelfKey = searchParams.get("shelf");
   const query = searchParams.get("query") ?? "";
+  const [searchInput, setSearchInput] = useState(query);
+  useEffect(() => setSearchInput(query), [query]);
   const selectedCategories = useMemo(
     () => (shelfKey === null ? searchParams.getAll("category") : []),
     [searchParams, shelfKey],
@@ -80,13 +89,15 @@ export function InstalledPluginsCollection({
   const allShelves = useMemo(() => pluginCategoryShelves(plugins), [plugins]);
   const selectedShelf = allShelves.find((shelf) => shelf.key === shelfKey);
   useResourceRouteLabel(selectedShelf?.label ?? null);
-  const scopedPlugins =
-    shelfKey === null ? plugins : (selectedShelf?.entries ?? []);
+  const scopedPlugins = useMemo(
+    () => (shelfKey === null ? plugins : (selectedShelf?.entries ?? [])),
+    [plugins, selectedShelf, shelfKey],
+  );
   const categoryOptions = useMemo(
     () => pluginCategoryFilterOptions(plugins, selectedCategories),
     [plugins, selectedCategories],
   );
-  const normalizedQuery = query.trim().toLowerCase();
+  const normalizedQuery = searchInput.trim().toLowerCase();
   const visiblePlugins = useMemo(
     () =>
       scopedPlugins
@@ -136,12 +147,11 @@ export function InstalledPluginsCollection({
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
     if (viewport === null || !ready) return;
+    const positions = scrollPositions.current;
     viewport.scrollTop =
-      navigation?.installedRestoreScroll ??
-      scrollPositions.current.get(location.search) ??
-      0;
+      navigation?.installedRestoreScroll ?? positions.get(location.search) ?? 0;
     return () => {
-      scrollPositions.current.set(location.search, viewport.scrollTop);
+      positions.set(location.search, viewport.scrollTop);
     };
   }, [
     location.key,
@@ -197,7 +207,7 @@ export function InstalledPluginsCollection({
                     aria-hidden
                   />
                   {selectedShelf.label}
-                </span>
+                </span>{" "}
                 <span className="rounded-md bg-muted px-2 py-1 text-2xs font-medium tabular-nums text-subtle-foreground">
                   {selectedShelf.entries.length.toLocaleString()}{" "}
                   {selectedShelf.entries.length === 1 ? "plugin" : "plugins"}
@@ -207,14 +217,15 @@ export function InstalledPluginsCollection({
           </div>
         ) : null}
         <ResourceToolbar
-          searchValue={query}
+          searchValue={searchInput}
           searchPlaceholder="Search installed plugins"
-          onSearchChange={(value) =>
+          onSearchChange={(value) => {
+            setSearchInput(value);
             changeSearchParams((next) => {
               if (value === "") next.delete("query");
               else next.set("query", value);
-            })
-          }
+            });
+          }}
           action={actions}
           controls={
             <>

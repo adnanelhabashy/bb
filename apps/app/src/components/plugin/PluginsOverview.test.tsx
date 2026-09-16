@@ -87,7 +87,7 @@ const GITHUB_CATALOG_ENTRY = {
   icon: "Github",
   iconUrl: null,
   categoryId: "code-and-reviews",
-  category: "Developer tools",
+  category: "Code & Reviews",
   source: "builtin:github",
   marketplace: "bb-official",
   marketplaceDisplayName: "BB Official",
@@ -108,7 +108,7 @@ const AUTOMATIONS_CATALOG_ENTRY = {
   description: AUTOMATIONS_PLUGIN.description,
   icon: AUTOMATIONS_PLUGIN.icon,
   categoryId: "tasks-and-workflows",
-  category: "Workflow management",
+  category: "Tasks & Workflows",
   source: AUTOMATIONS_PLUGIN.source,
   installed: true,
 };
@@ -121,7 +121,7 @@ const DOCS_CATALOG_ENTRY = {
   description: "Create and edit Markdown documents.",
   icon: "NotebookText",
   categoryId: "memory-and-context",
-  category: "Context & knowledge",
+  category: "Memory & Context",
   source: "builtin:docs",
   installed: true,
 };
@@ -318,9 +318,7 @@ describe("PluginsOverview", () => {
     });
     expect(screen.queryByRole("button", { name: "Type" })).toBeNull();
     fireEvent.click(categoryTrigger);
-    fireEvent.click(
-      screen.getByRole("option", { name: /Context & knowledge/u }),
-    );
+    fireEvent.click(screen.getByRole("option", { name: /Memory & Context/u }));
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.getByText("Docs")).toBeTruthy();
     expect(screen.queryByText("GitHub")).toBeNull();
@@ -673,7 +671,11 @@ describe("PluginsOverview", () => {
       screen.queryByRole("heading", { name: "Code & Reviews" }),
     ).toBeNull();
     expect(screen.getAllByTestId("plugin-row-github")).toHaveLength(1);
-    expect(screen.queryByText("Workflow management")).toBeNull();
+    expect(
+      within(screen.getByTestId("plugin-row-automations")).queryByText(
+        "Tasks & Workflows",
+      ),
+    ).toBeNull();
 
     fireEvent.click(
       screen.getByRole("button", {
