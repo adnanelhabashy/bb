@@ -37,14 +37,12 @@ vi.mock("@/components/plugin/PluginNavSidebarItems", () => ({
   ResourceNavSidebarItem: () => <div />,
   PluginNavSidebarItems: ({
     builtInEntries = [],
-    onOpenPalette,
   }: {
     builtInEntries?: Array<{
       id: string;
       title: string;
       onActivate: MouseEventHandler<HTMLButtonElement>;
     }>;
-    onOpenPalette?: () => void;
   }) => (
     <div>
       {builtInEntries.map((entry) => (
@@ -52,9 +50,6 @@ vi.mock("@/components/plugin/PluginNavSidebarItems", () => ({
           {entry.title}
         </button>
       ))}
-      <button type="button" onClick={onOpenPalette}>
-        Open command palette
-      </button>
     </div>
   ),
 }));
@@ -180,7 +175,7 @@ afterEach(() => {
 });
 
 describe("SidebarNavigationRegion", () => {
-  it("opens the command catalog from the ordinary menu and closes compact navigation", () => {
+  it("opens the command catalog from its sidebar row and closes compact navigation", () => {
     renderHarness();
     fireEvent.click(
       screen.getByRole("button", { name: "Open command palette" }),

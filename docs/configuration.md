@@ -665,6 +665,13 @@ a transient failure.
 
 ## Sidebar preferences
 
+**Open command palette** is a visible sidebar row by default. Use its context
+menu's **Hide from sidebar**, or clear its checkbox in **Customize sidebar**, to
+move it into **More**. Re-enable the checkbox to restore the row. Its order and
+visibility use the existing navigation preferences and the key
+`__bb__/command-palette`; SDK/CLI callers can include that key in
+`sidebar.pluginPanelOrder` and `sidebar.visiblePluginPanels` like other entries.
+
 Sidebar layout preferences are stored on the server in a keyed registry so
 every window, device, and the CLI read the same value. Each key has a typed
 schema, a default, and a revision that increments on every write. Writes name

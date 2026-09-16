@@ -163,7 +163,6 @@ interface RenderSidebarItemsOptions {
   initialEntries?: string[];
   initialLayout?: SplitLayout;
   onCompactCustomizeModeChange?: (isCustomizing: boolean) => void;
-  onOpenPalette?: () => void;
   splitEnabled?: boolean;
 }
 
@@ -189,7 +188,6 @@ function PluginNavSidebarItemsHarness({
     <PluginNavSidebarItems
       builtInEntries={options.builtInEntries}
       splitEnabled={options.splitEnabled}
-      onOpenPalette={options.onOpenPalette}
       {...compactControlProps}
     />
   );
@@ -276,7 +274,11 @@ function builtInEntry(
     id,
     title,
     icon: <span aria-hidden="true" />,
-    content: <button type="button">{title}</button>,
+    content: (
+      <button type="button" onClick={onActivate}>
+        {title}
+      </button>
+    ),
     onActivate,
   };
 }
@@ -345,7 +347,7 @@ afterEach(() => {
 
 describe("PluginNavSidebarItems", () => {
   it.each([false, true])(
-    "offers the palette with its configured shortcut when no rows are hidden (compact: %s)",
+    "offers the hidden palette row in More with its configured shortcut (compact: %s)",
     async (compactViewport) => {
       const onOpenPalette = vi.fn();
       paletteCommandState.shortcut = {
@@ -354,8 +356,16 @@ describe("PluginNavSidebarItems", () => {
       };
       renderSidebarItems({
         compactViewport,
-        onOpenPalette,
-        builtInEntries: [builtInEntry("new-thread", "New thread")],
+        builtInEntries: [
+          builtInEntry("new-thread", "New thread"),
+          builtInEntry(
+            "command-palette",
+            "Open command palette",
+            onOpenPalette,
+          ),
+        ],
+        storedOrder: ["__bb__/new-thread", "__bb__/command-palette"],
+        storedVisibleKeys: ["__bb__/new-thread"],
       });
       if (compactViewport) fireEvent.click(moreTrigger());
       else fireEvent.pointerDown(moreTrigger(), { button: 0 });
@@ -377,13 +387,79 @@ describe("PluginNavSidebarItems", () => {
 
   it("keeps the menu command available without an assigned shortcut", async () => {
     const onOpenPalette = vi.fn();
-    renderSidebarItems({ onOpenPalette });
+    renderSidebarItems({
+      builtInEntries: [
+        builtInEntry("command-palette", "Open command palette", onOpenPalette),
+      ],
+      storedOrder: ["__bb__/command-palette"],
+      storedVisibleKeys: [],
+    });
     await openMoreMenu();
     const item = screen.getByRole("menuitem", { name: "Open command palette" });
     expect(item.querySelector("kbd")).toBeNull();
     expect(item.hasAttribute("aria-keyshortcuts")).toBe(false);
     fireEvent.click(item);
     expect(onOpenPalette).toHaveBeenCalledOnce();
+  });
+
+  it("shows the palette as a normal row by default without forcing More", () => {
+    const onOpenPalette = vi.fn();
+    renderSidebarItems({
+      builtInEntries: [
+        builtInEntry("new-thread", "New thread"),
+        builtInEntry("command-palette", "Open command palette", onOpenPalette),
+      ],
+    });
+    expect(visibleRowKeys()).toEqual([
+      "__bb__/new-thread",
+      "__bb__/command-palette",
+    ]);
+    expect(screen.queryByTestId("sidebar-navigation-more-row")).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open command palette" }),
+    );
+    expect(onOpenPalette).toHaveBeenCalledOnce();
+  });
+
+  it("adds the palette to existing preferences, persists hiding it, and restores it through Customize", async () => {
+    const builtInEntries = [
+      builtInEntry("new-thread", "New thread"),
+      builtInEntry("command-palette", "Open command palette"),
+    ];
+    const view = renderSidebarItems({
+      builtInEntries,
+      storedOrder: ["__bb__/new-thread"],
+      storedVisibleKeys: ["__bb__/new-thread"],
+    });
+    const palette = screen.getByRole("button", {
+      name: "Open command palette",
+    });
+    fireEvent.contextMenu(palette);
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "Hide from sidebar" }),
+    );
+    expect(visibleRowKeys()).toEqual(["__bb__/new-thread"]);
+    const storedOrder = view.store.get(pluginNavPanelOrderAtom);
+    const storedVisibleKeys = view.store.get(pluginNavVisiblePanelKeysAtom);
+    expect(storedOrder).toContain("__bb__/command-palette");
+    expect(storedVisibleKeys).toEqual(["__bb__/new-thread"]);
+    view.unmount();
+
+    renderSidebarItems({ builtInEntries, storedOrder, storedVisibleKeys });
+    expect(visibleRowKeys()).toEqual(["__bb__/new-thread"]);
+    await openMoreMenu();
+    expect(
+      screen.getAllByRole("menuitem", { name: "Open command palette" }),
+    ).toHaveLength(1);
+    await openCustomizeFromMore();
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "Show Open command palette in sidebar",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(visibleRowKeys()).toContain("__bb__/command-palette");
+    expect(screen.queryByTestId("sidebar-navigation-more-row")).toBeNull();
   });
 
   it("keeps built-in actions visible without placeholders during startup", () => {

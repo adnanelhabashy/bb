@@ -20,7 +20,6 @@ import {
 import { Button } from "@bb/shared-ui/button";
 import { useAppCommandShortcut } from "@/components/commands/AppCommandProvider";
 import { AppCommandShortcutPill } from "@/components/commands/AppCommandShortcutHint";
-import { getAppCommandMetadata } from "@/lib/app-command-metadata";
 import { Checkbox } from "@bb/shared-ui/checkbox";
 import { Icon, type IconName } from "@bb/shared-ui/icon";
 import {
@@ -88,6 +87,7 @@ import {
 } from "./pluginNavSidebarAtoms";
 import {
   arrangePluginNavPanelPreferences,
+  BUILT_IN_SIDEBAR_NAVIGATION_KEYS,
   DEFAULT_HIDDEN_SIDEBAR_NAVIGATION_KEYS,
   getPluginNavPanelKey,
   seedSkillsNavigationPreference,
@@ -144,7 +144,6 @@ export function PluginNavSidebarItems(props: {
   leadingOrderKeys?: readonly string[];
   onCompactCustomizeModeChange?: (isCustomizing: boolean) => void;
   onNavigate?: () => void;
-  onOpenPalette?: () => void;
   splitEnabled?: boolean;
 }) {
   const entries = usePluginNavPanelChrome();
@@ -172,7 +171,7 @@ export function PluginNavSidebarItems(props: {
       (props.builtInEntries ?? []).map(getPluginNavPanelKey),
     [props.builtInEntries, props.leadingOrderKeys],
   );
-  if (rows.length === 0 && props.onOpenPalette === undefined) return null;
+  if (rows.length === 0) return null;
   return (
     <PluginNavSidebarItemList
       rows={rows}
@@ -187,7 +186,6 @@ export function PluginNavSidebarItems(props: {
           }
         : {})}
       {...(props.onNavigate ? { onNavigate: props.onNavigate } : {})}
-      {...(props.onOpenPalette ? { onOpenPalette: props.onOpenPalette } : {})}
     />
   );
 }
@@ -197,7 +195,6 @@ function PluginNavSidebarItemList({
   leadingOrderKeys,
   onCompactCustomizeModeChange,
   onNavigate,
-  onOpenPalette,
   rows,
   splitEnabled = false,
 }: {
@@ -205,7 +202,6 @@ function PluginNavSidebarItemList({
   leadingOrderKeys: readonly string[];
   onCompactCustomizeModeChange?: (isCustomizing: boolean) => void;
   onNavigate?: () => void;
-  onOpenPalette?: () => void;
   rows: readonly SidebarNavRow[];
   splitEnabled?: boolean;
 }) {
@@ -496,12 +492,11 @@ function PluginNavSidebarItemList({
           )}
         </SortableContext>
       </DndContext>
-      {hidden.length > 0 || onOpenPalette !== undefined ? (
+      {hidden.length > 0 ? (
         <SidebarNavigationMoreRow
           hiddenRows={hidden}
           onActivate={handleActivate}
           onCustomize={openCustomize}
-          onOpenPalette={onOpenPalette}
         />
       ) : null}
     </div>
@@ -512,7 +507,6 @@ function SidebarNavigationMoreRow({
   hiddenRows,
   onActivate,
   onCustomize,
-  onOpenPalette,
 }: {
   hiddenRows: readonly SidebarNavRow[];
   onActivate: (
@@ -520,7 +514,6 @@ function SidebarNavigationMoreRow({
     event: SidebarNavActivationModifiers,
   ) => void;
   onCustomize: () => void;
-  onOpenPalette: (() => void) | undefined;
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const paletteShortcut = useAppCommandShortcut("palette.open");
@@ -563,53 +556,50 @@ function SidebarNavigationMoreRow({
                 paletteSelectedRef.current = false;
               }}
             >
-              {hiddenRows.map((row) => (
-                <DropdownMenuItem
-                  key={getPluginNavPanelKey(row)}
-                  disabled={!isPluginSidebarNavRow(row) && row.disabled}
-                  data-sidebar-navigation-more-item={getPluginNavPanelKey(row)}
-                  onClick={(event) => {
-                    modifiersRef.current = {
-                      metaKey: event.metaKey,
-                      ctrlKey: event.ctrlKey,
-                    };
-                  }}
-                  onSelect={() => {
-                    const modifiers = modifiersRef.current;
-                    modifiersRef.current = { metaKey: false, ctrlKey: false };
-                    onActivate(row, modifiers);
-                  }}
-                >
-                  <span className="flex size-4 shrink-0 items-center justify-center">
-                    {isPluginSidebarNavRow(row) ? (
-                      <PluginIcon
-                        pluginId={row.chrome.pluginId}
-                        icon={row.chrome.icon}
-                      />
-                    ) : (
-                      row.icon
+              {hiddenRows.map((row) => {
+                const isPalette =
+                  getPluginNavPanelKey(row) ===
+                  BUILT_IN_SIDEBAR_NAVIGATION_KEYS.commandPalette;
+                return (
+                  <DropdownMenuItem
+                    key={getPluginNavPanelKey(row)}
+                    disabled={!isPluginSidebarNavRow(row) && row.disabled}
+                    aria-keyshortcuts={
+                      isPalette ? paletteShortcut?.ariaKeyshortcuts : undefined
+                    }
+                    data-sidebar-navigation-more-item={getPluginNavPanelKey(
+                      row,
                     )}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{row.title}</span>
-                </DropdownMenuItem>
-              ))}
-              {onOpenPalette === undefined ? null : (
-                <DropdownMenuItem
-                  aria-keyshortcuts={paletteShortcut?.ariaKeyshortcuts}
-                  onSelect={() => {
-                    paletteSelectedRef.current = true;
-                    onOpenPalette();
-                  }}
-                >
-                  <Icon name="Search" aria-hidden="true" />
-                  <span className="flex-1">
-                    {getAppCommandMetadata("palette.open").label}
-                  </span>
-                  {paletteShortcut === null ? null : (
-                    <AppCommandShortcutPill shortcut={paletteShortcut} />
-                  )}
-                </DropdownMenuItem>
-              )}
+                    onClick={(event) => {
+                      modifiersRef.current = {
+                        metaKey: event.metaKey,
+                        ctrlKey: event.ctrlKey,
+                      };
+                    }}
+                    onSelect={() => {
+                      const modifiers = modifiersRef.current;
+                      modifiersRef.current = { metaKey: false, ctrlKey: false };
+                      paletteSelectedRef.current = isPalette;
+                      onActivate(row, modifiers);
+                    }}
+                  >
+                    <span className="flex size-4 shrink-0 items-center justify-center">
+                      {isPluginSidebarNavRow(row) ? (
+                        <PluginIcon
+                          pluginId={row.chrome.pluginId}
+                          icon={row.chrome.icon}
+                        />
+                      ) : (
+                        row.icon
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{row.title}</span>
+                    {isPalette && paletteShortcut !== null ? (
+                      <AppCommandShortcutPill shortcut={paletteShortcut} />
+                    ) : null}
+                  </DropdownMenuItem>
+                );
+              })}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 data-testid="sidebar-navigation-customize-trigger"

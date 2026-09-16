@@ -6,9 +6,16 @@ import {
   PluginNavSidebarItems,
   type SidebarNavActivationModifiers,
 } from "@/components/plugin/PluginNavSidebarItems";
-import { useAppCommandRunner } from "@/components/commands/AppCommandProvider";
+import {
+  useAppCommandRunner,
+  useAppCommandShortcut,
+} from "@/components/commands/AppCommandProvider";
+import { AppCommandShortcutHint } from "@/components/commands/AppCommandShortcutHint";
+import { getAppCommandMetadata } from "@/lib/app-command-metadata";
+import { Button } from "@bb/shared-ui/button";
 import { Icon } from "@bb/shared-ui/icon";
 import {
+  PROJECT_LIST_ACTION_BUTTON_CLASS,
   ProjectListNewThreadAction,
   ProjectListSearchThreadsAction,
 } from "./ProjectList";
@@ -38,6 +45,16 @@ export function BuiltInSidebarNavigation({
 }: BuiltInSidebarNavigationProps) {
   const navigate = useNavigate();
   const commandRunner = useAppCommandRunner();
+  const paletteShortcut = useAppCommandShortcut("palette.open");
+  const paletteLabel = getAppCommandMetadata("palette.open").label;
+  const paletteDisabled = !commandRunner.isCommandAvailable(
+    "palette.open",
+    null,
+  );
+  const openPalette = (target: HTMLElement | null) => {
+    onSearchThreads?.();
+    commandRunner.dispatch("palette.open", target);
+  };
   const pluginsRoutePath = getPluginsRoutePath();
   const skillsRoutePath = getSkillsRoutePath();
   const builtInEntries: BuiltInSidebarNavEntry[] = [
@@ -77,6 +94,37 @@ export function BuiltInSidebarNavigation({
         onSearchThreads?.();
         commandRunner.dispatch("thread.search", null);
       },
+    },
+    {
+      kind: "built-in",
+      pluginId: "__bb__",
+      id: "command-palette",
+      title: paletteLabel,
+      icon: <Icon name="Search" aria-hidden="true" />,
+      content: (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className={`${PROJECT_LIST_ACTION_BUTTON_CLASS} w-full`}
+          disabled={paletteDisabled}
+          onClick={(event) => openPalette(event.currentTarget)}
+          aria-label={
+            paletteShortcut
+              ? `${paletteLabel} (${paletteShortcut.label})`
+              : paletteLabel
+          }
+          aria-keyshortcuts={paletteShortcut?.ariaKeyshortcuts}
+        >
+          <Icon name="Search" aria-hidden="true" />
+          <span className="min-w-0 flex-1 truncate text-left">
+            {paletteLabel}
+          </span>
+          <AppCommandShortcutHint shortcut={paletteShortcut} />
+        </Button>
+      ),
+      disabled: paletteDisabled,
+      onActivate: () => openPalette(null),
     },
     {
       kind: "built-in",
@@ -131,10 +179,6 @@ export function BuiltInSidebarNavigation({
           leadingOrderKeys={DEFAULT_BUILT_IN_SIDEBAR_NAVIGATION_ORDER}
           onCompactCustomizeModeChange={onCompactCustomizeModeChange}
           onNavigate={onNavigate}
-          onOpenPalette={() => {
-            onSearchThreads?.();
-            commandRunner.dispatch("palette.open", null);
-          }}
           splitEnabled={splitEnabled}
         />
       </div>
