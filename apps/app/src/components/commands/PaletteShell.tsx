@@ -106,6 +106,12 @@ export function PaletteShell({
                   className="shrink-0 px-2 font-normal text-muted-foreground max-md:pointer-coarse:h-9"
                   aria-label={modeChip.clearLabel}
                   onClick={modeChip.onClear}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Escape") return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    modeChip.onClear();
+                  }}
                 >
                   Commands
                 </Button>
