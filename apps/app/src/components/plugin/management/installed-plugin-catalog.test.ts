@@ -34,7 +34,12 @@ describe("installed plugin catalog identity", () => {
     ]) {
       expect(
         installedPluginCatalogEntry(
-          { id: "notes", catalogEntryId: null, source },
+          {
+            id: "notes",
+            catalogEntryId: null,
+            catalogMarketplaceName: null,
+            source,
+          },
           [official, community],
         ),
       ).toBeUndefined();
@@ -43,7 +48,12 @@ describe("installed plugin catalog identity", () => {
   it("matches a bundled plugin by its source without marketplace installation metadata", () => {
     expect(
       installedPluginCatalogEntry(
-        { id: "notes", catalogEntryId: null, source: "builtin:notes" },
+        {
+          id: "notes",
+          catalogEntryId: null,
+          catalogMarketplaceName: null,
+          source: "builtin:notes",
+        },
         [community, official],
       ),
     ).toBe(official);
