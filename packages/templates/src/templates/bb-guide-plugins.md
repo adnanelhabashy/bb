@@ -222,7 +222,7 @@ connect status and push with `&&`.
 Local file and empty-directory deletions are warnings unless `--delete` is
 explicit; a pulled folder root is retained, so pull its parent or the whole
 vault to remove that folder. Use `--workspace-host <id>` when a standalone
-CLI's working directory is on a non-primary host. Direct `write`, `mkdir`,
+CLI's working directory is not on the server machine. Direct `write`, `mkdir`,
 `move`, and `remove` remain only as deprecated compatibility commands.
 
 The Tasks plugin is an opt-in official plugin bundled with the app:
@@ -646,7 +646,7 @@ arrives as the component's subPath prop for panel-internal deep links; the
 host always renders the shared plugin title bar and the component owns a
 zero-padding full-bleed body, including its scrolling;
 experimental_rightPanel: false removes the entire right panel and toggle,
-including Browser, Terminal, and fixed tabs (requires SDK 0.4.96 or newer;
+including Browser, Terminal, and fixed tabs (requires SDK 0.4.99 or newer;
 omitted or true keeps the panel, and saved panel state is retained); optional
 experimental_sidebarAccessory mounts a presentational live-value component at
 the trailing edge of the sidebar row on wide viewports, bounded to one short

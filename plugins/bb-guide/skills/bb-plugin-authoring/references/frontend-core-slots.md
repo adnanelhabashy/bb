@@ -96,7 +96,7 @@ Slot props contracts (versioned, additive-only):
   `{ id, title, icon, path, component, fixedTabs?, experimental_rightPanel?, experimental_sidebarAccessory?, headerContent? }`.
   `experimental_rightPanel: false` removes the page's right panel and toggle,
   including Browser, Terminal, and declared fixed tabs. Omitted or true keeps
-  the panel. Saved panel state is retained. Requires SDK 0.4.96 or newer.
+  the panel. Saved panel state is retained. Requires SDK 0.4.99 or newer.
   By default, BB wraps plugin pages in the same host-owned App panel
   used by New thread and thread pages. The page component supplies only its
   main body; it must not mount a second panel layout or register Browser and
@@ -109,7 +109,7 @@ Slot props contracts (versioned, additive-only):
   (when the desktop browser is available) and Terminal; it does not offer
   workspace file search because a generic plugin page has no implicit project,
   environment, or working directory. The Terminal row includes a compact
-  connected-machine selector, initially resolving the primary machine and then
+  connected-machine selector, initially resolving the server machine and then
   the first connected fallback. Changing the selector does not launch
   anything; activating Start terminal uses the selected machine. The selection
   is page-session UI state, not plugin storage.
