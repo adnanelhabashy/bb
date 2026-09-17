@@ -147,6 +147,7 @@ function HistoryBackButton() {
 
 afterEach(() => {
   cleanup();
+  window.localStorage.removeItem("bb.plugins.workspace.tabs");
   resetPluginSlotStoreForTest();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -165,7 +166,7 @@ describe("PluginDetail official catalog lifecycle", () => {
     );
 
     expect(screen.getByRole("heading", { name: "GitHub" })).toBeTruthy();
-    expect(screen.getByText("BB Official")).toBeTruthy();
+    expect(screen.getAllByText("BB Official").length).toBeGreaterThan(0);
     expect(screen.getByText("Developer tools")).toBeTruthy();
     expect(
       screen.getByText("Browse GitHub issues and pull requests in BB."),
@@ -589,7 +590,7 @@ describe("PluginDetail official catalog lifecycle", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("BB Official")).toBeTruthy();
+    expect(screen.getAllByText("BB Official").length).toBeGreaterThan(0);
     expect(
       screen.getByRole("switch", { name: "Disable Automations" }),
     ).toBeTruthy();
@@ -613,6 +614,111 @@ describe("PluginDetail official catalog lifecycle", () => {
 });
 
 describe("BB Official plugin detail routing", () => {
+  it("keeps official attribution and open details while navigating collections", async () => {
+    const author = {
+      name: "BB",
+      github: "get-bb",
+      url: "https://github.com/get-bb",
+    };
+    const entries = [
+      { ...GITHUB_CATALOG_ENTRY, author, installed: true },
+      {
+        ...GITHUB_CATALOG_ENTRY,
+        author,
+        entryId: "automations",
+        pluginId: "automations",
+        source: "builtin:automations",
+        displayName: "Automations",
+      },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url === "/api/v1/plugins")
+          return new Response(
+            JSON.stringify({
+              enabled: true,
+              plugins: [
+                {
+                  ...GITHUB_PLUGIN,
+                  provenance: "builtin",
+                  catalogEntryId: null,
+                  catalogMarketplaceName: null,
+                },
+              ],
+            }),
+            { headers: { "content-type": "application/json" } },
+          );
+        if (url.startsWith("/api/v1/plugin-catalog/search"))
+          return new Response(
+            JSON.stringify({ results: entries, collections: [] }),
+            { headers: { "content-type": "application/json" } },
+          );
+        return new Response(JSON.stringify({ error: "not found" }), {
+          status: 404,
+          headers: { "content-type": "application/json" },
+        });
+      }),
+    );
+    const { wrapper } = createQueryClientTestHarness();
+    render(
+      <MemoryRouter initialEntries={["/plugins/github?view=installed"]}>
+        <RoutedPluginsView />
+      </MemoryRouter>,
+      { wrapper },
+    );
+    const title = await screen.findByRole("heading", {
+      name: "GitHub",
+      level: 1,
+    });
+    const header = title.parentElement?.parentElement;
+    expect(header).not.toBeNull();
+    if (!header) throw new Error("Plugin header missing");
+    const authorLink = await within(header).findByRole("link", {
+      name: "BB Official",
+    });
+    expect(within(header).queryByText(/^By/u)).toBeNull();
+    expect(within(header).getAllByText("BB Official")).toHaveLength(1);
+    expect(
+      within(header).getByRole("img", { name: "BB Official's GitHub avatar" }),
+    ).toBeTruthy();
+    fireEvent.click(authorLink);
+    expect(
+      await screen.findByRole("heading", { name: /^BB Official/u, level: 1 }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Close GitHub" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "GitHub", level: 1 })).toBe(
+      title,
+    );
+    fireEvent.click(
+      (
+        await screen.findAllByRole("button", {
+          name: "Open Automations details",
+        })
+      )[0]!,
+    );
+    expect(
+      await screen.findByRole("button", { name: "Close Automations" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Close GitHub" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("link", { name: "Browse plugins" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("route-search").textContent).toBe(""),
+    );
+    expect(
+      screen.getByRole("button", { name: "Close Automations" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Close GitHub" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close Automations" }));
+    expect(
+      await screen.findByRole("heading", { name: "GitHub", level: 1 }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Close Automations" }),
+    ).toBeNull();
+  });
+
   it("uses the installed catalog identity when plugin ids collide", async () => {
     const firstCatalogEntry = {
       ...GITHUB_CATALOG_ENTRY,
@@ -1195,7 +1301,7 @@ describe("BB Official plugin detail routing", () => {
     expect(
       await screen.findByRole("heading", { name: "More from this author" }),
     ).toBeTruthy();
-    const authorLinks = screen.getAllByRole("link", { name: "BB" });
+    const authorLinks = screen.getAllByRole("link", { name: "BB Official" });
     fireEvent.click(authorLinks.at(-1)!);
     await waitFor(() => {
       expect(screen.getByTestId("route-path").textContent).toBe("/plugins");

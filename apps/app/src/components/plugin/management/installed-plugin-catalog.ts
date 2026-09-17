@@ -16,6 +16,19 @@ export function installedPluginCatalogEntry<
 ): Entry | undefined {
   if (plugin.source.startsWith("path:")) return undefined;
   if (
+    plugin.source.startsWith("builtin:") &&
+    plugin.catalogMarketplaceName === null
+  ) {
+    return entries.find(
+      (entry) =>
+        entry.pluginId === plugin.id &&
+        entry.marketplace === "bb-official" &&
+        entry.source === plugin.source &&
+        (plugin.catalogEntryId === null ||
+          entry.entryId === plugin.catalogEntryId),
+    );
+  }
+  if (
     !allowSourceFallback &&
     (plugin.catalogEntryId === null || plugin.catalogMarketplaceName === null)
   ) {

@@ -143,7 +143,7 @@ export function PluginAuthorPage({
       contentClassName="[&>div]:block!"
     >
       <div className={cn("space-y-6 pb-8", TOOLS_PAGE_BAND_CLASSES)}>
-        <div className="mx-auto w-full max-w-3xl space-y-2">
+        <div className="w-full space-y-2">
           <Link
             to={{
               pathname: getPluginsRoutePath(),

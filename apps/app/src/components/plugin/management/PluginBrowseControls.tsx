@@ -68,7 +68,7 @@ export function PluginBrowseToolbar({
   changeSearchParams: (change: (next: URLSearchParams) => void) => void;
 }) {
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className="w-full">
       <ResourceToolbar
         searchValue={query}
         searchPlaceholder="Search plugins"
