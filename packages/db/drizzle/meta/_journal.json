@@ -883,6 +883,13 @@
       "when": 1789588549270,
       "tag": "0125_silent_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "6",
+      "when": 1789602480359,
+      "tag": "0126_futuristic_zaladane",
+      "breakpoints": true
     }
   ]
 }

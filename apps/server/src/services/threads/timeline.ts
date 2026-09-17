@@ -1,3 +1,4 @@
+import { expandSelectedCompletedItemRows } from "@bb/db";
 import { paginateTimelineContents } from "./timeline-content-pagination.js";
 import {
   getTimelineGroupingContext,
@@ -1365,7 +1366,11 @@ function buildThreadTimelineInternal(
           rows: hydrateRetainedEventOutputRows(db, storedEventSelection.rows),
         }
       : storedEventSelection;
-  const rawEventRows = eventSelection.rows;
+  const rawEventRows = expandSelectedCompletedItemRows(
+    db,
+    eventSelection.rows,
+    snapshot.maxSeq,
+  );
   profile.eventDataBytes = byteLengthOfStoredEventRows(rawEventRows);
   profile.eventRowCount = rawEventRows.length;
   profile.selectionStrategy = eventSelection.strategy;
@@ -1581,9 +1586,10 @@ export function buildThreadConversationOutline(
       sequenceStart: contextBoundarySeq ?? 0,
       threadId: thread.id,
     });
-    const decodedRawEvents = rawEventRows.map((row) =>
-      toThreadEventWithMeta(row),
-    );
+    const decodedRawEvents = expandSelectedCompletedItemRows(
+      db,
+      rawEventRows,
+    ).map((row) => toThreadEventWithMeta(row));
     const decodedEvents = compactThreadTimelineSummaryEvents(decodedRawEvents);
     const clientRequestContextRows = selectClientRequestContextRows(db, {
       rows: rawEventRows,
@@ -1884,7 +1890,11 @@ function buildTimelineTurnSummaryDetailsPage(
         : sourceSeqStart,
     sourceRange.sourceSeqStart,
   );
-  const projectionEvents = projectionEventRows
+  const projectionEvents = expandSelectedCompletedItemRows(
+    db,
+    projectionEventRows,
+    snapshot.maxSeq,
+  )
     .filter((row) => row.sequence <= snapshot.maxSeq)
     .map((row) => toThreadEventWithMeta(row));
   const children = buildThreadTimelineTurnDetailsFromEvents({
