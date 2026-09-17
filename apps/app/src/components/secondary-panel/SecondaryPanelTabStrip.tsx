@@ -444,7 +444,7 @@ export function SecondaryPanelTabStrip({
     <div
       ref={stripRef}
       data-testid="secondary-panel-tab-strip"
-      className="group relative flex min-w-0 items-center [&_[data-tab-pill-close]]:text-muted-foreground/70 [&_[data-tab-pill-close]:hover]:text-foreground [&_[data-tab-pill-close]_[data-icon-root]]:size-3 max-md:pointer-coarse:[&_[data-tab-pill-close]_[data-icon-root]]:size-3.5"
+      className="group relative flex min-w-0 flex-1 items-center [&_[data-tab-pill-close]]:text-muted-foreground/70 [&_[data-tab-pill-close]:hover]:text-foreground [&_[data-tab-pill-close]_[data-icon-root]]:size-3 max-md:pointer-coarse:[&_[data-tab-pill-close]_[data-icon-root]]:size-3.5"
     >
       <TabStripScrollButton
         buttonRef={leftScrollButtonRef}
@@ -453,7 +453,10 @@ export function SecondaryPanelTabStrip({
         className={chevronNoDragClass}
         onClick={() => scrollByStep(-1)}
       />
-      <div data-secondary-panel-tab-scroll-region className="relative min-w-0">
+      <div
+        data-secondary-panel-tab-scroll-region
+        className="relative min-w-0 flex-1"
+      >
         <OverflowFade
           placement="left"
           tone={SECONDARY_PANEL_TAB_STRIP_FADE_TONE}

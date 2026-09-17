@@ -9,7 +9,7 @@ const TAB_PILL_DEFAULT_LABEL_MAX_WIDTH_CLASS = "max-w-[180px]";
 const TAB_PILL_AFFORDANCE_BUTTON_BASE_CLASS =
   "inline-flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-muted-foreground/15 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none max-md:pointer-coarse:size-5";
 const TAB_PILL_AFFORDANCE_ICON_CLASS = "size-3.5 max-md:pointer-coarse:size-5";
-const TAB_PILL_CLOSE_BUTTON_CLASS = `pointer-events-none absolute left-1.5 top-1/2 z-10 -translate-y-1/2 ${TAB_PILL_AFFORDANCE_BUTTON_BASE_CLASS} opacity-0 hover:opacity-100 group-hover/tab-pill:pointer-events-auto group-hover/tab-pill:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 disabled:opacity-30 max-md:pointer-coarse:pointer-events-auto max-md:pointer-coarse:opacity-100`;
+const TAB_PILL_CLOSE_BUTTON_CLASS = `pointer-events-none mr-1 ${TAB_PILL_AFFORDANCE_BUTTON_BASE_CLASS} opacity-0 hover:opacity-100 group-hover/tab-pill:pointer-events-auto group-hover/tab-pill:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 disabled:opacity-30 max-md:pointer-coarse:pointer-events-auto max-md:pointer-coarse:opacity-100`;
 const TAB_PILL_LARGE_COARSE_POINTER_CLOSE_BUTTON_CLASS =
   "max-md:pointer-coarse:min-h-9 max-md:pointer-coarse:min-w-9";
 const TAB_PILL_LEADING_VISUAL_CLASS =
@@ -75,10 +75,7 @@ export function TabPill({
         aria-pressed={isActive}
         className={cn(
           "flex h-full min-w-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-          iconOnly ? "px-1.5" : "pl-1.5 pr-2",
-          !iconOnly && closeAction !== null && enlargeCloseTargetOnCoarsePointer
-            ? "max-md:pointer-coarse:pl-3.5"
-            : null,
+          iconOnly ? "w-7 justify-center max-md:pointer-coarse:w-9" : "px-2",
         )}
       >
         {leadingVisual ? (
@@ -86,9 +83,7 @@ export function TabPill({
             className={cn(
               TAB_PILL_LEADING_VISUAL_CLASS,
               !iconOnly && "mr-1.5",
-              closeAction
-                ? "group-hover/tab-pill:opacity-0 tab-pill-close-focus-visible:opacity-0 max-md:pointer-coarse:opacity-0"
-                : null,
+              !iconOnly && "max-md:pointer-coarse:hidden",
             )}
           >
             {leadingVisual}

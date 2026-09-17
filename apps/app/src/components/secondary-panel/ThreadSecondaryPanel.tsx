@@ -699,8 +699,8 @@ function ThreadSecondaryPanelContent({
             data-testid="thread-secondary-panel-top-chrome"
             className={cn(
               CHROME_ROW_CLASS,
-              "min-w-0 justify-between gap-2 px-4",
-              renderAsDrawer && "pl-14",
+              "min-w-0 justify-between gap-1 px-2",
+              renderAsDrawer && "pl-13",
               usesDesktopChrome && usesWindowChrome && MACOS_WINDOW_DRAG_CLASS,
               usesDesktopChrome &&
                 usesWindowChrome &&

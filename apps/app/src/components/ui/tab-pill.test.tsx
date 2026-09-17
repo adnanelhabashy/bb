@@ -112,10 +112,9 @@ describe("TabPill", () => {
       />,
     );
 
-    expect(
-      screen
-        .getByRole("button", { name: "rabbits.md" })
-        .classList.contains("max-md:pointer-coarse:pl-3.5"),
-    ).toBe(true);
+    const tab = screen.getByRole("button", { name: "rabbits.md" });
+    const close = screen.getByRole("button", { name: "Close rabbits.md" });
+    expect(tab.nextElementSibling).toBe(close);
+    expect(close.classList.contains("absolute")).toBe(false);
   });
 });
