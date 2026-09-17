@@ -9,7 +9,7 @@ install scripts. Keep all personal changes inside `adnan/` so GitHub's
 
 | Path | What | BB id |
 |---|---|---|
-| `plugins/adnan-mission-control` | Engineering cockpit plugin (workflow state, agent tree, role resolver) | `adnan-mission-control` v0.2.0 |
+| `plugins/adnan-mission-control` | Engineering cockpit plugin (workflow state, agent tree, role resolver, usage & limits) | `adnan-mission-control` v0.2.0 |
 | `plugins/cyberpunk-terminal` | Neon tabbed terminal window plugin | `cyberpunk-terminal` v0.1.0 |
 | `theme/cyber-punk/theme.css` | Custom app theme | `cyber-punk` |
 

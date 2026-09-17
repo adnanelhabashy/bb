@@ -1,7 +1,7 @@
 // Shared data hooks: typed RPC + realtime invalidation + reconnect reconcile.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRealtime, useRealtimeConnectionState, useRpc } from "@get-bb/plugin-sdk/app";
-import type { ApprovalsState, EnrichedThread, MissionState, MissionValues, Probe, RoleCatalog, RoleIssue, RoleMapping, RoleMappingsState, VerificationEvidence, rpcContract } from "../server";
+import type { ApprovalsState, EnrichedThread, MissionState, MissionValues, Probe, RoleCatalog, RoleIssue, RoleMapping, RoleMappingsState, UsageDashboard, VerificationEvidence, rpcContract } from "../server";
 
 export type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
@@ -275,6 +275,51 @@ export function useEvidence(): {
   });
 
   return { evidence, at, isLoading, error, refresh: load };
+}
+
+/** Usage & Limits (Phase 6): one aggregated snapshot of direct provider usage
+ *  and pooled accounts. Fetched on demand (tab open / Refresh click) — usage
+ *  data is expensive to collect, so there is no polling and no realtime
+ *  signal; the page adds its own slow tick for countdown rendering. */
+export function useUsageDashboard(): {
+  data: UsageDashboard | null;
+  isLoading: boolean;
+  isFetching: boolean;
+  error: string | null;
+  refresh: () => void;
+} {
+  const rpc = useRpc<typeof rpcContract>();
+  const [data, setData] = useState<UsageDashboard | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    let cancelled = false;
+    setIsFetching(true);
+    rpc
+      .call("usage_dashboard_get", null)
+      .then((result: UsageDashboard) => {
+        if (cancelled) return;
+        setData(result);
+        setError(null);
+        setIsLoading(false);
+        setIsFetching(false);
+      })
+      .catch((cause: unknown) => {
+        if (cancelled) return;
+        setError(cause instanceof Error ? cause.message : String(cause));
+        setIsLoading(false);
+        setIsFetching(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rpc]);
+
+  useEffect(() => load(), [load]);
+
+  return { data, isLoading, isFetching, error, refresh: load };
 }
 
 /** Quick Actions (Phase 5): every call here is a real BB mutation fired by a

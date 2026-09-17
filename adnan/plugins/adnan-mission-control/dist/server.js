@@ -10,10 +10,10 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/server.ts
+// adnan/plugins/adnan-mission-control/server.ts
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/classic/external.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/classic/external.js
 var external_exports = {};
 __export(external_exports, {
   $brand: () => $brand,
@@ -276,7 +276,7 @@ __export(external_exports, {
   xor: () => xor
 });
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/index.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/index.js
 var core_exports2 = {};
 __export(core_exports2, {
   $ZodAny: () => $ZodAny,
@@ -593,7 +593,7 @@ __export(core_exports2, {
   withParser: () => withParser
 });
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/util.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/util.js
 var util_exports = {};
 __export(util_exports, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -1436,7 +1436,7 @@ function constantCatch(value) {
   return fn;
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/core.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/core.js
 var _a;
 var NEVER = /* @__PURE__ */ Object.freeze({
   status: "aborted"
@@ -1558,7 +1558,7 @@ function config(newConfig) {
   return globalConfig;
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/errors.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/errors.js
 function _getMessage() {
   const internals = this._zod;
   internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer, 2));
@@ -1750,7 +1750,7 @@ function prettifyError(error62) {
   return lines.join("\n");
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/parse.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/parse.js
 function finalizeParams(callee, params) {
   return { callee: params?.callee ?? callee, Err: params?.Err };
 }
@@ -1910,7 +1910,7 @@ var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
 };
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync($ZodRealError);
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/regexes.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/regexes.js
 var regexes_exports = {};
 __export(regexes_exports, {
   anyString: () => anyString,
@@ -2082,7 +2082,7 @@ var sha512_hex = /^[0-9a-fA-F]{128}$/;
 var sha512_base64 = /* @__PURE__ */ fixedBase64(86, "==");
 var sha512_base64url = /* @__PURE__ */ fixedBase64url(86);
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/checks.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a3;
   inst._zod ?? (inst._zod = {});
@@ -2558,7 +2558,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/doc.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/doc.js
 var Doc = class {
   constructor(args = [], closed = {}) {
     this.content = [];
@@ -2599,14 +2599,14 @@ ${content.join("\n")}
   }
 };
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/versions.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 6,
   patch: 5
 };
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/schemas.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a3;
   inst ?? (inst = {});
@@ -5020,7 +5020,7 @@ function handleRefineResult(result, payload, input2, inst) {
   }
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/memoizer.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/memoizer.js
 var $ZodCyclicError = class extends Error {
   constructor() {
     super(`Cannot parse a reference cycle that closes through a transform`);
@@ -5297,7 +5297,7 @@ function isBackEdge(ctx, value) {
   return backEdges !== void 0 && isRef(value) && backEdges.has(value);
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/index.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/index.js
 var locales_exports = {};
 __export(locales_exports, {
   ar: () => ar_default,
@@ -5365,7 +5365,7 @@ __export(locales_exports, {
   zhTW: () => zh_TW_default
 });
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/ar.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/ar.js
 var error = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0641", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" },
@@ -5477,7 +5477,7 @@ function ar_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/az.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/az.js
 var error2 = () => {
   const Sizable = {
     string: { unit: "simvol", verb: "olmal\u0131d\u0131r" },
@@ -5588,7 +5588,7 @@ function az_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/be.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/be.js
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -5757,7 +5757,7 @@ function be_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/bg.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/bg.js
 var error4 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" },
@@ -5883,7 +5883,7 @@ function bg_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/bn.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/bn.js
 var error5 = () => {
   const Sizable = {
     string: { unit: "\u0985\u0995\u09CD\u09B7\u09B0", verb: "\u09A5\u09BE\u0995\u09A4\u09C7 \u09B9\u09AC\u09C7" },
@@ -5997,7 +5997,7 @@ function bn_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/ca.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/ca.js
 var error6 = () => {
   const Sizable = {
     string: { unit: "car\xE0cters", verb: "contenir" },
@@ -6111,7 +6111,7 @@ function ca_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/ckb.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/ckb.js
 var error7 = () => {
   const Sizable = {
     string: { unit: "\u067E\u06CC\u062A", verb: "\u0628\u06CE\u062A" },
@@ -6244,7 +6244,7 @@ function ckb_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/cs.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/cs.js
 var error8 = () => {
   const Sizable = {
     string: { unit: "znak\u016F", verb: "m\xEDt" },
@@ -6361,7 +6361,7 @@ function cs_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/da.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/da.js
 var error9 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "havde" },
@@ -6482,7 +6482,7 @@ function da_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/de.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/de.js
 var error10 = () => {
   const Sizable = {
     string: { unit: "Zeichen", verb: "zu haben" },
@@ -6596,7 +6596,7 @@ function de_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/el.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/el.js
 var error11 = () => {
   const Sizable = {
     string: { unit: "\u03C7\u03B1\u03C1\u03B1\u03BA\u03C4\u03AE\u03C1\u03B5\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
@@ -6709,7 +6709,7 @@ function el_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/en.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/en.js
 var error12 = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -6834,7 +6834,7 @@ function en_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/eo.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/eo.js
 var error13 = () => {
   const Sizable = {
     string: { unit: "karaktrojn", verb: "havi" },
@@ -6949,7 +6949,7 @@ function eo_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/es.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/es.js
 var error14 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "tener" },
@@ -7086,7 +7086,7 @@ function es_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/fa.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/fa.js
 var error15 = () => {
   const Sizable = {
     string: { unit: "\u06A9\u0627\u0631\u0627\u06A9\u062A\u0631", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
@@ -7206,7 +7206,7 @@ function fa_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/fi.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/fi.js
 var error16 = () => {
   const Sizable = {
     string: { unit: "merkki\xE4", subject: "merkkijonon" },
@@ -7324,7 +7324,7 @@ function fi_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/fr.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/fr.js
 var error17 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -7454,7 +7454,7 @@ function fr_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/fr-CA.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/fr-CA.js
 var error18 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -7567,7 +7567,7 @@ function fr_CA_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/gu.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/gu.js
 var error19 = () => {
   const Sizable = {
     string: { unit: "\u0A85\u0A95\u0ACD\u0AB7\u0AB0", verb: "\u0AB9\u0ACB\u0AB5\u0ABE \u0A9C\u0ACB\u0A88\u0A8F" },
@@ -7681,7 +7681,7 @@ function gu_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/he.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/he.js
 var error20 = () => {
   const TypeNames = {
     string: { label: "\u05DE\u05D7\u05E8\u05D5\u05D6\u05EA", gender: "f" },
@@ -7883,7 +7883,7 @@ function he_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/hi.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/hi.js
 var error21 = () => {
   const Sizable = {
     string: { unit: "\u0905\u0915\u094D\u0937\u0930", verb: "\u0930\u0916\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F" },
@@ -7995,7 +7995,7 @@ function hi_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/hr.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/hr.js
 var error22 = () => {
   const Sizable = {
     string: { unit: "znakova", verb: "imati" },
@@ -8122,7 +8122,7 @@ function hr_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/hu.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/hu.js
 var error23 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "legyen" },
@@ -8236,7 +8236,7 @@ function hu_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/hy.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/hy.js
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -8395,7 +8395,7 @@ function hy_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/id.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/id.js
 var error25 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "memiliki" },
@@ -8507,7 +8507,7 @@ function id_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/is.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/is.js
 var error26 = () => {
   const Sizable = {
     string: { unit: "stafi", verb: "a\xF0 hafa" },
@@ -8622,7 +8622,7 @@ function is_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/it.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/it.js
 var error27 = () => {
   const Sizable = {
     string: { unit: "caratteri", verb: "avere" },
@@ -8736,7 +8736,7 @@ function it_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/ja.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/ja.js
 var error28 = () => {
   const Sizable = {
     string: { unit: "\u6587\u5B57", verb: "\u3067\u3042\u308B" },
@@ -8849,7 +8849,7 @@ function ja_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/ka.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/ka.js
 var error29 = () => {
   const Sizable = {
     string: { unit: "\u10E1\u10D8\u10DB\u10D1\u10DD\u10DA\u10DD", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
@@ -8967,7 +8967,7 @@ function ka_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/km.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/km.js
 var error30 = () => {
   const Sizable = {
     string: { unit: "\u178F\u17BD\u17A2\u1780\u17D2\u179F\u179A", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
@@ -9083,12 +9083,12 @@ function km_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/kh.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/kh.js
 function kh_default() {
   return km_default();
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/kn.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/kn.js
 var error31 = () => {
   const Sizable = {
     string: { unit: "\u0C85\u0C95\u0CCD\u0CB7\u0CB0\u0C97\u0CB3\u0CC1", verb: "\u0CB9\u0CCA\u0C82\u0CA6\u0CB2\u0CC1" },
@@ -9204,7 +9204,7 @@ function kn_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/ko.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/ko.js
 var error32 = () => {
   const Sizable = {
     string: { unit: "\uBB38\uC790", verb: "to have" },
@@ -9321,7 +9321,7 @@ function ko_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/lt.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/lt.js
 var capitalizeFirstCharacter = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
@@ -9529,7 +9529,7 @@ function lt_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/mk.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/mk.js
 var error34 = () => {
   const Sizable = {
     string: { unit: "\u0437\u043D\u0430\u0446\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
@@ -9644,7 +9644,7 @@ function mk_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/ms.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/ms.js
 var error35 = () => {
   const Sizable = {
     string: { unit: "aksara", verb: "mempunyai" },
@@ -9757,7 +9757,7 @@ function ms_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/ne.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/ne.js
 var error36 = () => {
   const Sizable = {
     string: { unit: "\u0905\u0915\u094D\u0937\u0930", verb: "\u0939\u0941\u0928\u0941\u092A\u0930\u094D\u091B" },
@@ -9869,7 +9869,7 @@ function ne_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/nl.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/nl.js
 var error37 = () => {
   const Sizable = {
     string: { unit: "tekens", verb: "heeft" },
@@ -9985,7 +9985,7 @@ function nl_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/nn.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/nn.js
 var error38 = () => {
   const Sizable = {
     string: { unit: "teikn", verb: "\xE5 ha" },
@@ -10099,7 +10099,7 @@ function nn_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/no.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/no.js
 var error39 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "\xE5 ha" },
@@ -10213,7 +10213,7 @@ function no_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/ota.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/ota.js
 var error40 = () => {
   const Sizable = {
     string: { unit: "harf", verb: "olmal\u0131d\u0131r" },
@@ -10328,7 +10328,7 @@ function ota_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/ps.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/ps.js
 var error41 = () => {
   const Sizable = {
     string: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
@@ -10448,7 +10448,7 @@ function ps_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/pl.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/pl.js
 var error42 = () => {
   const Sizable = {
     string: { unit: "znak\xF3w", verb: "mie\u0107" },
@@ -10563,7 +10563,7 @@ function pl_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/pt.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/pt.js
 var error43 = () => {
   const Sizable = {
     string: { unit: "caracteres" },
@@ -10707,7 +10707,7 @@ function pt_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/pt-BR.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/pt-BR.js
 var error44 = () => {
   const Sizable = {
     string: { unit: "caracteres" },
@@ -10852,7 +10852,7 @@ function pt_BR_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/ro.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/ro.js
 var error45 = () => {
   const Sizable = {
     string: { unit: "caractere", verb: "s\u0103 aib\u0103" },
@@ -10975,7 +10975,7 @@ function ro_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/ru.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/ru.js
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -11144,7 +11144,7 @@ function ru_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/sk.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/sk.js
 var error47 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "ma\u0165" },
@@ -11261,7 +11261,7 @@ function sk_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/sl.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/sl.js
 var error48 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "imeti" },
@@ -11376,7 +11376,7 @@ function sl_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/sv.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/sv.js
 var error49 = () => {
   const Sizable = {
     string: { unit: "tecken", verb: "att ha" },
@@ -11492,7 +11492,7 @@ function sv_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/ta.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/ta.js
 var error50 = () => {
   const Sizable = {
     string: { unit: "\u0B8E\u0BB4\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
@@ -11608,7 +11608,7 @@ function ta_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/tg.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/tg.js
 var error51 = () => {
   const Sizable = {
     string: { unit: "\u0430\u043B\u043E\u043C\u0430\u0442", verb: "\u0434\u043E\u0448\u0442\u0430 \u0431\u043E\u0448\u0430\u0434" },
@@ -11725,7 +11725,7 @@ function tg_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/th.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/th.js
 var error52 = () => {
   const Sizable = {
     string: { unit: "\u0E15\u0E31\u0E27\u0E2D\u0E31\u0E01\u0E29\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
@@ -11841,7 +11841,7 @@ function th_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/tk.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/tk.js
 var error53 = () => {
   const Sizable = {
     string: { unit: "simwol", verb: "bolmaly" },
@@ -11949,7 +11949,7 @@ function tk_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/tr.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/tr.js
 var error54 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "olmal\u0131" },
@@ -12060,7 +12060,7 @@ function tr_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/uk.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/uk.js
 var error55 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
@@ -12174,12 +12174,12 @@ function uk_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/ua.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/ua.js
 function ua_default() {
   return uk_default();
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/ur.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/ur.js
 var error56 = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0648\u0641", verb: "\u06C1\u0648\u0646\u0627" },
@@ -12295,7 +12295,7 @@ function ur_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/uz.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/uz.js
 var error57 = () => {
   const Sizable = {
     string: { unit: "belgi", verb: "bo\u2018lishi kerak" },
@@ -12409,7 +12409,7 @@ function uz_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/vi.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/vi.js
 var error58 = () => {
   const Sizable = {
     string: { unit: "k\xFD t\u1EF1", verb: "c\xF3" },
@@ -12523,7 +12523,7 @@ function vi_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/zh-CN.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/zh-CN.js
 var error59 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u7B26", verb: "\u5305\u542B" },
@@ -12638,7 +12638,7 @@ function zh_CN_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/zh-TW.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/zh-TW.js
 var error60 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u5143", verb: "\u64C1\u6709" },
@@ -12751,7 +12751,7 @@ function zh_TW_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/locales/yo.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/locales/yo.js
 var error61 = () => {
   const Sizable = {
     string: { unit: "\xE0mi", verb: "n\xED" },
@@ -12864,7 +12864,7 @@ function yo_default() {
   };
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/registries.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/registries.js
 var _a2;
 var $output = /* @__PURE__ */ Symbol("ZodOutput");
 var $input = /* @__PURE__ */ Symbol("ZodInput");
@@ -12914,7 +12914,7 @@ function registry() {
 (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/compile.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/compile.js
 var INVALID = /* @__PURE__ */ Symbol.for("zod.compile.invalid");
 var FALLBACK_FLAG = /* @__PURE__ */ Symbol.for("zod.compile.fallback");
 var ZodCompileAsyncError = class extends Error {
@@ -14516,7 +14516,7 @@ function generateTransformCheck(doc, ctx, schema, accessor) {
   return accessor;
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/api.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/api.js
 function snapshotChecks(def) {
   if (def.checks)
     def.checks = [...def.checks];
@@ -15575,7 +15575,7 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
   return inst;
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/to-json-schema.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/to-json-schema.js
 function assignProps(target, ...sources) {
   for (const source of sources) {
     for (const key of Reflect.ownKeys(source)) {
@@ -16105,7 +16105,7 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) =
   return finalize(ctx, schema);
 };
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/json-schema-processors.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/json-schema-processors.js
 var narrowMin = (agg, key, value) => {
   if (agg[key] === void 0 || value > agg[key])
     agg[key] = value;
@@ -16853,7 +16853,7 @@ function toJSONSchema(input2, params) {
   return finalize(ctx, input2);
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/json-schema-generator.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/json-schema-generator.js
 var JSONSchemaGenerator = class {
   /** @deprecated Access via ctx instead */
   get metadataRegistry() {
@@ -16931,10 +16931,10 @@ var JSONSchemaGenerator = class {
   }
 };
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/json-schema.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/json-schema.js
 var json_schema_exports = {};
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/classic/schemas.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/classic/schemas.js
 var schemas_exports2 = {};
 __export(schemas_exports2, {
   ZodAny: () => ZodAny,
@@ -17115,7 +17115,7 @@ __export(schemas_exports2, {
   xor: () => xor
 });
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/classic/checks.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/classic/checks.js
 var checks_exports2 = {};
 __export(checks_exports2, {
   endsWith: () => _endsWith,
@@ -17150,7 +17150,7 @@ __export(checks_exports2, {
   uppercase: () => _uppercase
 });
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/classic/errors.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/classic/errors.js
 var _installedErrorProtos = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
 function _lazyMethod(proto, key, make) {
   Object.defineProperty(proto, key, {
@@ -17196,7 +17196,7 @@ var ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, void 0
   Parent: Error
 });
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/classic/parse.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/classic/parse.js
 var parse2 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse2 = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -17210,7 +17210,7 @@ var safeDecode2 = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync2 = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync2 = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/classic/schemas.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/classic/schemas.js
 function _ensureDefaultLocale() {
   if (!globalConfig.localeError)
     config(en_default());
@@ -18675,7 +18675,7 @@ function preprocess(fn, schema) {
   });
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/classic/compat.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/classic/compat.js
 var ZodIssueCode = {
   invalid_type: "invalid_type",
   too_big: "too_big",
@@ -18701,7 +18701,7 @@ var ZodFirstPartyTypeKind;
 /* @__PURE__ */ (function(ZodFirstPartyTypeKind2) {
 })(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/classic/iso.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/classic/iso.js
 var iso_exports = {};
 __export(iso_exports, {
   ZodISODate: () => ZodISODate,
@@ -18726,7 +18726,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/classic/from-json-schema.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/classic/from-json-schema.js
 var z = {
   ...schemas_exports2,
   ...checks_exports2,
@@ -19459,7 +19459,7 @@ function fromJSONSchema(schema, params) {
   return convertSchema(normalized, ctx);
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/core/visit.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/core/visit.js
 var RESOLVING = /* @__PURE__ */ Symbol("z.visit/resolving");
 function visit(schema, fnOrHandlers) {
   const fn = typeof fnOrHandlers === "function" ? fnOrHandlers : (node2, rewritten) => {
@@ -19614,7 +19614,7 @@ function visit(schema, fnOrHandlers) {
   return run(schema);
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/classic/deep-partial.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/classic/deep-partial.js
 function deepPartial(schema) {
   return visit(schema, {
     object: (s) => s.partial(),
@@ -19626,7 +19626,7 @@ function deepPartial(schema) {
   });
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/classic/in-out.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/classic/in-out.js
 function withChecks(side, checks) {
   if (!checks?.length)
     return side;
@@ -19656,7 +19656,7 @@ function output(schema) {
   });
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/node_modules/zod/v4/classic/coerce.js
+// adnan/plugins/adnan-mission-control/node_modules/zod/v4/classic/coerce.js
 var coerce_exports = {};
 __export(coerce_exports, {
   bigint: () => bigint3,
@@ -19681,7 +19681,7 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
-// ../../../../../../Projects/bb-setup/plugins/adnan-mission-control/server.ts
+// adnan/plugins/adnan-mission-control/server.ts
 var provenanceSchema = external_exports.enum(["bb-observed", "agent-reported", "user-confirmed"]);
 var verificationEvidenceSchema = external_exports.object({
   threadId: external_exports.string(),
@@ -19889,6 +19889,162 @@ var countersSchema = external_exports.object({
   providersInUse: external_exports.array(external_exports.string()),
   generatedAt: external_exports.number()
 });
+var usageWindowSchema = external_exports.object({
+  label: external_exports.string().min(1),
+  usedPercent: external_exports.number().min(0).max(100).nullable(),
+  resetsAt: external_exports.number().int().nullable(),
+  status: external_exports.enum(["ok", "warning", "blocked", "unknown"]).nullable(),
+  scope: external_exports.enum(["provider", "account", "model", "session"]).nullable(),
+  cost: external_exports.object({ usedUsdCents: external_exports.number().int(), limitUsdCents: external_exports.number().int() }).nullable()
+});
+var usageEntryStateSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.literal("ready"), updatedAt: external_exports.number().nullable() }),
+  external_exports.object({ kind: external_exports.literal("loading") }),
+  external_exports.object({ kind: external_exports.literal("unauthenticated") }),
+  external_exports.object({ kind: external_exports.literal("not_installed") }),
+  external_exports.object({ kind: external_exports.literal("expired") }),
+  external_exports.object({ kind: external_exports.literal("error"), message: external_exports.string().min(1) }),
+  external_exports.object({ kind: external_exports.literal("not_exposed") })
+]);
+var usageEntrySchema = external_exports.object({
+  source: external_exports.enum(["direct", "pool"]),
+  providerId: external_exports.string().min(1),
+  providerLabel: external_exports.string().min(1),
+  accountLabel: external_exports.string().nullable(),
+  planLabel: external_exports.string().nullable(),
+  modelLabel: external_exports.string().nullable(),
+  windows: external_exports.array(usageWindowSchema),
+  state: usageEntryStateSchema
+});
+var usageDashboardSchema = external_exports.object({
+  direct: external_exports.array(usageEntrySchema),
+  pool: external_exports.array(usageEntrySchema),
+  poolAvailable: external_exports.boolean(),
+  generatedAt: external_exports.number()
+});
+function mapLimitStatus(value) {
+  if (value === "allowed" || value === "ok") return "ok";
+  if (value === "warning") return "warning";
+  if (value === "blocked") return "blocked";
+  if (typeof value === "string" && value.length > 0) return "unknown";
+  return null;
+}
+function toEpochMs(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+function mapDirectUsage(providers, usageResponse) {
+  const usageRecord = asRecord(usageResponse) ?? {};
+  const entries = [];
+  for (const [providerId, rawUsage] of Object.entries(usageRecord)) {
+    const provider = providers.find((row) => str(row.id) === providerId) ?? null;
+    const usage = asRecord(rawUsage);
+    const base = {
+      source: "direct",
+      providerId,
+      providerLabel: str(provider?.displayName) ?? providerId,
+      accountLabel: null,
+      planLabel: null,
+      modelLabel: null,
+      windows: [],
+      state: { kind: "not_exposed" }
+    };
+    if (usage === null) {
+      entries.push(base);
+      continue;
+    }
+    base.accountLabel = str(usage.accountEmail);
+    base.planLabel = str(usage.planLabel);
+    const status = str(usage.status);
+    if (status === "ok") {
+      base.windows = (Array.isArray(usage.windows) ? usage.windows.map(asRecord) : []).filter((row) => row !== null).map((row) => {
+        const cost = asRecord(row.cost);
+        return {
+          label: str(row.label) ?? "Limit",
+          usedPercent: typeof row.usedPercent === "number" ? Math.round(row.usedPercent) : null,
+          resetsAt: toEpochMs(row.resetsAt),
+          status: null,
+          scope: null,
+          cost: cost !== null && typeof cost.usedUsdCents === "number" && typeof cost.limitUsdCents === "number" ? { usedUsdCents: cost.usedUsdCents, limitUsdCents: cost.limitUsdCents } : null
+        };
+      });
+      base.state = { kind: "ready", updatedAt: null };
+    } else if (status === "unauthenticated" || status === "not_installed" || status === "expired") {
+      base.state = { kind: status };
+    } else if (status === "error") {
+      base.state = { kind: "error", message: str(usage.message) ?? "Provider usage could not be loaded." };
+    }
+    entries.push(base);
+  }
+  return entries;
+}
+var poolQuotaBucketSchema = external_exports.object({
+  utilization: external_exports.number().nullable().optional(),
+  resetAt: external_exports.number().nullable().optional(),
+  status: external_exports.string().nullable().optional()
+}).passthrough();
+var poolAccountSchema = external_exports.object({
+  id: external_exports.string().optional(),
+  provider: external_exports.string().optional(),
+  label: external_exports.string().nullable().optional(),
+  email: external_exports.string().nullable().optional(),
+  enabled: external_exports.boolean().optional(),
+  quota: external_exports.object({
+    fiveHour: poolQuotaBucketSchema.nullable().optional(),
+    sevenDay: poolQuotaBucketSchema.nullable().optional(),
+    familyWeekly: external_exports.record(external_exports.string(), poolQuotaBucketSchema.nullable()).nullable().optional(),
+    limitWindows: external_exports.array(external_exports.unknown()).nullable().optional(),
+    observedAt: external_exports.number().nullable().optional(),
+    error: external_exports.string().nullable().optional()
+  }).nullable().optional()
+}).passthrough();
+function mapPoolBucketWindow(label, bucket) {
+  return {
+    label,
+    usedPercent: typeof bucket.utilization === "number" ? Math.round(bucket.utilization * 100) : null,
+    resetsAt: toEpochMs(bucket.resetAt),
+    status: mapLimitStatus(bucket.status),
+    scope: "account",
+    cost: null
+  };
+}
+function mapPoolAccount(rawAccount) {
+  const parsed = poolAccountSchema.safeParse(rawAccount);
+  const account = parsed.success ? parsed.data : {};
+  const quota = account.quota ?? void 0;
+  const windows = [];
+  if (quota?.fiveHour != null) windows.push(mapPoolBucketWindow("5-hour", quota.fiveHour));
+  if (quota?.sevenDay != null) windows.push(mapPoolBucketWindow("7-day", quota.sevenDay));
+  if (quota?.familyWeekly != null) {
+    for (const [family, bucket] of Object.entries(quota.familyWeekly)) {
+      if (bucket == null) continue;
+      const capitalized = family.charAt(0).toUpperCase() + family.slice(1);
+      windows.push({ ...mapPoolBucketWindow(`Weekly \xB7 ${capitalized}`, bucket), scope: "model" });
+    }
+  }
+  if (Array.isArray(quota?.limitWindows)) {
+    for (const rawWindow of quota.limitWindows) {
+      const parsedWindow = usageWindowSchema.safeParse(rawWindow);
+      if (parsedWindow.success) windows.push(parsedWindow.data);
+    }
+  }
+  const error62 = str(quota?.error);
+  const providerId = account.provider ?? "pool";
+  return {
+    source: "pool",
+    providerId,
+    providerLabel: providerId,
+    accountLabel: account.label ?? account.email ?? account.id ?? null,
+    planLabel: null,
+    modelLabel: null,
+    windows,
+    state: error62 !== null ? { kind: "error", message: error62 } : { kind: "ready", updatedAt: typeof quota?.observedAt === "number" ? quota.observedAt : null }
+  };
+}
 var rpcContract = defineRpcContract({
   mission_get: {
     input: external_exports.null(),
@@ -19939,6 +20095,10 @@ var rpcContract = defineRpcContract({
   evidence_get: {
     input: external_exports.null(),
     output: external_exports.object({ at: external_exports.number().nullable(), evidence: external_exports.array(verificationEvidenceSchema) })
+  },
+  usage_dashboard_get: {
+    input: external_exports.null(),
+    output: usageDashboardSchema
   },
   verification_attach_evidence: {
     input: external_exports.object({ label: external_exports.string().max(80), evidence: verificationEvidenceSchema }),
@@ -20040,7 +20200,7 @@ function str(value) {
   return typeof value === "string" && value !== "" ? value : null;
 }
 async function plugin(bb) {
-  bb.log.info("loaded (phase 5: quick actions)");
+  bb.log.info("loaded (phase 6: usage & limits)");
   async function readMission() {
     const raw = await bb.storage.kv.get(KV_MISSION);
     if (raw == null) return null;
@@ -20163,6 +20323,44 @@ async function plugin(bb) {
       bb.log.warn(`provider catalog fetch failed: ${message}`);
       if (catalogCache !== null) return catalogCache.data;
       return { at: null, loadError: message, providers: [], models: [] };
+    }
+  }
+  async function buildUsageDashboard() {
+    const [providerRows, usageResponse, pool] = await Promise.all([
+      bb.sdk.providers.list().then(
+        (rows) => Array.isArray(rows) ? rows.map(asRecord).filter((row) => row !== null) : []
+      ).catch(() => []),
+      bb.sdk.system.usageLimits().catch((error62) => {
+        bb.log.warn(`usage limits fetch failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
+        return null;
+      }),
+      fetchPoolAccounts()
+    ]);
+    return {
+      direct: mapDirectUsage(providerRows, usageResponse),
+      pool: pool.accounts.map(mapPoolAccount),
+      poolAvailable: pool.available,
+      generatedAt: Date.now()
+    };
+  }
+  async function fetchPoolAccounts() {
+    try {
+      const response = await fetch(`${bb.server.loopbackBaseUrl}/api/v1/plugins/account-pool/rpc/account.list`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "null"
+      });
+      if (!response.ok) return { available: false, accounts: [] };
+      const payload = asRecord(await response.json());
+      if (payload?.ok !== true || !Array.isArray(payload.result)) {
+        return { available: false, accounts: [] };
+      }
+      return {
+        available: true,
+        accounts: payload.result.map(asRecord).filter((row) => row !== null)
+      };
+    } catch {
+      return { available: false, accounts: [] };
     }
   }
   function computeRoleIssues(roles, catalog) {
@@ -20608,6 +20806,7 @@ async function plugin(bb) {
     }),
     approvals_set: async ({ approvals }) => ({ state: await writeApprovals(approvals, "ui") }),
     evidence_get: async () => ({ at: Date.now(), evidence: await fetchCommandEvidence() }),
+    usage_dashboard_get: async () => buildUsageDashboard(),
     verification_attach_evidence: async ({ label, evidence }) => ({ state: await setVerificationEvidence(label, evidence) }),
     verification_clear_evidence: async ({ label }) => ({ state: await setVerificationEvidence(label, null) }),
     // Every one of these is fired by a deliberate button click in the panel

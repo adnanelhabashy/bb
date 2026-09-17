@@ -28,6 +28,16 @@ Adnan Mission Control — a personal engineering cockpit for BB.
     threads. An item only counts as verified once a user attaches one of
     those real executions as evidence; an agent reporting "passed" renders
     as "not verified" until then.
+  - **Usage & Limits** — one capacity dashboard over every configured
+    source, normalized from real BB usage contracts and nothing else:
+    direct providers (the same `bb.sdk.system.usageLimits` contract the
+    thread popup renders — windows, plan, account, cost, reset times) and
+    Account Pooler accounts (sibling-plugin RPC, presented honestly as
+    their own group: 5-hour/7-day/family-weekly utilization with true
+    account-vs-model scope). Remaining quota leads, low-capacity cards
+    raise amber/red attention borders, missing values render as n/a —
+    nothing is estimated. Fetched on tab open with a manual refresh; no
+    polling.
   - **Agents → Quick actions** — a per-thread action menu (the "⋯" on each
     row): open the thread in BB's own UI, steer it (interrupts an active
     turn), ask why / request review / request verification (queued

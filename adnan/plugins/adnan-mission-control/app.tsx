@@ -11,6 +11,7 @@ import { AgentsPage } from "@/components/agents";
 import { RolesPage } from "@/components/roles";
 import { ApprovalsPage } from "@/components/approvals";
 import { VerificationPage } from "@/components/verification";
+import { UsageLimitsPage } from "@/components/usage-limits";
 
 const TABS = [
   { id: "overview", title: "Overview", subPath: "" },
@@ -18,6 +19,7 @@ const TABS = [
   { id: "roles", title: "Roles", subPath: "roles" },
   { id: "approvals", title: "Approvals", subPath: "approvals" },
   { id: "verification", title: "Verification", subPath: "verification" },
+  { id: "usage", title: "Usage & Limits", subPath: "usage" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -27,6 +29,7 @@ function activeTab(subPath: string): TabId {
   if (subPath === "roles") return "roles";
   if (subPath === "approvals") return "approvals";
   if (subPath === "verification") return "verification";
+  if (subPath === "usage") return "usage";
   return "overview";
 }
 
@@ -63,6 +66,8 @@ function MissionControlShell({ subPath }: { subPath: string }) {
           <ApprovalsPage />
         ) : active === "verification" ? (
           <VerificationPage />
+        ) : active === "usage" ? (
+          <UsageLimitsPage />
         ) : (
           <OverviewPage />
         )}
