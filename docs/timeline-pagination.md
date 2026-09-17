@@ -5,6 +5,38 @@ groups. Copy both `timelinePage.olderCursor.anchorId` and `anchorSeq` to
 `beforeAnchorId` and `beforeAnchorSeq`. Cursors are opaque; do not construct
 row IDs or sequence cuts. Keep display options unchanged throughout the walk.
 
+Pagination boundaries are the sequences where user input enters the
+conversation: `client/turn/requested` events with text or an attachment, and
+completed context clears. A steer accepted into the turn it targeted is
+bounded at its `turn/input/accepted` sequence, which is where the timeline
+displays it and after the work that finished between the request and its
+acceptance; every other request, including pending, rejected, and steers the
+server routed to a different turn, is bounded at the request sequence. Empty
+requests are excluded because they produce no message row. The latest clear is
+the history floor. These boundaries control history retrieval, not visual
+message grouping.
+
+A page owns the event window `[start, end)` the boundary query selected. It
+returns every projected row whose `sourceSeqStart` falls inside that window, in
+display order, and nothing projected from context loaded outside it. Rows are
+grouped for the segment limit by the boundary sequences inside the window, so
+grouping never depends on recognizing a rendered row. `olderCursor.anchorSeq`
+is the window start itself, which is always a boundary sequence or the history
+floor; the next older page owns `[previous start, start)`, so a walk visits
+contiguous windows with strictly decreasing cursors and cannot skip or repeat
+events. A content cut continues inside the same window bounds, which
+reconstructs the same group and keeps its leaf offsets meaningful. Older
+history is advertised only with a cursor, and only when the window start is
+above the history floor.
+
+Display order is turn-by-turn until a user message lands inside another turn:
+after that message everything is ordered by source sequence. A turn spans from
+its first event or accepted request to its `turn/completed` event, or stays
+open while it is running; events that arrive after completion, such as a
+background command finishing, do not extend it. The projection applies this
+rule to the events it loaded, and the server evaluates the same rule over the
+whole thread so a budgeted page orders rows the way the full history does.
+
 `timelinePage.historySnapshot` identifies the history tip, grouping version,
 and display surface. A walk excludes subsequent appends. Earlier events can
 change grouping even after a turn completed. `timelinePage.olderRowsSourceSeqEnd`

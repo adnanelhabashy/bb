@@ -484,6 +484,7 @@ function walkAllPages(
   db: DbConnection,
   thread: Thread,
   eventBudget: number,
+  segmentLimit = 20,
 ): WalkResult {
   let mergedRows: TimelineRow[] = [];
   const seenCursors = new Set<string>();
@@ -492,7 +493,13 @@ function walkAllPages(
   let pages = 0;
 
   for (;;) {
-    const { profile, response } = buildPage(db, thread, eventBudget, cursor);
+    const { profile, response } = buildPage(
+      db,
+      thread,
+      eventBudget,
+      cursor,
+      segmentLimit,
+    );
     pages += 1;
     maxEventRowCount = Math.max(maxEventRowCount, profile.eventRowCount);
     mergedRows = prependOlderTimelineRows({
@@ -684,6 +691,32 @@ describe("in-turn timeline windows", () => {
     ]);
 
     const timeline = buildPage(db, thread, LARGE_BUDGET, null).response;
+    const latest = buildPage(db, thread, LARGE_BUDGET, null, 1).response;
+    expect(latest.timelinePage.hasOlderRows).toBe(true);
+    expect(latest.rows).toContainEqual(
+      expect.objectContaining({
+        kind: "conversation",
+        role: "user",
+        turnRequest: expect.objectContaining({
+          kind: "steer",
+          status: steerStatus,
+        }),
+      }),
+    );
+    const older = buildPage(
+      db,
+      thread,
+      LARGE_BUDGET,
+      latest.timelinePage.olderCursor!,
+      1,
+    ).response;
+    expect(older.timelinePage.hasOlderRows).toBe(false);
+    expect(
+      prependOlderTimelineRows({
+        loadedRows: latest.rows,
+        olderRows: older.rows,
+      }),
+    ).toEqual(timeline.rows);
     const turnRow = timeline.rows.find(
       (row): row is Extract<TimelineRow, { kind: "turn" }> =>
         row.kind === "turn",
@@ -754,7 +787,7 @@ describe("in-turn timeline windows", () => {
     );
     expect(budgeted.response.timelinePage.hasOlderRows).toBe(true);
     expect(budgeted.response.timelinePage.olderCursor?.anchorId).toMatch(
-      /^timeline-v1:/,
+      /^timeline-v2:/,
     );
   });
 
@@ -866,7 +899,7 @@ describe("in-turn timeline windows", () => {
       }
       cursor = page.response.timelinePage.olderCursor;
       expect(cursor).not.toBeNull();
-      expect(cursor?.anchorId).toMatch(/^timeline-v1:/);
+      expect(cursor?.anchorId).toMatch(/^timeline-v2:/);
       expect(pages).toBeLessThan(10);
     }
 
@@ -1489,6 +1522,174 @@ describe("timeline segment anchors", () => {
     ]);
   });
 
+  it.each([false, true])(
+    "walks every message in a steer-heavy turn with empty input %s",
+    (empty) => {
+      const { db, thread } = setup();
+      try {
+        seedTurns(db, thread, { completeLastTurn: false, itemsPerTurn: [2] });
+        let sequence = getLatestThreadSequence(db, { threadId: thread.id });
+        const events: EventInput[] = [];
+        for (let index = 0; index < 25; index += 1) {
+          const clientRequestId = requestId(index + 2);
+          events.push({
+            threadId: thread.id,
+            sequence: ++sequence,
+            type: "client/turn/requested",
+            scope: threadScope(),
+            itemId: null,
+            itemKind: null,
+            parentToolCallId: null,
+            data: JSON.stringify({
+              direction: "outbound",
+              source: "tell",
+              initiator: "user",
+              request: { method: "turn/start", params: {} },
+              requestId: clientRequestId,
+              senderThreadId: null,
+              input: [
+                {
+                  type: "text",
+                  text: empty ? "" : `Steer ${index}`,
+                  mentions: [],
+                },
+              ],
+              target: { kind: "steer", expectedTurnId: "turn-1" },
+              execution,
+            }),
+          });
+          if (!empty)
+            events.push({
+              threadId: thread.id,
+              sequence: ++sequence,
+              type: "turn/input/accepted",
+              scope: turnScope("turn-1"),
+              providerThreadId,
+              itemId: null,
+              itemKind: null,
+              parentToolCallId: null,
+              data: JSON.stringify({ clientRequestId }),
+            });
+          if (!empty)
+            events.push({
+              threadId: thread.id,
+              sequence: ++sequence,
+              type: "item/completed",
+              scope: turnScope("turn-1"),
+              providerThreadId,
+              itemId: `answer-${index}`,
+              itemKind: "agentMessage",
+              parentToolCallId: null,
+              data: JSON.stringify({
+                item: {
+                  type: "agentMessage",
+                  id: `answer-${index}`,
+                  text: `Answer ${index}`,
+                },
+              }),
+            });
+        }
+        insertEvents(db, noopNotifier, events);
+        const canonical = buildPage(
+          db,
+          thread,
+          LARGE_BUDGET,
+          null,
+          100,
+        ).response;
+        const walked = walkAllPages(db, thread, 100, 1);
+        expect(walked.rows).toEqual(
+          canonical.rows.map((row) => JSON.stringify(row)),
+        );
+        if (!empty) expect(walked.pages).toBeGreaterThan(1);
+      } finally {
+        db.$client.close();
+      }
+    },
+  );
+
+  it("pages at a steer without projecting a partial summary from latest plan state", () => {
+    const { db, thread } = setup();
+    try {
+      seedTurns(db, thread, { completeLastTurn: true, itemsPerTurn: [1, 0] });
+      db.$client.exec("UPDATE events SET sequence = sequence + 100000");
+      db.$client.exec(
+        "UPDATE events SET sequence = (sequence - 100000) * 10",
+      );
+      const base = {
+        threadId: thread.id,
+        providerThreadId,
+        itemId: null,
+        itemKind: null,
+        parentToolCallId: null,
+      };
+      insertEvents(db, noopNotifier, [
+        {
+          ...base,
+          sequence: 45,
+          type: "item/completed",
+          scope: turnScope("turn-1"),
+          itemId: "old-plan",
+          itemKind: "planSteps",
+          data: JSON.stringify({
+            item: {
+              type: "planSteps",
+              id: "old-plan",
+              steps: [{ step: "A task", status: "pending" }],
+              status: "completed",
+            },
+          }),
+        },
+        {
+          ...base,
+          sequence: 55,
+          type: "item/completed",
+          scope: turnScope("turn-1"),
+          itemId: "old-answer",
+          itemKind: "agentMessage",
+          data: JSON.stringify({
+            item: { type: "agentMessage", id: "old-answer", text: "First answer" },
+          }),
+        },
+        {
+          ...base,
+          sequence: 95,
+          type: "client/turn/requested",
+          scope: threadScope(),
+          data: JSON.stringify({
+            direction: "outbound",
+            source: "tell",
+            initiator: "user",
+            request: { method: "turn/start", params: {} },
+            requestId: requestId(3),
+            senderThreadId: null,
+            input: [{ type: "text", text: "Steer second turn", mentions: [] }],
+            target: { kind: "steer", expectedTurnId: "turn-2" },
+            execution,
+          }),
+        },
+        {
+          ...base,
+          sequence: 96,
+          type: "turn/input/accepted",
+          scope: turnScope("turn-2"),
+          data: JSON.stringify({ clientRequestId: requestId(3) }),
+        },
+      ]);
+      const reference = buildPage(db, thread, LARGE_BUDGET, null, 100).response;
+      expect(reference.timelinePage.hasOlderRows).toBe(false);
+      for (const segmentLimit of [1, 2]) {
+        const walked = walkAllPages(db, thread, LARGE_BUDGET, segmentLimit);
+        expect(walked.rows).toEqual(
+          reference.rows.map((row) => JSON.stringify(row)),
+        );
+        expect(walked.pages).toBeGreaterThan(1);
+      }
+    } finally {
+      db.$client.close();
+    }
+  });
+
   it("treats a steer sent with nothing running as a pageable anchor", () => {
     const { db, thread } = setup();
     seedTurns(db, thread, { completeLastTurn: true, itemsPerTurn: [40] });
@@ -1716,7 +1917,7 @@ describe("background tasks across an in-turn window", () => {
 
     const budgeted = buildPage(db, thread, 100, null);
     expect(budgeted.response.timelinePage.olderCursor?.anchorId).toMatch(
-      /^timeline-v1:/,
+      /^timeline-v2:/,
     );
     expect(budgeted.profile.eventRowCount).toBeGreaterThan(600);
     expect(

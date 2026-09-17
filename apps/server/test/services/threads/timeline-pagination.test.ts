@@ -3,10 +3,7 @@ import type {
   TimelineRow,
   TimelineUserConversationRow,
 } from "@bb/server-contract";
-import {
-  paginateTimelineRows,
-  type PaginateTimelineRowsArgs,
-} from "../../../src/services/threads/timeline-pagination.js";
+import { paginateTimelineRows } from "../../../src/services/threads/timeline-pagination.js";
 
 function userRow(args: {
   id: string;
@@ -65,37 +62,20 @@ function assistantRow(seq: number): TimelineRow {
 describe("paginateTimelineRows", () => {
   it("keeps grouped user rows from one request in the same segment", () => {
     const rows: TimelineRow[] = [
-      userRow({
-        id: "thread-1:user-seed:1",
-        seq: 1,
-        text: "older",
-      }),
-      userRow({
-        id: "thread-1:user-seed:2",
-        seq: 2,
-        text: "group first",
-      }),
-      userRow({
-        id: "thread-1:user-seed:2-1",
-        seq: 2,
-        text: "group second",
-      }),
-      userRow({
-        id: "thread-1:user-seed:3",
-        seq: 3,
-        text: "newer",
-      }),
+      userRow({ id: "thread-1:user-seed:1", seq: 1, text: "older" }),
+      userRow({ id: "thread-1:user-seed:2", seq: 2, text: "group first" }),
+      userRow({ id: "thread-1:user-seed:2-1", seq: 2, text: "group second" }),
+      userRow({ id: "thread-1:user-seed:3", seq: 3, text: "newer" }),
     ];
 
     const page = paginateTimelineRows({
-      contextBoundarySeq: null,
       knownHasOlderSegments: null,
       maxLeaves: 1_000,
       maxBytes: 1_000_000,
       ownedSequenceStart: 0,
       ownedSequenceEnd: 4,
       page: { kind: "latest", segmentLimit: 2 },
-      segmentAnchorSequences: new Set([1, 2, 3]),
+      segmentAnchorSequences: [1, 2, 3],
       rows,
     });
 
@@ -105,12 +85,12 @@ describe("paginateTimelineRows", () => {
       "thread-1:user-seed:3",
     ]);
     expect(page.olderCursor).toEqual({
-      anchorId: "thread-1:user-seed:2",
+      anchorId: "timeline-window:2",
       anchorSeq: 2,
     });
   });
 
-  it("anchors a group at its message when rows recorded after the request display before it", () => {
+  it("keeps rows recorded after a request that display before it in the request's segment", () => {
     const providerEnvironment: TimelineRow = {
       id: "thread-1:op:provider-environment:15",
       kind: "system",
@@ -134,14 +114,13 @@ describe("paginateTimelineRows", () => {
     ];
 
     const page = paginateTimelineRows({
-      contextBoundarySeq: null,
       knownHasOlderSegments: true,
       maxLeaves: 1_000,
       maxBytes: 1_000_000,
       ownedSequenceStart: 13,
       ownedSequenceEnd: 21,
       page: { kind: "latest", segmentLimit: 20 },
-      segmentAnchorSequences: new Set([13, 20]),
+      segmentAnchorSequences: [13, 20],
       rows,
     });
 
@@ -149,7 +128,7 @@ describe("paginateTimelineRows", () => {
     expect(page.olderRowsSourceSeqEnd).toBeNull();
     expect(page.returnedSegmentCount).toBe(2);
     expect(page.olderCursor).toEqual({
-      anchorId: "thread-1:user-seed:13",
+      anchorId: "timeline-window:13",
       anchorSeq: 13,
     });
   });
@@ -172,14 +151,13 @@ describe("paginateTimelineRows", () => {
     });
 
     const page = paginateTimelineRows({
-      contextBoundarySeq: null,
       knownHasOlderSegments: true,
       maxLeaves: 1_000,
       maxBytes: 1_000_000,
       ownedSequenceStart: 20,
       ownedSequenceEnd: 32,
       page: { kind: "latest", segmentLimit: 20 },
-      segmentAnchorSequences: new Set([1, 20]),
+      segmentAnchorSequences: [20],
       rows: [olderUser, lateOlderRow, latestUser],
     });
 
@@ -199,14 +177,13 @@ describe("paginateTimelineRows", () => {
     });
 
     const page = paginateTimelineRows({
-      contextBoundarySeq: null,
       knownHasOlderSegments: null,
       maxLeaves: 2,
       maxBytes: 1_000_000,
       ownedSequenceStart: 1,
       ownedSequenceEnd: 31,
       page: { kind: "latest", segmentLimit: 20 },
-      segmentAnchorSequences: new Set([1]),
+      segmentAnchorSequences: [1],
       rows: [
         userRow({ id: "thread-1:user-seed:1", seq: 1, text: "prompt" }),
         steer("thread-1:running-item", 2, 30),
@@ -219,20 +196,50 @@ describe("paginateTimelineRows", () => {
       "thread-1:item-3",
       "thread-1:item-4",
     ]);
-    expect(page.contentPage).toMatchObject({ start: 2, total: 4 });
+    expect(page.contentPage).toMatchObject({ anchorSeq: 1, start: 2, total: 4 });
     expect(page.olderRowsSourceSeqEnd).toBe(30);
+    expect(page.olderCursor).toEqual({
+      anchorId: "timeline-window:1",
+      anchorSeq: 1,
+    });
+    expect(page.contentCursor).toEqual({ beforeLeaf: 2, beforeSequence: 31 });
+  });
+
+  it("continues a content cut at the next window bound, not a projected row", () => {
+    const page = paginateTimelineRows({
+      knownHasOlderSegments: null,
+      maxLeaves: 1,
+      maxBytes: 1_000_000,
+      ownedSequenceStart: 10,
+      ownedSequenceEnd: 40,
+      page: { kind: "latest", segmentLimit: 20 },
+      segmentAnchorSequences: [10, 20, 30],
+      rows: [
+        assistantRow(12),
+        assistantRow(14),
+        assistantRow(33),
+        assistantRow(35),
+      ],
+    });
+
+    expect(page.rows.map((row) => row.id)).toEqual(["thread-1:assistant:35"]);
+    expect(page.contentCursor).toEqual({ beforeLeaf: 1, beforeSequence: 40 });
+    expect(page.olderCursor).toEqual({
+      anchorId: "timeline-window:30",
+      anchorSeq: 30,
+    });
+    expect(page.olderRowsSourceSeqEnd).toBe(33);
   });
 
   it("reports owned groups a budget cut left out of the page", () => {
     const page = paginateTimelineRows({
-      contextBoundarySeq: null,
       knownHasOlderSegments: null,
       maxLeaves: 1,
       maxBytes: 1_000_000,
       ownedSequenceStart: 1,
       ownedSequenceEnd: 21,
       page: { kind: "latest", segmentLimit: 20 },
-      segmentAnchorSequences: new Set([1, 20]),
+      segmentAnchorSequences: [1, 20],
       rows: [
         {
           ...userRow({ id: "thread-1:user-seed:1", seq: 1, text: "older" }),
@@ -244,6 +251,10 @@ describe("paginateTimelineRows", () => {
 
     expect(page.rows.map((row) => row.id)).toEqual(["thread-1:user-seed:20"]);
     expect(page.olderRowsSourceSeqEnd).toBe(25);
+    expect(page.olderCursor).toEqual({
+      anchorId: "timeline-window:20",
+      anchorSeq: 20,
+    });
   });
 
   it("keeps rows recorded before the first message as their own group", () => {
@@ -265,14 +276,13 @@ describe("paginateTimelineRows", () => {
     };
 
     const page = paginateTimelineRows({
-      contextBoundarySeq: null,
       knownHasOlderSegments: null,
       maxLeaves: 1_000,
       maxBytes: 1_000_000,
       ownedSequenceStart: 0,
       ownedSequenceEnd: 4,
       page: { kind: "latest", segmentLimit: 1 },
-      segmentAnchorSequences: new Set([3]),
+      segmentAnchorSequences: [3],
       rows: [
         provisioning,
         userRow({ id: "thread-1:user-seed:3", seq: 3, text: "first" }),
@@ -281,20 +291,39 @@ describe("paginateTimelineRows", () => {
 
     expect(page.rows.map((row) => row.id)).toEqual(["thread-1:user-seed:3"]);
     expect(page.olderCursor).toEqual({
-      anchorId: "thread-1:user-seed:3",
+      anchorId: "timeline-window:3",
       anchorSeq: 3,
     });
+
+    const older = paginateTimelineRows({
+      knownHasOlderSegments: null,
+      maxLeaves: 1_000,
+      maxBytes: 1_000_000,
+      ownedSequenceStart: 0,
+      ownedSequenceEnd: 3,
+      page: { kind: "older", beforeCursor: page.olderCursor!, segmentLimit: 1 },
+      segmentAnchorSequences: [],
+      rows: [
+        provisioning,
+        userRow({ id: "thread-1:user-seed:3", seq: 3, text: "first" }),
+      ],
+    });
+    expect(older.rows.map((row) => row.id)).toEqual([
+      "thread-1:op:thread-provisioning:1",
+    ]);
+    expect(older.hasOlderRows).toBe(false);
+    expect(older.olderCursor).toBeNull();
   });
-  it("renders a window whose only user rows steered into a running turn", () => {
+
+  it("owns rows by the selected window, whatever row shape they project to", () => {
     const page = paginateTimelineRows({
-      contextBoundarySeq: null,
       knownHasOlderSegments: true,
       maxLeaves: 1_000,
       maxBytes: 1_000_000,
       ownedSequenceStart: 15,
       ownedSequenceEnd: 30,
       page: { kind: "latest", segmentLimit: 8 },
-      segmentAnchorSequences: new Set(),
+      segmentAnchorSequences: [15],
       rows: [
         assistantRow(10),
         steerRow({ id: "thread-1:user-seed:20", seq: 20, text: "steer" }),
@@ -303,24 +332,60 @@ describe("paginateTimelineRows", () => {
     });
 
     expect(page.rows.map((row) => row.id)).toEqual([
-      "thread-1:assistant:10",
       "thread-1:user-seed:20",
       "thread-1:assistant:21",
     ]);
     expect(page.returnedSegmentCount).toBe(1);
-    expect(page.olderCursor).not.toBeNull();
+    expect(page.olderCursor).toEqual({
+      anchorId: "timeline-window:15",
+      anchorSeq: 15,
+    });
+    expect(page.olderRowsSourceSeqEnd).toBe(10);
   });
 
-  it("anchors a segment on a sequence the window selection chose, whatever row shape it projects to", () => {
+  it("keeps an in-window row that displays before an accepted steer projected at its acceptance", () => {
+    const notice = assistantRow(13093);
     const page = paginateTimelineRows({
-      contextBoundarySeq: null,
+      knownHasOlderSegments: true,
+      maxLeaves: 1_000,
+      maxBytes: 1_000_000,
+      ownedSequenceStart: 12545,
+      ownedSequenceEnd: 14416,
+      page: { kind: "latest", segmentLimit: 20 },
+      segmentAnchorSequences: [12545, 13091],
+      rows: [
+        userRow({ id: "thread-1:user-seed:5198", seq: 5198, text: "context" }),
+        steerRow({
+          id: "thread-1:user-seed:12545",
+          seq: 12547,
+          text: "accepted steer",
+        }),
+        notice,
+        userRow({ id: "thread-1:user-seed:13091", seq: 13091, text: "new turn" }),
+      ],
+    });
+
+    expect(page.rows.map((row) => row.id)).toEqual([
+      "thread-1:user-seed:12545",
+      "thread-1:assistant:13093",
+      "thread-1:user-seed:13091",
+    ]);
+    expect(page.returnedSegmentCount).toBe(2);
+    expect(page.olderCursor).toEqual({
+      anchorId: "timeline-window:12545",
+      anchorSeq: 12545,
+    });
+  });
+
+  it("selects the newest groups when the window holds more than the limit", () => {
+    const page = paginateTimelineRows({
       knownHasOlderSegments: null,
       maxLeaves: 1_000,
       maxBytes: 1_000_000,
       ownedSequenceStart: 1,
       ownedSequenceEnd: 30,
       page: { kind: "latest", segmentLimit: 1 },
-      segmentAnchorSequences: new Set([20]),
+      segmentAnchorSequences: [20],
       rows: [
         userRow({ id: "thread-1:user-seed:1", seq: 1, text: "first" }),
         assistantRow(20),
@@ -332,55 +397,44 @@ describe("paginateTimelineRows", () => {
       "thread-1:assistant:20",
       "thread-1:assistant:21",
     ]);
+    expect(page.hasOlderRows).toBe(true);
     expect(page.olderCursor).toEqual({
-      anchorId: "thread-1:assistant:20",
+      anchorId: "timeline-window:20",
       anchorSeq: 20,
     });
   });
 
-  it("never advertises older rows without a cursor to request them", () => {
-    const cases: PaginateTimelineRowsArgs[] = [
-      {
-        contextBoundarySeq: null,
-        knownHasOlderSegments: true,
-        maxLeaves: 1_000,
-        maxBytes: 1_000_000,
-        ownedSequenceStart: 15,
-        ownedSequenceEnd: 30,
-        page: { kind: "latest", segmentLimit: 8 },
-        segmentAnchorSequences: new Set(),
-        rows: [
-          assistantRow(10),
-          steerRow({ id: "thread-1:user-seed:20", seq: 20, text: "steer" }),
-        ],
-      },
-      {
-        contextBoundarySeq: null,
-        knownHasOlderSegments: true,
-        maxLeaves: 1_000,
-        maxBytes: 1_000_000,
-        ownedSequenceStart: 100,
-        ownedSequenceEnd: 200,
-        page: { kind: "latest", segmentLimit: 8 },
-        segmentAnchorSequences: new Set([5]),
-        rows: [userRow({ id: "thread-1:user-seed:5", seq: 5, text: "old" })],
-      },
-      {
-        contextBoundarySeq: null,
-        knownHasOlderSegments: true,
-        maxLeaves: 1_000,
-        maxBytes: 1_000_000,
-        ownedSequenceStart: 15,
-        ownedSequenceEnd: 30,
-        page: { kind: "latest", segmentLimit: 8 },
-        segmentAnchorSequences: new Set([20]),
-        rows: [],
-      },
-    ];
+  it("hands back the window start when the window projects no owned rows", () => {
+    const page = paginateTimelineRows({
+      knownHasOlderSegments: true,
+      maxLeaves: 1_000,
+      maxBytes: 1_000_000,
+      ownedSequenceStart: 100,
+      ownedSequenceEnd: 200,
+      page: { kind: "latest", segmentLimit: 8 },
+      segmentAnchorSequences: [100],
+      rows: [userRow({ id: "thread-1:user-seed:5", seq: 5, text: "old" })],
+    });
 
-    for (const args of cases) {
-      const page = paginateTimelineRows(args);
-      expect(page.hasOlderRows).toBe(page.olderCursor !== null);
-    }
+    expect(page.rows).toEqual([]);
+    expect(page.hasOlderRows).toBe(true);
+    expect(page.olderCursor).toEqual({
+      anchorId: "timeline-window:100",
+      anchorSeq: 100,
+    });
+    expect(page.olderRowsSourceSeqEnd).toBe(5);
+
+    const last = paginateTimelineRows({
+      knownHasOlderSegments: null,
+      maxLeaves: 1_000,
+      maxBytes: 1_000_000,
+      ownedSequenceStart: 0,
+      ownedSequenceEnd: 100,
+      page: { kind: "older", beforeCursor: page.olderCursor!, segmentLimit: 8 },
+      segmentAnchorSequences: [],
+      rows: [],
+    });
+    expect(last.hasOlderRows).toBe(false);
+    expect(last.olderCursor).toBeNull();
   });
 });

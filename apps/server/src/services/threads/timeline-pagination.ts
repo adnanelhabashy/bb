@@ -23,8 +23,8 @@ export type ThreadTimelinePageRequest =
   | OlderThreadTimelinePageRequest;
 
 interface TimelineLogicalSegment {
-  cursor: TimelinePaginationCursor;
   rows: TimelineRow[];
+  sequenceStart: number;
 }
 
 interface PaginatedTimelineRowsResult {
@@ -42,121 +42,92 @@ interface PaginatedTimelineRowsResult {
   rows: TimelineRow[];
 }
 
-function buildTimelineLogicalSegment(
-  anchorRow: TimelineRow | null,
-  rows: TimelineRow[],
-): TimelineLogicalSegment {
-  const cursorRow = anchorRow ?? rows[0];
-  if (!cursorRow) {
-    throw new Error("Cannot build a timeline segment without rows");
-  }
-
-  return {
-    cursor: {
-      anchorSeq: cursorRow.sourceSeqStart,
-      anchorId: cursorRow.id,
-    },
-    rows,
-  };
-}
-
-function buildTimelineLogicalSegments(
-  rows: readonly TimelineRow[],
-  contextBoundarySeq: number | null,
-  segmentAnchorSequences: ReadonlySet<number>,
-): TimelineLogicalSegment[] {
-  const segments: TimelineLogicalSegment[] = [];
-  let currentRows: TimelineRow[] = [];
-  let anchorRow: TimelineRow | null = null;
-
-  for (const row of rows) {
-    if (
-      row.sourceSeqStart === contextBoundarySeq ||
-      segmentAnchorSequences.has(row.sourceSeqStart)
-    ) {
-      if (
-        anchorRow === null &&
-        currentRows.every(
-          (current) => current.sourceSeqStart > row.sourceSeqStart,
-        )
-      ) {
-        anchorRow = row;
-        currentRows.push(row);
-        continue;
-      }
-      const currentAnchorRow = anchorRow ?? currentRows[0];
-      if (currentAnchorRow?.sourceSeqStart !== row.sourceSeqStart) {
-        segments.push(buildTimelineLogicalSegment(anchorRow, currentRows));
-        currentRows = [row];
-        anchorRow = row;
-        continue;
-      }
-    }
-
-    currentRows.push(row);
-  }
-
-  if (currentRows.length > 0) {
-    segments.push(buildTimelineLogicalSegment(anchorRow, currentRows));
-  }
-
-  return segments;
-}
-
 export interface PaginateTimelineRowsArgs {
   contentCursor?: TimelineContentCursor;
   maxLeaves: number;
   maxBytes: number;
   ownedSequenceStart: number;
   ownedSequenceEnd: number;
-  contextBoundarySeq: number | null;
   knownHasOlderSegments: boolean | null;
   page: ThreadTimelinePageRequest;
   rows: readonly TimelineRow[];
-  segmentAnchorSequences: ReadonlySet<number>;
+  segmentAnchorSequences: readonly number[];
+}
+
+function timelineWindowCursor(
+  sequenceStart: number,
+): TimelinePaginationCursor {
+  return {
+    anchorSeq: sequenceStart,
+    anchorId: `timeline-window:${sequenceStart}`,
+  };
+}
+
+function buildTimelineLogicalSegments(
+  args: PaginateTimelineRowsArgs,
+): TimelineLogicalSegment[] {
+  const { ownedSequenceStart, ownedSequenceEnd } = args;
+  const bounds = [
+    ownedSequenceStart,
+    ...args.segmentAnchorSequences.filter(
+      (sequence) =>
+        sequence > ownedSequenceStart && sequence < ownedSequenceEnd,
+    ),
+  ];
+  const segments = bounds.map(
+    (sequenceStart): TimelineLogicalSegment => ({ rows: [], sequenceStart }),
+  );
+  for (const row of args.rows) {
+    if (
+      row.sourceSeqStart < ownedSequenceStart ||
+      row.sourceSeqStart >= ownedSequenceEnd
+    ) {
+      continue;
+    }
+    let index = bounds.length - 1;
+    while (index > 0 && bounds[index]! > row.sourceSeqStart) index -= 1;
+    segments[index]!.rows.push(row);
+  }
+  return segments.filter((segment) => segment.rows.length > 0);
 }
 
 export function paginateTimelineRows(
   args: PaginateTimelineRowsArgs,
 ): PaginatedTimelineRowsResult {
-  const { contextBoundarySeq, knownHasOlderSegments, page, rows } = args;
-  const logicalSegments = buildTimelineLogicalSegments(
-    rows,
-    contextBoundarySeq,
-    args.segmentAnchorSequences,
-  );
-  const returnedSegments = new Set<TimelineLogicalSegment>();
+  const { knownHasOlderSegments, page, rows } = args;
+  const segments = buildTimelineLogicalSegments(args);
+  const selectedSegments = segments.slice(-page.segmentLimit);
+  const returnedRows = new Map<string, TimelineRow>();
+  const collectRows = (): TimelineRow[] =>
+    rows.flatMap((row) => {
+      const returned = returnedRows.get(row.id);
+      return returned === undefined ? [] : [returned];
+    });
   const olderRowsSourceSeqEnd = (
     omittedContentSourceSeqEnd: number | null,
   ): number | null =>
-    logicalSegments
+    rows
       .filter(
-        (segment) =>
-          !returnedSegments.has(segment) &&
-          segment.cursor.anchorSeq < args.ownedSequenceEnd,
+        (row) =>
+          row.sourceSeqStart < args.ownedSequenceEnd &&
+          !returnedRows.has(row.id),
       )
-      .flatMap((segment) => segment.rows)
       .reduce<number | null>(
         (sourceSeqEnd, row) => Math.max(sourceSeqEnd ?? 0, row.sourceSeqEnd),
         omittedContentSourceSeqEnd,
       );
-  const ownedSegments = logicalSegments.filter(
-    (segment) =>
-      segment.cursor.anchorSeq >= args.ownedSequenceStart &&
-      segment.cursor.anchorSeq < args.ownedSequenceEnd,
-  );
-  const segments = ownedSegments.length > 0 ? ownedSegments : logicalSegments;
-  const selectedSegments = segments.slice(-page.segmentLimit);
   if (selectedSegments.length === 0) {
+    const hasOlderRows = knownHasOlderSegments ?? false;
     return {
-      hasOlderRows: false,
-      olderCursor: null,
+      hasOlderRows,
+      olderCursor: hasOlderRows
+        ? timelineWindowCursor(args.ownedSequenceStart)
+        : null,
       olderRowsSourceSeqEnd: olderRowsSourceSeqEnd(null),
       returnedSegmentCount: 0,
       rows: [],
     };
   }
-  const resultRows: TimelineRow[] = [];
   let remainingLeaves = args.maxLeaves;
   let remainingBytes = args.maxBytes;
   let returnedSegmentCount = 0;
@@ -168,8 +139,7 @@ export function paginateTimelineRows(
       remainingLeaves,
       remainingBytes,
     );
-    resultRows.unshift(...contents.rows);
-    returnedSegments.add(segment);
+    for (const row of contents.rows) returnedRows.set(row.id, row);
     returnedSegmentCount += 1;
     remainingLeaves -= contents.end - contents.start;
     remainingBytes -= Buffer.byteLength(JSON.stringify(contents.rows));
@@ -179,10 +149,12 @@ export function paginateTimelineRows(
         index > 0 ||
         (knownHasOlderSegments ?? segments.length > selectedSegments.length);
       return {
-        rows: resultRows,
+        rows: collectRows(),
         returnedSegmentCount,
         hasOlderRows,
-        olderCursor: hasOlderRows ? segment.cursor : null,
+        olderCursor: hasOlderRows
+          ? timelineWindowCursor(segment.sequenceStart)
+          : null,
         olderRowsSourceSeqEnd: olderRowsSourceSeqEnd(
           contents.olderRowsSourceSeqEnd,
         ),
@@ -191,12 +163,12 @@ export function paginateTimelineRows(
             ? {
                 beforeLeaf: contents.start,
                 beforeSequence:
-                  selectedSegments[index + 1]?.cursor.anchorSeq ??
+                  selectedSegments[index + 1]?.sequenceStart ??
                   args.ownedSequenceEnd,
               }
             : undefined,
         contentPage: {
-          anchorSeq: segment.cursor.anchorSeq,
+          anchorSeq: segment.sequenceStart,
           start: contents.start,
           end: contents.end,
           total: contents.total,
@@ -207,10 +179,12 @@ export function paginateTimelineRows(
   const hasOlderRows =
     knownHasOlderSegments ?? segments.length > selectedSegments.length;
   return {
-    rows: resultRows,
+    rows: collectRows(),
     returnedSegmentCount,
     hasOlderRows,
-    olderCursor: hasOlderRows ? selectedSegments[0]!.cursor : null,
+    olderCursor: hasOlderRows
+      ? timelineWindowCursor(selectedSegments[0]!.sequenceStart)
+      : null,
     olderRowsSourceSeqEnd: olderRowsSourceSeqEnd(null),
   };
 }

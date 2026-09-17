@@ -41,6 +41,7 @@ import {
   listLatestThreadStateEventRowsByThreadIds,
   listStoredConversationOutlineEventRows,
   listTimelineSegmentAnchorsDescending,
+  listTimelineSegmentAnchorSequences,
   listOpenTurnInputAcceptedRowsByThreadIds,
   listStoredClientTurnRequestIdsInRange,
   listStoredClientTurnRequestRowsByKeys,
@@ -1506,7 +1507,7 @@ describe("events", () => {
     ).toEqual([2, 5]);
   });
 
-  it("lists bounded timeline segment anchors with request shape rules", () => {
+  it("lists bounded timeline segment anchors for every nonempty request", () => {
     const { db, thread } = setup();
 
     insertEvents(db, noopNotifier, [
@@ -1634,19 +1635,21 @@ describe("events", () => {
 
     expect(
       listTimelineSegmentAnchorsDescending(db, {
-        limit: 8,
+        limit: 10,
         sequenceStart: 0,
         threadId: thread.id,
       }),
     ).toEqual([
-      { rowId: `${thread.id}:user-seed:11`, sequence: 11 },
-      { rowId: `${thread.id}:user-seed:10`, sequence: 10 },
-      { rowId: `${thread.id}:user-seed:9`, sequence: 9 },
-      { rowId: `${thread.id}:user-seed:8`, sequence: 8 },
-      { rowId: `${thread.id}:user-seed:7`, sequence: 7 },
-      { rowId: `${thread.id}:user-seed:4`, sequence: 4 },
-      { rowId: `${thread.id}:user-seed:2`, sequence: 2 },
-      { rowId: `${thread.id}:user-seed:1`, sequence: 1 },
+      { sequence: 11 },
+      { sequence: 10 },
+      { sequence: 9 },
+      { sequence: 8 },
+      { sequence: 7 },
+      { sequence: 5 },
+      { sequence: 4 },
+      { sequence: 3 },
+      { sequence: 2 },
+      { sequence: 1 },
     ]);
 
     expect(
@@ -1664,10 +1667,94 @@ describe("events", () => {
         threadId: thread.id,
       }),
     ).toEqual([
-      { rowId: `${thread.id}:user-seed:7`, sequence: 7 },
-      { rowId: `${thread.id}:user-seed:4`, sequence: 4 },
-      { rowId: `${thread.id}:user-seed:2`, sequence: 2 },
+      { sequence: 7 },
+      { sequence: 5 },
+      { sequence: 4 },
     ]);
+  });
+
+  it("anchors an accepted steer where its input entered the turn", () => {
+    const { db, thread } = setup();
+    const request = (
+      sequence: number,
+      requestId: string,
+      expectedTurnId: string,
+    ): InsertEventInput => ({
+      threadId: thread.id,
+      sequence,
+      type: "client/turn/requested",
+      ...threadEventFields,
+      data: JSON.stringify({
+        initiator: "user",
+        requestId,
+        input: textInput(`steer ${sequence}`),
+        target: { kind: "steer", expectedTurnId },
+      }),
+    });
+    const accepted = (
+      sequence: number,
+      clientRequestId: string,
+      turnId: string,
+    ): InsertEventInput => ({
+      threadId: thread.id,
+      sequence,
+      type: "turn/input/accepted",
+      scope: turnScope(turnId),
+      providerThreadId: "provider-1",
+      itemId: null,
+      itemKind: null,
+      parentToolCallId: null,
+      data: JSON.stringify({ clientRequestId }),
+    });
+
+    insertEvents(db, noopNotifier, [
+      {
+        threadId: thread.id,
+        sequence: 1,
+        type: "client/turn/requested",
+        ...threadEventFields,
+        data: JSON.stringify({
+          initiator: "user",
+          requestId: "req-1",
+          input: textInput("first"),
+          target: { kind: "new-turn" },
+        }),
+      },
+      request(2, "req-2", "turn-1"),
+      accepted(5, "req-2", "turn-1"),
+      request(6, "req-6", "turn-1"),
+      accepted(8, "req-6", "turn-2"),
+      request(9, "req-9", "turn-1"),
+    ]);
+
+    expect(
+      listTimelineSegmentAnchorSequences(db, {
+        beforeSequence: 100,
+        sequenceStart: 0,
+        threadId: thread.id,
+      }),
+    ).toEqual([1, 5, 6, 9]);
+    expect(
+      listTimelineSegmentAnchorsDescending(db, {
+        limit: 10,
+        sequenceStart: 0,
+        threadId: thread.id,
+      }).map((row) => row.sequence),
+    ).toEqual([9, 6, 5, 1]);
+    expect(
+      listTimelineSegmentAnchorSequences(db, {
+        beforeSequence: 5,
+        sequenceStart: 0,
+        threadId: thread.id,
+      }),
+    ).toEqual([1]);
+    expect(
+      listTimelineSegmentAnchorSequences(db, {
+        beforeSequence: 100,
+        sequenceStart: 5,
+        threadId: thread.id,
+      }),
+    ).toEqual([5, 6, 9]);
   });
 
   it.each<{
@@ -1677,6 +1764,19 @@ describe("events", () => {
     expected: number | null;
   }>([
     { name: "a user request inside a tool call span", expected: 3 },
+    {
+      name: "a steer inside a tool call span",
+      overrides: {
+        3: {
+          data: JSON.stringify({
+            initiator: "user",
+            input: textInput("steer message"),
+            target: { kind: "steer", expectedTurnId: "turn-a" },
+          }),
+        },
+      },
+      expected: null,
+    },
     {
       name: "a delegation span",
       overrides: { 2: { itemKind: "delegation" } },

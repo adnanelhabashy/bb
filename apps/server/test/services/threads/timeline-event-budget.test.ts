@@ -79,7 +79,7 @@ it.each([
       data: JSON.stringify({
         requestId: requestId(1),
         initiator: "user",
-        input: [],
+        input: [{ type: "text", text: "external request", mentions: [] }],
       }),
     });
     insertEvents(

@@ -961,6 +961,7 @@ function selectStandardTimelineEventRows(
   });
   if (
     page.kind === "older" &&
+    page.beforeCursor.anchorSeq !== epochSequenceStart &&
     !isTimelineCursorSequencePresent(db, {
       threadId: thread.id,
       sequence: page.beforeCursor.anchorSeq,
@@ -1454,7 +1455,6 @@ function buildThreadTimelineInternal(
             )
           ),
       ),
-      decodedEvents,
       eventSelection.orderingBoundarySequence,
     ),
     decodedRawEvents,
@@ -1466,7 +1466,6 @@ function buildThreadTimelineInternal(
     "pagination-segmentation",
     () =>
       paginateTimelineRows({
-        contextBoundarySeq,
         contentCursor,
         maxLeaves: Math.max(1, options.eventBudget),
         maxBytes:
@@ -1476,7 +1475,7 @@ function buildThreadTimelineInternal(
         knownHasOlderSegments: eventSelection.knownHasOlderSegments,
         page: eventSelection.paginationPage,
         rows: projectedTimelineRows,
-        segmentAnchorSequences: new Set(eventSelection.segmentAnchorSequences),
+        segmentAnchorSequences: eventSelection.segmentAnchorSequences,
       }),
   );
   profile.responseRowCount = paginatedTimeline.rows.length;
