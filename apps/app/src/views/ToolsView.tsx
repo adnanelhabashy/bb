@@ -1,3 +1,4 @@
+import { useIsCompactViewport } from "@bb/shared-ui/hooks/use-compact-viewport";
 import { useAtom } from "jotai";
 import { pluginWorkspaceAtom } from "@/components/plugin/plugin-workspace-state";
 import { useSetPluginEnabled } from "@/components/plugin/useSetPluginEnabled";
@@ -428,8 +429,10 @@ export function PluginsView({ pluginId }: { pluginId?: string } = {}) {
   const focusReturnRef = useRef<HTMLButtonElement | null>(null);
   const [isPluginDetailFullPage, setIsPluginDetailFullPage] = useState(false);
   const [workspace, setWorkspace] = useAtom(pluginWorkspaceAtom);
+  const isCompact = useIsCompactViewport();
   const activePluginId = pluginId ?? workspace.activePluginId;
-  const isPanelOpen = activePluginId !== null;
+  const isPanelOpen =
+    activePluginId !== null && (!isCompact || pluginId !== undefined);
   const catalogQuery = usePluginCatalogSearch("", { enabled: isPanelOpen });
   const listQuery = usePluginList({ enabled: true });
   const openIds = useMemo(
