@@ -55,7 +55,8 @@ describe("installed plugin catalog identity", () => {
           catalogMarketplaceName: null,
           source: "builtin:notes",
         },
-        [community, official],
+        [{ ...official, marketplace: "untrusted" }, community, official],
+        { allowSourceFallback: false },
       ),
     ).toBe(official);
   });
@@ -63,11 +64,11 @@ describe("installed plugin catalog identity", () => {
     for (const metadata of [
       { catalogEntryId: null, catalogMarketplaceName: null },
       { catalogEntryId: "notes", catalogMarketplaceName: null },
-      { catalogEntryId: null, catalogMarketplaceName: "bb-official" },
+      { catalogEntryId: null, catalogMarketplaceName: "community" },
     ]) {
       expect(
         installedPluginCatalogEntry(
-          { id: "notes", source: "builtin:notes", ...metadata },
+          { id: "notes", source: community.source, ...metadata },
           [community, official],
           { allowSourceFallback: false },
         ),

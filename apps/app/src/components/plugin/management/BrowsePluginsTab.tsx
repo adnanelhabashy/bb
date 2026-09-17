@@ -176,7 +176,7 @@ export function BrowsePluginsTab({
     >
       <div className={cn("space-y-7 pb-8", TOOLS_PAGE_BAND_CLASSES)}>
         {shelfKey !== null ? (
-          <div className="mx-auto w-full max-w-3xl space-y-2">
+          <div className="w-full space-y-2">
             <Link
               to={{ pathname: getPluginsRoutePath(), search: browseSearch }}
               className="-ml-1 inline-flex items-center gap-1 rounded-sm px-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"

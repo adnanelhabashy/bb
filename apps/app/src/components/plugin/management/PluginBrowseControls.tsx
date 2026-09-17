@@ -80,7 +80,7 @@ export function PluginCollectionToolbar({
   changeSearchParams: (change: (next: URLSearchParams) => void) => void;
 }) {
   return (
-    <div className={cn("mx-auto w-full max-w-3xl", className)}>
+    <div className={cn("w-full", className)}>
       <ResourceToolbar
         compact
         action={action}

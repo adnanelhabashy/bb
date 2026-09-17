@@ -22,7 +22,7 @@ export function PluginCatalogGrid({
   onOpenPlugin: (pluginId: string, trigger: HTMLButtonElement) => void;
 }) {
   return (
-    <PluginCardGrid className="mx-auto max-w-3xl">
+    <PluginCardGrid>
       {entries.map((entry) => (
         <PluginCatalogCard
           key={`${entry.marketplace}/${entry.entryId}`}
