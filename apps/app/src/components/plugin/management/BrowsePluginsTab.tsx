@@ -24,10 +24,7 @@ import { BrowseHeroCarousel } from "@/components/plugin/browse-hero/BrowseHeroCa
 import { nextComposerRequestNonce } from "@/components/plugin/browse-hero/browse-hero-archetypes";
 import { TOOLS_PAGE_BAND_CLASSES } from "@/components/tools/tools-navigation";
 import { getPluginsRoutePath } from "@/lib/route-paths";
-import {
-  usePluginCatalogSearch,
-  type PluginCatalogSearchEntry,
-} from "@/hooks/queries/plugin-catalog-queries";
+import { usePluginCatalogSearch } from "@/hooks/queries/plugin-catalog-queries";
 import type { AddPluginInitial } from "./AddPluginDialog";
 import { PluginCatalogCard, PluginCatalogGrid } from "./PluginCatalogCard";
 import {
