@@ -1,5 +1,10 @@
+import {
+  pluginSourceFilterId,
+  pluginSourceFilterOptions,
+} from "./plugin-provenance";
+import { usePluginCollectionParams } from "./management/usePluginCollectionParams";
 import { useMemo, useState, type ReactNode } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   ResourceInfiniteScrollSentinel,
   useResourceInfiniteItems,
@@ -8,6 +13,7 @@ import {
 import {
   ResourceCollectionViewport,
   ResourceListState,
+  ResourceMultiSelectMenu,
 } from "@bb/shared-ui/resource-list";
 import { cn } from "@bb/shared-ui/lib/utils";
 import { CreateWithTemplatesButton } from "@/components/create-via-prompt-examples";
@@ -17,10 +23,7 @@ import {
   AddPluginDialog,
   type AddPluginInitial,
 } from "@/components/plugin/management/AddPluginDialog";
-import {
-  BrowsePluginsTab,
-  pluginCategoryFilterOptions,
-} from "@/components/plugin/management/BrowsePluginsTab";
+import { BrowsePluginsTab } from "@/components/plugin/management/BrowsePluginsTab";
 import { InstalledPluginsTab } from "@/components/plugin/management/InstalledPluginsTab";
 import { PluginAuthorPage } from "@/components/plugin/management/PluginAuthorPage";
 import {
@@ -33,13 +36,10 @@ import {
   PluginRemovalDialog,
 } from "./management/usePluginRemoval";
 import { installedPluginCatalogEntry } from "./management/installed-plugin-catalog";
-import {
-  PluginCollectionToolbar,
-  pluginBrowseSort,
-  pluginBrowseSortDirection,
-} from "./management/PluginBrowseControls";
+import { PluginCollectionToolbar } from "./management/PluginBrowseControls";
 import {
   pluginCategoryFilterId,
+  pluginCategoryFilterOptions,
   sortPluginEntries,
 } from "./management/plugin-browse-discovery";
 import { PLUGINS_INSTALLED_DESCRIPTION } from "@/components/plugin/plugins-collection-copy";
@@ -58,7 +58,14 @@ export function PluginsOverview({
 } = {}) {
   const navigate = useNavigate();
   const removal = usePluginRemoval();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const {
+    searchParams,
+    query: installedQuery,
+    requestedSort,
+    sortDirection: installedSortDirection,
+    selectedCategories,
+    changeSearchParams,
+  } = usePluginCollectionParams();
   const listQuery = usePluginList({ enabled: true });
   const plugins = useMemo(
     () => listQuery.data?.plugins ?? [],
@@ -68,7 +75,6 @@ export function PluginsOverview({
     mode ?? (searchParams.get("view") === "installed" ? "installed" : "browse");
   usePluginUpdateCheck(null, { enabled: activeMode === "installed" });
   const authorKey = searchParams.get("author");
-  const installedQuery = searchParams.get("query") ?? "";
   const catalogQuery = usePluginCatalogSearch("", {
     enabled: activeMode === "installed",
   });
@@ -91,7 +97,14 @@ export function PluginsOverview({
       }),
     [plugins, catalogQuery.data?.entries],
   );
-  const selectedCategories = searchParams.getAll("category");
+  const sourceFilterOptions = useMemo(
+    () => pluginSourceFilterOptions(plugins),
+    [plugins],
+  );
+  const sourceFilters = searchParams.getAll("source");
+  const activeSourceFilters = sourceFilters.filter((value) =>
+    sourceFilterOptions.some((option) => option.id === value),
+  );
   const categoryOptions = useMemo(
     () => pluginCategoryFilterOptions(installedEntries, selectedCategories),
     [installedEntries, selectedCategories],
@@ -99,20 +112,12 @@ export function PluginsOverview({
   const installsKnown = installedEntries.some(
     (entry) => entry.installs !== null,
   );
-  const requestedSort = pluginBrowseSort(searchParams.get("sort"));
   const installedSort =
     requestedSort === "most-installed" && !installsKnown ? null : requestedSort;
-  const installedSortDirection =
-    pluginBrowseSortDirection(searchParams.get("direction")) ??
-    (installedSort === "name" ? "asc" : "desc");
-  const changeSearchParams = (change: (next: URLSearchParams) => void) => {
-    const next = new URLSearchParams(searchParams);
-    change(next);
-    setSearchParams(next, { replace: true });
-  };
   const normalizedInstalledQuery = installedQuery.trim().toLowerCase();
   const installedResetKey = [
     normalizedInstalledQuery,
+    [...activeSourceFilters].sort().join(","),
     installedSort,
     installedSortDirection,
     [...selectedCategories].sort().join(","),
@@ -124,6 +129,11 @@ export function PluginsOverview({
 
   const visiblePlugins = useMemo(() => {
     const filtered = installedEntries.filter((entry) => {
+      if (
+        activeSourceFilters.length > 0 &&
+        !activeSourceFilters.includes(pluginSourceFilterId(entry.plugin))
+      )
+        return false;
       if (
         selectedCategories.length > 0 &&
         !selectedCategories.includes(pluginCategoryFilterId(entry))
@@ -166,6 +176,7 @@ export function PluginsOverview({
       });
   }, [
     installedEntries,
+    activeSourceFilters,
     selectedCategories,
     normalizedInstalledQuery,
     installedSort,
@@ -212,11 +223,17 @@ export function PluginsOverview({
     </>
   );
 
+  const openPlugin =
+    onOpenPlugin ??
+    ((pluginId: string) =>
+      navigate(
+        getPluginDetailRoutePath({
+          pluginId,
+          view: activeMode === "installed" ? "installed" : undefined,
+        }),
+      ));
   let content: ReactNode;
   if (activeMode === "browse") {
-    const openPlugin =
-      onOpenPlugin ??
-      ((pluginId: string) => navigate(getPluginDetailRoutePath({ pluginId })));
     content =
       authorKey === null ? (
         <BrowsePluginsTab
@@ -252,6 +269,23 @@ export function PluginsOverview({
             installsKnown={installsKnown}
             changeSearchParams={changeSearchParams}
             action={installedActions}
+            additionalControls={
+              <>
+                <ResourceMultiSelectMenu
+                  label="Source"
+                  icon="Package"
+                  compact
+                  options={sourceFilterOptions}
+                  selectedValues={activeSourceFilters}
+                  onChange={(values) =>
+                    changeSearchParams((next) => {
+                      next.delete("source");
+                      for (const value of values) next.append("source", value);
+                    })
+                  }
+                />
+              </>
+            }
           />
         }
       >
@@ -270,7 +304,8 @@ export function PluginsOverview({
               message={
                 normalizedInstalledQuery === ""
                   ? "No plugins match these filters."
-                  : selectedCategories.length > 0
+                  : selectedCategories.length > 0 ||
+                      activeSourceFilters.length > 0
                     ? `No plugins match "${installedQuery}" with these filters.`
                     : `No plugins match "${installedQuery}"`
               }
@@ -279,7 +314,7 @@ export function PluginsOverview({
             <>
               <InstalledPluginsTab
                 plugins={installedList.items}
-                onOpenPlugin={onOpenPlugin}
+                onOpenPlugin={openPlugin}
               />
               <ResourceInfiniteScrollSentinel
                 hasMore={installedList.hasMore}

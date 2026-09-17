@@ -1,22 +1,49 @@
 import type { ReactNode } from "react";
-import { ResourceBrowseCard } from "@bb/shared-ui/resource-list";
+import {
+  ResourceBrowseCard,
+  ResourceBrowseGrid,
+} from "@bb/shared-ui/resource-list";
+import { cn } from "@bb/shared-ui/lib/utils";
 import type { PluginCatalogSearchEntry } from "@/hooks/queries/plugin-catalog-queries";
 import { PluginAuthorAvatar } from "./PluginAuthorAvatar";
 import { PluginAuthorLink } from "./PluginAuthorLink";
 import { pluginAuthorGithub } from "./plugin-marketplace-author";
+import { PluginCategoryLabel } from "./plugin-ui";
+
+export function PluginCardGrid({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <ResourceBrowseGrid
+      className={cn(
+        "w-full grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-2",
+        className,
+      )}
+    >
+      {children}
+    </ResourceBrowseGrid>
+  );
+}
 
 interface PluginCardProps {
   title: string;
   description: ReactNode;
   leading: ReactNode;
   byline: ReactNode;
-  footerMeta: ReactNode;
+  badge:
+    | { kind: "category"; categoryId: string | undefined; label: string }
+    | { kind: "local" }
+    | null;
   headerAction: ReactNode;
   openLabel: string;
   onOpen: (trigger: HTMLButtonElement) => void;
 }
 
-export function PluginCard(props: PluginCardProps) {
+export function PluginCard({ badge, ...props }: PluginCardProps) {
   return (
     <ResourceBrowseCard
       {...props}
@@ -24,6 +51,16 @@ export function PluginCard(props: PluginCardProps) {
       leadingClassName="size-6"
       title={
         <span className="line-clamp-2 whitespace-normal">{props.title}</span>
+      }
+      footerMeta={
+        badge === null ? null : (
+          <PluginCategoryLabel
+            categoryId={
+              badge.kind === "category" ? badge.categoryId : undefined
+            }
+            label={badge.kind === "category" ? badge.label : "Local"}
+          />
+        )
       }
     />
   );

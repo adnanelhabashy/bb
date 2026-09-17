@@ -1,3 +1,4 @@
+import { PluginCardAuthor } from "@/components/plugin/management/PluginCard";
 import { useSyncExternalStore } from "react";
 import {
   ResourceActivitySection,
@@ -37,7 +38,6 @@ import {
   PluginMarketplaceDetailMetadata,
   PluginDetailMetadata,
   PluginDetailMetadataItem,
-  PluginMarketplaceHeaderMetadata,
   PluginMarketplaceListingSections,
   PluginMarketplaceOverview,
   PluginMarketplaceSource,
@@ -164,7 +164,7 @@ export function CatalogPluginDetail({
       leading={<CatalogEntryIconChip entry={entry} />}
       leadingClassName="size-6"
       title={entry.displayName}
-      metadata={<PluginMarketplaceHeaderMetadata entry={entry} />}
+      metadata={<PluginCardAuthor entry={entry} />}
       actions={
         <>
           <PluginCatalogInstallControl
@@ -406,7 +406,7 @@ export function PluginDetail({
       title={pluginName}
       metadata={
         catalogEntry === undefined ? undefined : (
-          <PluginMarketplaceHeaderMetadata entry={catalogEntry} />
+          <PluginCardAuthor entry={catalogEntry} />
         )
       }
       actions={

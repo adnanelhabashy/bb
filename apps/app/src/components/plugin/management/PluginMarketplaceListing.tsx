@@ -16,35 +16,13 @@ import {
 } from "@bb/shared-ui/resource-list";
 import type { PluginCatalogSearchEntry } from "@/hooks/queries/plugin-catalog-queries";
 import { PluginOverviewMarkdown } from "@/components/plugin/management/PluginOverviewMarkdown";
-import {
-  CatalogEntryIconChip,
-  PluginCategoryLabel,
-  formatUrlLabel,
-} from "./plugin-ui";
+import { CatalogEntryIconChip, formatUrlLabel } from "./plugin-ui";
 import { PluginAuthorLink } from "./PluginAuthorLink";
-import { PluginCard, PluginCardAuthor } from "./PluginCard";
+import { PluginCard, PluginCardGrid, PluginCardAuthor } from "./PluginCard";
 import {
   entriesByMarketplaceAuthor,
   pluginMarketplaceAuthorKey,
 } from "./plugin-marketplace-author";
-
-export function PluginMarketplaceHeaderMetadata({
-  entry,
-}: {
-  entry: PluginCatalogSearchEntry;
-}) {
-  return <PluginCardAuthor entry={entry} />;
-}
-
-export function PluginMarketplaceCategoryPill({
-  entry,
-}: {
-  entry: PluginCatalogSearchEntry;
-}) {
-  return entry.category === undefined ? null : (
-    <PluginCategoryLabel categoryId={entry.categoryId} label={entry.category} />
-  );
-}
 
 export function PluginDetailMetadata({ children }: { children: ReactNode }) {
   return <dl className="grid grid-cols-2 gap-x-6 gap-y-4">{children}</dl>;
@@ -306,21 +284,29 @@ export function PluginMoreFromAuthorSection({
         </Button>
       }
     >
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-3">
+      <PluginCardGrid>
         {moreEntries.map((candidate) => (
           <PluginCard
             key={`${candidate.marketplace}/${candidate.entryId}`}
-            leading={<CatalogEntryIconChip entry={candidate} />}
+            leading={<CatalogEntryIconChip entry={candidate} compact />}
             title={candidate.displayName}
             description={candidate.description}
             byline={<PluginCardAuthor entry={candidate} />}
-            footerMeta={<PluginMarketplaceCategoryPill entry={candidate} />}
+            badge={
+              candidate.category === undefined
+                ? null
+                : {
+                    kind: "category",
+                    categoryId: candidate.categoryId,
+                    label: candidate.category,
+                  }
+            }
             headerAction={null}
             openLabel={`Open ${candidate.displayName} details`}
             onOpen={() => onOpenPlugin(candidate.pluginId)}
           />
         ))}
-      </div>
+      </PluginCardGrid>
     </ResourceDefinitionSection>
   );
 }

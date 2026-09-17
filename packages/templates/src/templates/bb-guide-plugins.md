@@ -222,7 +222,7 @@ connect status and push with `&&`.
 Local file and empty-directory deletions are warnings unless `--delete` is
 explicit; a pulled folder root is retained, so pull its parent or the whole
 vault to remove that folder. Use `--workspace-host <id>` when a standalone
-CLI's working directory is on a non-primary host. Direct `write`, `mkdir`,
+CLI's working directory is not on the server machine. Direct `write`, `mkdir`,
 `move`, and `remove` remain only as deprecated compatibility commands.
 
 The Tasks plugin is an opt-in official plugin bundled with the app:
@@ -921,3 +921,9 @@ Contributed commands may accept `--stdin`: the calling CLI transfers up to
 The existing `--<flag>-stdin` form still accepts one line.
 
 Modal image debugging: `bb modal image build [--json]` prepares the saved image; `bb modal sandbox run [--json]` starts a 30-minute standalone sandbox; `bb modal sandbox exec ID [--json] -- COMMAND...` runs a command (60-second timeout); `bb modal sandbox stop ID [--json]` cleans up. These debug sandboxes skip BB enrollment, clone and setup. Logs are returned after the build finishes.
+
+## Inspect plugin RPC
+
+`bb plugin rpc list [plugin-id] [--method <exact-name>] [--json]` lists discoverable methods from running plugins, optionally restricted to one plugin. `bb plugin rpc inspect <plugin-id> [method] [--json]` dumps registration and method descriptions plus input/output JSON Schemas. Copy the relevant schema into your consumer and call the existing plugin RPC endpoint. Discovery is opt-in advertising, not access control; method names may carry versions such as `provider-usage.v1.listResources`.
+
+`bb plugin rpc call <plugin-id> <method> [--input-file <json-path>] [--json]` invokes a method using server-side schema validation. Omitting the input file sends JSON null. Input files avoid putting sensitive values in command arguments.

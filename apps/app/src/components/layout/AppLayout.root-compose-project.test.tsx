@@ -13,6 +13,7 @@ const mockUseThreadDetailBootstrap = vi.hoisted(() => vi.fn());
 const commandHandlers = vi.hoisted(() => new Map<string, () => boolean>());
 
 vi.mock("@/components/commands/AppCommandProvider", () => ({
+  useIndexedAppCommandHandlers: () => {},
   useAppCommandHandler: (command: string, handler: () => boolean) => {
     commandHandlers.set(command, handler);
   },
@@ -35,6 +36,8 @@ vi.mock("@/hooks/queries/system-queries", () => ({
       experiments: {
         changelogPreview: false,
         mobileApp: false,
+        multiMachinePicker: false,
+        serverMove: false,
         sidebarProgressiveDisclosure: false,
         timelineWindowing: false,
       },

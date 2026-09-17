@@ -1,5 +1,6 @@
+import { usePluginCollectionParams } from "./usePluginCollectionParams";
 import { useMemo } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Icon } from "@bb/shared-ui/icon";
 import {
   ResourceCollectionViewport,
@@ -14,18 +15,12 @@ import {
 } from "@/hooks/queries/plugin-catalog-queries";
 import { getPluginsRoutePath } from "@/lib/route-paths";
 import type { AddPluginInitial } from "./AddPluginDialog";
-import {
-  PluginCatalogGrid,
-  pluginCategoryFilterOptions,
-} from "./BrowsePluginsTab";
+import { PluginCatalogGrid } from "./PluginCatalogCard";
 import { PluginAuthorAvatar } from "./PluginAuthorAvatar";
-import {
-  PluginCollectionToolbar,
-  pluginBrowseSort,
-  pluginBrowseSortDirection,
-} from "./PluginBrowseControls";
+import { PluginCollectionToolbar } from "./PluginBrowseControls";
 import {
   pluginCategoryFilterId,
+  pluginCategoryFilterOptions,
   sortPluginEntries,
 } from "./plugin-browse-discovery";
 import {
@@ -74,14 +69,15 @@ export function PluginAuthorPage({
   onUninstall?: (entry: PluginCatalogSearchEntry) => void;
   onOpenPlugin: (pluginId: string, trigger: HTMLButtonElement) => void;
 }) {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const query = searchParams.get("query") ?? "";
+  const {
+    searchParams,
+    query,
+    requestedSort,
+    sortDirection,
+    selectedCategories,
+    changeSearchParams,
+  } = usePluginCollectionParams();
   const debouncedQuery = useDebouncedValue(query.trim(), 300);
-  const selectedCategories = searchParams.getAll("category");
-  const requestedSort = pluginBrowseSort(searchParams.get("sort"));
-  const sortDirection =
-    pluginBrowseSortDirection(searchParams.get("direction")) ??
-    (requestedSort === "name" ? "asc" : "desc");
   const catalogQuery = usePluginCatalogSearch("", { enabled: true });
   const searchQuery = usePluginCatalogSearch(debouncedQuery, {
     enabled: debouncedQuery !== "",
@@ -135,12 +131,6 @@ export function PluginAuthorPage({
   const browseParams = new URLSearchParams(searchParams);
   browseParams.delete("author");
   const browseSearch = browseParams.toString();
-
-  const changeSearchParams = (change: (next: URLSearchParams) => void) => {
-    const next = new URLSearchParams(searchParams);
-    change(next);
-    setSearchParams(next, { replace: true });
-  };
 
   return (
     <ResourceCollectionViewport
