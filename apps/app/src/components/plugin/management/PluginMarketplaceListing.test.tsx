@@ -1,3 +1,4 @@
+import { PluginCardAuthor } from "@/components/plugin/management/PluginCard";
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -5,7 +6,6 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PluginCatalogSearchEntry } from "@/hooks/queries/plugin-catalog-queries";
 import {
-  PluginMarketplaceHeaderMetadata,
   PluginMarketplaceListingSections,
   PluginMoreFromAuthorSection,
 } from "./PluginMarketplaceListing";
@@ -93,7 +93,7 @@ describe("plugin marketplace author links", () => {
   it("routes the detail author name to the author page", () => {
     render(
       <MemoryRouter initialEntries={["/plugins/Current?category=security"]}>
-        <PluginMarketplaceHeaderMetadata entry={catalogEntry("Current")} />
+        <PluginCardAuthor entry={catalogEntry("Current")} />
       </MemoryRouter>,
     );
 

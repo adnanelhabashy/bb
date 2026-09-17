@@ -24,6 +24,7 @@ describe("installed plugin catalog identity", () => {
           source: "git:https://github.com/alice/notes.git@v1",
         },
         [official, community],
+        { allowSourceFallback: false },
       ),
     ).toBe(community);
   });
@@ -34,7 +35,12 @@ describe("installed plugin catalog identity", () => {
     ]) {
       expect(
         installedPluginCatalogEntry(
-          { id: "notes", catalogEntryId: null, source },
+          {
+            id: "notes",
+            catalogEntryId: null,
+            catalogMarketplaceName: null,
+            source,
+          },
           [official, community],
         ),
       ).toBeUndefined();
@@ -43,9 +49,29 @@ describe("installed plugin catalog identity", () => {
   it("matches a bundled plugin by its source without marketplace installation metadata", () => {
     expect(
       installedPluginCatalogEntry(
-        { id: "notes", catalogEntryId: null, source: "builtin:notes" },
+        {
+          id: "notes",
+          catalogEntryId: null,
+          catalogMarketplaceName: null,
+          source: "builtin:notes",
+        },
         [community, official],
       ),
     ).toBe(official);
+  });
+  it("requires complete installation metadata when source fallback is disabled", () => {
+    for (const metadata of [
+      { catalogEntryId: null, catalogMarketplaceName: null },
+      { catalogEntryId: "notes", catalogMarketplaceName: null },
+      { catalogEntryId: null, catalogMarketplaceName: "bb-official" },
+    ]) {
+      expect(
+        installedPluginCatalogEntry(
+          { id: "notes", source: "builtin:notes", ...metadata },
+          [community, official],
+          { allowSourceFallback: false },
+        ),
+      ).toBeUndefined();
+    }
   });
 });

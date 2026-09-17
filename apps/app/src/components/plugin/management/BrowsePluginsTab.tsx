@@ -1,7 +1,8 @@
+import type { PluginCatalogSearchEntry } from "@/hooks/queries/plugin-catalog-queries";
+import { usePluginCollectionParams } from "./usePluginCollectionParams";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@bb/shared-ui/button";
-import { PLUGIN_CATALOG_CATEGORIES, pluginCatalogCategory } from "@bb/domain";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,42 +15,29 @@ import { OpenPluginGuideButton } from "./OpenPluginGuideButton";
 import { cn } from "@bb/shared-ui/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
-  ResourceBrowseGrid,
   ResourceCollectionViewport,
   ResourceListState,
-  ResourceShelfSeeAllAction,
+  ResourceShelfAction,
   ResourceSourceShelf,
+  useResourceRouteLabel,
 } from "@bb/shared-ui/resource-list";
 import { BrowseArchetypeCards } from "@/components/plugin/browse-hero/BrowseArchetypeCards";
 import { BrowseHeroCarousel } from "@/components/plugin/browse-hero/BrowseHeroCarousel";
 import { nextComposerRequestNonce } from "@/components/plugin/browse-hero/browse-hero-archetypes";
 import { TOOLS_PAGE_BAND_CLASSES } from "@/components/tools/tools-navigation";
-import {
-  usePluginCatalogSearch,
-  type PluginCatalogSearchEntry,
-} from "@/hooks/queries/plugin-catalog-queries";
+import { getPluginsRoutePath } from "@/lib/route-paths";
+import { usePluginCatalogSearch } from "@/hooks/queries/plugin-catalog-queries";
 import type { AddPluginInitial } from "./AddPluginDialog";
-import { PluginCard, PluginCardAuthor } from "./PluginCard";
-import { PluginCatalogInstallControl } from "./PluginCatalogInstallControl";
+import { PluginCatalogCard, PluginCatalogGrid } from "./PluginCatalogCard";
+import { PluginCollectionToolbar } from "./PluginBrowseControls";
 import {
-  PluginCollectionToolbar,
-  pluginBrowseSort,
-  pluginBrowseSortDirection,
-  type PluginBrowseCategoryOption,
-} from "./PluginBrowseControls";
-import {
-  UNCATEGORIZED_PLUGIN_CATEGORY_ID,
   pluginBrowseShelves,
   pluginCategoryFilterId,
+  pluginCategoryFilterOptions,
   sortPluginEntries,
   type PluginBrowseShelf,
 } from "./plugin-browse-discovery";
-import {
-  CatalogEntryIconChip,
-  PluginCategoryLabel,
-  pluginCatalogCategoryMutedAccentStyle,
-  pluginInstallCountPresentation,
-} from "./plugin-ui";
+import { pluginCatalogCategoryMutedAccentStyle } from "./plugin-ui";
 
 const SHELF_ENTRY_LIMIT = 6;
 
@@ -64,14 +52,17 @@ export function BrowsePluginsTab({
   onOpenPlugin: (pluginId: string, trigger: HTMLButtonElement) => void;
   onInstallFromSource: () => void;
 }) {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const query = searchParams.get("query") ?? "";
+  const {
+    searchParams,
+    query,
+    requestedSort,
+    sortDirection,
+    selectedCategories,
+    changeSearchParams,
+  } = usePluginCollectionParams();
+  const shelfKey = searchParams.get("shelf");
+  const isCategoryShelf = shelfKey?.startsWith("category:") ?? false;
   const creationViewActive = searchParams.get("view") === "create";
-  const selectedCategories = searchParams.getAll("category");
-  const requestedSort = pluginBrowseSort(searchParams.get("sort"));
-  const sortDirection =
-    pluginBrowseSortDirection(searchParams.get("direction")) ??
-    (requestedSort === "name" ? "asc" : "desc");
   const [heroRequest, setHeroRequest] = useState<{
     nonce: number;
     seed?: string;
@@ -82,30 +73,62 @@ export function BrowsePluginsTab({
   const [requestedCreationView, setRequestedCreationView] =
     useState(creationViewActive);
   const [composing, setComposing] = useState(false);
-  const [expandedShelves, setExpandedShelves] = useState<Set<string>>(
-    () => new Set(),
-  );
   const debouncedQuery = useDebouncedValue(query.trim(), 300);
   const searchQuery = usePluginCatalogSearch(debouncedQuery, { enabled: true });
-  const catalog = searchQuery.data ?? { entries: [], collections: [] };
+  const catalogQuery = usePluginCatalogSearch("", {
+    enabled: shelfKey !== null,
+  });
+  const activeQuery = shelfKey === null ? searchQuery : catalogQuery;
+  const catalog = activeQuery.data ?? { entries: [], collections: [] };
   const entries = useMemo(
     () => catalog.entries.filter((entry) => entry.compatible),
     [catalog.entries],
   );
-  const installsKnown = entries.some((entry) => entry.installs !== null);
+  const selectedShelf = useMemo(
+    () =>
+      shelfKey === null
+        ? undefined
+        : pluginBrowseShelves({
+            entries,
+            collections: catalog.collections,
+          }).find((shelf) => shelf.key === shelfKey),
+    [catalog.collections, entries, shelfKey],
+  );
+  useResourceRouteLabel(selectedShelf?.label ?? null);
+  const shelfEntries = useMemo(
+    () => (shelfKey === null ? entries : (selectedShelf?.entries ?? [])),
+    [entries, selectedShelf, shelfKey],
+  );
+  const installsKnown = shelfEntries.some((entry) => entry.installs !== null);
   const sort =
     requestedSort === "most-installed" && !installsKnown ? null : requestedSort;
   const categoryOptions = useMemo(
-    () => pluginCategoryFilterOptions(entries, selectedCategories),
-    [entries, selectedCategories],
+    () => pluginCategoryFilterOptions(shelfEntries, selectedCategories),
+    [shelfEntries, selectedCategories],
   );
   const filteredEntries = useMemo(() => {
-    if (selectedCategories.length === 0) return entries;
     const selected = new Set(selectedCategories);
-    return entries.filter((entry) =>
-      selected.has(pluginCategoryFilterId(entry)),
+    const matchingSearch =
+      shelfKey !== null && debouncedQuery !== ""
+        ? new Set(
+            searchQuery.data?.entries.map(
+              (entry) => `${entry.marketplace}/${entry.entryId}`,
+            ),
+          )
+        : null;
+    return shelfEntries.filter(
+      (entry) =>
+        (selected.size === 0 || selected.has(pluginCategoryFilterId(entry))) &&
+        (matchingSearch === null ||
+          matchingSearch.has(`${entry.marketplace}/${entry.entryId}`)),
     );
-  }, [entries, selectedCategories]);
+  }, [
+    debouncedQuery,
+    searchQuery.data?.entries,
+    selectedCategories,
+    shelfEntries,
+    shelfKey,
+  ]);
   const shelves = useMemo(
     () =>
       pluginBrowseShelves({
@@ -117,19 +140,14 @@ export function BrowsePluginsTab({
   const flatEntries = useMemo(
     () =>
       sort === null
-        ? []
+        ? filteredEntries
         : sortPluginEntries(filteredEntries, sort, sortDirection),
     [filteredEntries, sort, sortDirection],
   );
+  const browseParams = new URLSearchParams(searchParams);
+  browseParams.delete("shelf");
+  const browseSearch = browseParams.toString();
 
-  const changeSearchParams = (
-    change: (next: URLSearchParams) => void,
-    replace = true,
-  ) => {
-    const next = new URLSearchParams(searchParams);
-    change(next);
-    setSearchParams(next, { replace });
-  };
   const openComposer = (seed?: string) =>
     setHeroRequest({
       nonce: nextComposerRequestNonce(),
@@ -155,48 +173,90 @@ export function BrowsePluginsTab({
 
   return (
     <ResourceCollectionViewport
+      key={shelfKey ?? "browse"}
       scrollId="plugins-browse-results"
       contentClassName="[&>div]:block!"
     >
       <div className={cn("space-y-7 pb-8", TOOLS_PAGE_BAND_CLASSES)}>
-        <div className="ml-auto flex w-fit flex-col items-center gap-2">
-          <div className="flex items-stretch">
-            <Button
-              className="rounded-r-none"
-              onClick={() => {
-                if (creationViewActive) return;
-                changeSearchParams((next) => next.set("view", "create"), false);
-              }}
+        {shelfKey !== null ? (
+          <div className="mx-auto w-full max-w-3xl space-y-2">
+            <Link
+              to={{ pathname: getPluginsRoutePath(), search: browseSearch }}
+              className="-ml-1 inline-flex items-center gap-1 rounded-sm px-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
-              <Icon name="MessageSquarePlus" className="size-3.5" />
-              Create a plugin
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  aria-label="Create a plugin options"
-                  className="rounded-l-none border-l border-l-primary-foreground/20 px-1.5"
-                >
-                  <Icon name="ChevronDown" className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-max min-w-40">
-                <DropdownMenuItem onSelect={onInstallFromSource}>
-                  <Icon name="Download" className="size-4" />
-                  Install from source
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              <Icon name="ChevronLeft" className="size-3" aria-hidden />
+              Browse plugins
+            </Link>
+            {selectedShelf === undefined ? null : (
+              <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold text-foreground">
+                <span className="inline-flex min-w-0 items-center gap-2">
+                  {selectedShelf.key.startsWith("category:") ? (
+                    <span
+                      className="size-2 shrink-0 rounded-full"
+                      style={pluginCatalogCategoryMutedAccentStyle(
+                        selectedShelf.categoryId,
+                      )}
+                      aria-hidden
+                    />
+                  ) : null}
+                  {selectedShelf.label}
+                </span>{" "}
+                <span className="rounded-md bg-muted px-2 py-1 text-2xs font-medium tabular-nums text-subtle-foreground">
+                  {selectedShelf.entries.length.toLocaleString()}{" "}
+                  {selectedShelf.entries.length === 1 ? "plugin" : "plugins"}
+                </span>
+              </h1>
+            )}
           </div>
-          <OpenPluginGuideButton />
-        </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <OpenPluginGuideButton />
+              <div className="flex shrink-0 items-stretch">
+                <Button
+                  className="rounded-r-none"
+                  onClick={() => {
+                    if (creationViewActive) return;
+                    changeSearchParams(
+                      (next) => next.set("view", "create"),
+                      false,
+                    );
+                  }}
+                >
+                  <Icon name="MessageSquarePlus" className="size-3.5" />
+                  <span>
+                    Create <span className="hidden sm:inline">a</span> plugin
+                  </span>
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      aria-label="Create a plugin options"
+                      className="rounded-l-none border-l border-l-primary-foreground/20 px-1.5"
+                    >
+                      <Icon name="ChevronDown" className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-max min-w-40">
+                    <DropdownMenuItem onSelect={onInstallFromSource}>
+                      <Icon name="Download" className="size-4" />
+                      Install from source
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
 
-        <BrowseHeroCarousel
-          openRequest={heroRequest}
-          onComposingChange={setComposing}
-        />
+            <div className={cn(!composing && "hidden sm:block")}>
+              <BrowseHeroCarousel
+                openRequest={heroRequest}
+                onComposingChange={setComposing}
+              />
+            </div>
+          </>
+        )}
 
-        {composing ? (
+        {composing && shelfKey === null ? (
           <BrowseArchetypeCards onCreate={openComposer} />
         ) : (
           <section className="space-y-6">
@@ -204,52 +264,54 @@ export function BrowsePluginsTab({
               query={query}
               selectedCategories={selectedCategories}
               categoryOptions={categoryOptions}
+              showCategoryFilter={!isCategoryShelf}
               sort={sort}
               sortDirection={sortDirection}
               installsKnown={installsKnown}
               changeSearchParams={changeSearchParams}
             />
 
-            {searchQuery.isError && entries.length > 0 ? (
+            {(searchQuery.isError || activeQuery.isError) &&
+            entries.length > 0 ? (
               <p className="text-xs text-warning-text" role="status">
                 The latest search failed. The page shows saved catalog results.
               </p>
             ) : null}
-            {searchQuery.isPending ? (
+            {activeQuery.isPending ||
+            (shelfKey !== null &&
+              debouncedQuery !== "" &&
+              searchQuery.isPending) ? (
               <ResourceListState state="loading" message="Loading plugins" />
+            ) : activeQuery.isError && entries.length === 0 ? (
+              <ResourceListState
+                state="error"
+                message="The plugin catalog is not available."
+                onRetry={() => void activeQuery.refetch()}
+              />
+            ) : shelfKey !== null && selectedShelf === undefined ? (
+              <ResourceListState state="empty" message="Shelf not found." />
             ) : entries.length === 0 ? (
               <ResourceListState
-                state={searchQuery.isError ? "error" : "empty"}
-                message={
-                  searchQuery.isError
-                    ? "The plugin catalog is not available."
-                    : "No plugins match this search."
-                }
-                onRetry={
-                  searchQuery.isError
-                    ? () => {
-                        void searchQuery.refetch();
-                      }
-                    : undefined
-                }
+                state="empty"
+                message="No plugins match this search."
+              />
+            ) : searchQuery.isError && searchQuery.data === undefined ? (
+              <ResourceListState
+                state="error"
+                message="The plugin search is not available."
+                onRetry={() => void searchQuery.refetch()}
               />
             ) : filteredEntries.length === 0 ? (
               <ResourceListState
                 state="empty"
                 message="No plugins match these category filters."
               />
-            ) : sort === null ? (
+            ) : sort === null && shelfKey === null ? (
               <div className="space-y-8" data-testid="plugin-browse-shelves">
                 {shelves.map((shelf) => (
                   <BrowseShelf
                     key={shelf.key}
                     shelf={shelf}
-                    expanded={expandedShelves.has(shelf.key)}
-                    onExpand={() =>
-                      setExpandedShelves((current) =>
-                        new Set(current).add(shelf.key),
-                      )
-                    }
                     onInstall={onInstall}
                     onUninstall={onUninstall}
                     onOpenPlugin={onOpenPlugin}
@@ -259,6 +321,7 @@ export function BrowsePluginsTab({
             ) : (
               <PluginCatalogGrid
                 entries={flatEntries}
+                showCategory={!isCategoryShelf}
                 onInstall={onInstall}
                 onUninstall={onUninstall}
                 onOpenPlugin={onOpenPlugin}
@@ -271,82 +334,26 @@ export function BrowsePluginsTab({
   );
 }
 
-export function pluginCategoryFilterOptions(
-  entries: readonly Pick<PluginCatalogSearchEntry, "categoryId" | "category">[],
-  selected: readonly string[],
-): PluginBrowseCategoryOption[] {
-  const labels = new Map<string, string>();
-  const counts = new Map<string, number>();
-  const unknownIds: string[] = [];
-  for (const entry of entries) {
-    const id = pluginCategoryFilterId(entry);
-    if (!labels.has(id)) {
-      labels.set(
-        id,
-        id === UNCATEGORIZED_PLUGIN_CATEGORY_ID
-          ? "Uncategorized"
-          : (entry.category ?? id),
-      );
-      if (
-        id !== UNCATEGORIZED_PLUGIN_CATEGORY_ID &&
-        pluginCatalogCategory(id) === undefined
-      ) {
-        unknownIds.push(id);
-      }
-    }
-    counts.set(id, (counts.get(id) ?? 0) + 1);
-  }
-  for (const id of selected) {
-    if (labels.has(id)) continue;
-    const category = pluginCatalogCategory(id);
-    labels.set(
-      id,
-      id === UNCATEGORIZED_PLUGIN_CATEGORY_ID
-        ? "Uncategorized"
-        : (category?.displayName ?? id),
-    );
-    if (id !== UNCATEGORIZED_PLUGIN_CATEGORY_ID && category === undefined) {
-      unknownIds.push(id);
-    }
-  }
-  const orderedIds = [
-    ...PLUGIN_CATALOG_CATEGORIES.map((category) => category.id).filter((id) =>
-      labels.has(id),
-    ),
-    ...unknownIds,
-    ...(labels.has(UNCATEGORIZED_PLUGIN_CATEGORY_ID)
-      ? [UNCATEGORIZED_PLUGIN_CATEGORY_ID]
-      : []),
-  ];
-  return orderedIds.map((id) => ({
-    id,
-    label: labels.get(id) ?? id,
-    count: counts.get(id) ?? 0,
-  }));
-}
-
 function BrowseShelf({
   shelf,
-  expanded,
-  onExpand,
   onInstall,
   onUninstall,
   onOpenPlugin,
 }: {
   shelf: PluginBrowseShelf;
-  expanded: boolean;
-  onExpand: () => void;
   onInstall: (initial: AddPluginInitial) => void;
   onUninstall?: (entry: PluginCatalogSearchEntry) => void;
   onOpenPlugin: (pluginId: string, trigger: HTMLButtonElement) => void;
 }) {
-  const visible = expanded
-    ? shelf.entries
-    : shelf.entries.slice(0, SHELF_ENTRY_LIMIT);
+  const [searchParams] = useSearchParams();
+  const shelfParams = new URLSearchParams(searchParams);
+  shelfParams.set("shelf", shelf.key);
+  const visible = shelf.entries.slice(0, SHELF_ENTRY_LIMIT);
   return (
     <ResourceSourceShelf
       label={shelf.label}
       description={shelf.description}
+      hideDescriptionOnMobile
       leading={
         shelf.key === "collection:bb-official" ? (
           <span
@@ -365,26 +372,31 @@ function BrowseShelf({
         )
       }
       browseAction={
-        !expanded && shelf.entries.length > 2 ? (
-          <ResourceShelfSeeAllAction
-            type="button"
-            onClick={onExpand}
-            className={
-              shelf.entries.length <= SHELF_ENTRY_LIMIT
-                ? "sm:hidden"
-                : undefined
-            }
-          />
+        shelf.entries.length > 2 ? (
+          <ResourceShelfAction
+            asChild
+            className={cn(
+              "underline underline-offset-4",
+              shelf.entries.length <= SHELF_ENTRY_LIMIT && "sm:hidden",
+            )}
+          >
+            <Link
+              to={{
+                pathname: getPluginsRoutePath(),
+                search: shelfParams.toString(),
+              }}
+              aria-label={`See all ${shelf.label}`}
+            >
+              See all
+            </Link>
+          </ResourceShelfAction>
         ) : undefined
       }
     >
       <div data-plugin-shelf>
         <div
           data-plugin-shelf-grid
-          className={cn(
-            "grid gap-2",
-            !expanded && "max-sm:[&>*:nth-child(n+3)]:hidden",
-          )}
+          className="grid gap-2 max-sm:[&>*:nth-child(n+3)]:hidden"
         >
           {visible.map((entry) => (
             <PluginCatalogCard
@@ -399,99 +411,5 @@ function BrowseShelf({
         </div>
       </div>
     </ResourceSourceShelf>
-  );
-}
-
-export function PluginCatalogGrid({
-  entries,
-  onInstall,
-  onUninstall,
-  onOpenPlugin,
-}: {
-  entries: readonly PluginCatalogSearchEntry[];
-  onInstall: (initial: AddPluginInitial) => void;
-  onUninstall?: (entry: PluginCatalogSearchEntry) => void;
-  onOpenPlugin: (pluginId: string, trigger: HTMLButtonElement) => void;
-}) {
-  return (
-    <ResourceBrowseGrid className="mx-auto w-full max-w-3xl grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-2">
-      {entries.map((entry) => (
-        <PluginCatalogCard
-          key={`${entry.marketplace}/${entry.entryId}`}
-          entry={entry}
-          showCategory
-          onInstall={onInstall}
-          onUninstall={onUninstall}
-          onOpenPlugin={onOpenPlugin}
-        />
-      ))}
-    </ResourceBrowseGrid>
-  );
-}
-
-function PluginCatalogCard({
-  entry,
-  showCategory,
-  onInstall,
-  onUninstall,
-  onOpenPlugin,
-}: {
-  entry: PluginCatalogSearchEntry;
-  showCategory: boolean;
-  onInstall: (initial: AddPluginInitial) => void;
-  onUninstall?: (entry: PluginCatalogSearchEntry) => void;
-  onOpenPlugin: (pluginId: string, trigger: HTMLButtonElement) => void;
-}) {
-  const count = pluginInstallCountPresentation(entry.installs);
-  return (
-    <PluginCard
-      leading={<CatalogEntryIconChip entry={entry} compact />}
-      title={entry.displayName}
-      description={entry.description || undefined}
-      byline={<PluginCardAuthor entry={entry} />}
-      footerMeta={
-        showCategory && entry.category !== undefined ? (
-          <PluginCategoryLabel
-            categoryId={entry.categoryId}
-            label={entry.category}
-          />
-        ) : undefined
-      }
-      headerAction={
-        entry.installed ? (
-          <PluginCatalogInstallControl
-            displayName={entry.displayName}
-            installed
-            included={entry.source.startsWith("builtin:")}
-            count={count}
-            onUninstall={
-              onUninstall === undefined ? undefined : () => onUninstall(entry)
-            }
-          />
-        ) : (
-          <PluginCatalogInstallControl
-            displayName={entry.displayName}
-            installed={false}
-            disabled={!entry.compatible}
-            count={count}
-            onInstall={() =>
-              onInstall({
-                entryId: entry.entryId,
-                marketplace: entry.marketplace,
-                pluginId: entry.pluginId,
-                publisherLabel: entry.publisherLabel,
-                displayName: entry.displayName,
-                icon: entry.icon,
-                iconUrl: entry.iconUrl,
-                iconTinted: entry.iconTinted,
-                source: entry.source,
-              })
-            }
-          />
-        )
-      }
-      openLabel={`Open ${entry.displayName} details`}
-      onOpen={(trigger) => onOpenPlugin(entry.pluginId, trigger)}
-    />
   );
 }

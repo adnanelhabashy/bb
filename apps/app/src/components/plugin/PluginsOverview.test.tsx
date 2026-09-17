@@ -339,6 +339,45 @@ describe("PluginsOverview", () => {
     expect(screen.getByTestId("location-path").textContent).toBe("/");
   });
 
+  it("retains Direct install source filtering when sorting Installed", async () => {
+    installFetch([
+      AUTOMATIONS_PLUGIN,
+      {
+        ...AUTOMATIONS_PLUGIN,
+        id: "local-notes",
+        name: "Local notes",
+        source: "/plugins/local-notes",
+        provenance: "user",
+        publisherKey: null,
+        publisherLabel: null,
+      },
+    ]);
+    const { wrapper: QueryClientWrapper } = createQueryClientTestHarness();
+    render(
+      <MemoryRouter initialEntries={["/plugins?view=installed&source=user"]}>
+        <QueryClientWrapper>
+          <PluginsOverview />
+        </QueryClientWrapper>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("Local notes")).toBeTruthy();
+    expect(screen.queryByText("Automations")).toBeNull();
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Sort: Default" }),
+    );
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Plugin name" }));
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByText("Automations")).toBeNull();
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Source: 1 selected" }),
+    );
+    fireEvent.click(
+      screen.getByRole("menuitemcheckbox", { name: "Direct install" }),
+    );
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(await screen.findByText("Automations")).toBeTruthy();
+  });
+
   it("shows the same category control on Installed", async () => {
     installFetch([AUTOMATIONS_PLUGIN]);
     const { wrapper: QueryClientWrapper } = createQueryClientTestHarness();

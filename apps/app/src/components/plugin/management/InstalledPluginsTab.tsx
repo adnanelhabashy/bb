@@ -1,42 +1,36 @@
-import { useSetPluginEnabled } from "@/components/plugin/useSetPluginEnabled";
+import { usePluginEnabledMutation } from "@/components/plugin/usePluginEnabledMutation";
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation, useNavigate } from "react-router-dom";
 import { EmptyState } from "@bb/shared-ui/empty-state";
 import { Switch } from "@bb/shared-ui/switch";
-import {
-  ResourceBrowseGrid,
-  ResourceIconFrame,
-} from "@bb/shared-ui/resource-list";
-import { appToast } from "@/components/ui/app-toast.js";
-import { invalidatePluginList } from "@/hooks/cache-owners/plugin-cache-owner";
+import { ResourceIconFrame } from "@bb/shared-ui/resource-list";
 import type { PluginListItem } from "@/hooks/queries/plugin-settings-queries";
 import { pluginNeedsAttention } from "@/hooks/usePluginAttention";
 import { cn } from "@bb/shared-ui/lib/utils";
-import {
-  getPluginDetailRoutePath,
-  isPluginsRoutePath,
-} from "@/lib/route-paths";
 import {
   pluginRowSignal,
   pluginRuntimeStatusPresentation,
 } from "./plugin-status";
 import { PluginRowSignalView, PluginSignalLogo } from "./PluginRowSignal";
-import { PluginCard, PluginCardAuthor, PluginAuthorByline } from "./PluginCard";
+import {
+  PluginCard,
+  PluginCardGrid,
+  PluginCardAuthor,
+  PluginAuthorByline,
+} from "./PluginCard";
 import { installedPluginCatalogEntry } from "./installed-plugin-catalog";
 import {
   usePluginCatalogSearch,
   type PluginCatalogSearchEntry,
 } from "@/hooks/queries/plugin-catalog-queries";
 import { UpdatePluginDialog } from "./UpdatePluginDialog";
-import { PluginLogo, PluginCategoryLabel } from "./plugin-ui";
+import { PluginLogo } from "./plugin-ui";
 
 export function InstalledPluginsTab({
   plugins,
   onOpenPlugin,
 }: {
   plugins: readonly PluginListItem[];
-  onOpenPlugin?: (pluginId: string, trigger: HTMLButtonElement) => void;
+  onOpenPlugin: (pluginId: string, trigger: HTMLButtonElement) => void;
 }) {
   const catalogQuery = usePluginCatalogSearch("", { enabled: true });
   const [updateTargetId, setUpdateTargetId] = useState<string | null>(null);
@@ -53,7 +47,7 @@ export function InstalledPluginsTab({
 
   return (
     <>
-      <ResourceBrowseGrid className="w-full grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-2">
+      <PluginCardGrid>
         {plugins.map((plugin) => (
           <InstalledPluginRow
             key={plugin.id}
@@ -66,7 +60,7 @@ export function InstalledPluginsTab({
             onOpenPlugin={onOpenPlugin}
           />
         ))}
-      </ResourceBrowseGrid>
+      </PluginCardGrid>
       {updateTarget !== null ? (
         <UpdatePluginDialog
           plugin={updateTarget}
@@ -89,26 +83,11 @@ export function InstalledPluginRow({
   plugin: PluginListItem;
   catalogEntry?: PluginCatalogSearchEntry;
   onUpdateClick: () => void;
-  onOpenPlugin?: (pluginId: string, trigger: HTMLButtonElement) => void;
+  onOpenPlugin: (pluginId: string, trigger: HTMLButtonElement) => void;
 }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const queryClient = useQueryClient();
-  const setEnabled = useSetPluginEnabled();
-  const toggle = useMutation({
-    meta: { showErrorToast: false },
-    mutationFn: (enabled: boolean) => setEnabled(plugin.id, enabled),
-    onError: (error, enabled) => {
-      appToast.error(
-        `${enabled ? "Enabling" : "Disabling"} ${plugin.id} failed`,
-        {
-          description: error instanceof Error ? error.message : String(error),
-        },
-      );
-    },
-    onSettled: () => invalidatePluginList({ queryClient }),
-  });
-  const enabled = toggle.isPending ? toggle.variables : plugin.enabled;
+  const { toggle, enabled } = usePluginEnabledMutation(plugin);
+  const isLocal = plugin.source.startsWith("path:");
+  const category = catalogEntry?.category ?? plugin.category;
   const signal = pluginRowSignal(plugin);
   const statusSignal = signal?.kind === "status" ? signal : null;
   const updateSignal = signal?.kind === "update" ? signal : null;
@@ -124,25 +103,8 @@ export function InstalledPluginRow({
         ? "text-warning-text"
         : "text-muted-foreground";
 
-  const openDetail = (trigger?: HTMLButtonElement) => {
-    if (onOpenPlugin !== undefined && trigger !== undefined) {
-      onOpenPlugin(plugin.id, trigger);
-      return;
-    }
-    if (!isPluginsRoutePath(location.pathname)) {
-      navigate(
-        getPluginDetailRoutePath({ pluginId: plugin.id, view: "installed" }),
-      );
-      return;
-    }
-    const params = new URLSearchParams(location.search);
-    params.set("view", "installed");
-    params.delete("configure");
-    navigate({
-      pathname: getPluginDetailRoutePath({ pluginId: plugin.id }),
-      search: params.toString(),
-    });
-  };
+  const openDetail = (trigger: HTMLButtonElement) =>
+    onOpenPlugin(plugin.id, trigger);
   return (
     <div data-testid={`plugin-row-${plugin.id}`}>
       <PluginCard
@@ -155,11 +117,7 @@ export function InstalledPluginRow({
         }
         title={plugin.name ?? plugin.id}
         byline={
-          plugin.source.startsWith("path:") ? (
-            <span className="font-mono text-2xs" title={plugin.source.slice(5)}>
-              {plugin.sourceDisplay}
-            </span>
-          ) : catalogEntry !== undefined ? (
+          isLocal ? null : catalogEntry !== undefined ? (
             <PluginCardAuthor entry={catalogEntry} />
           ) : plugin.publisherLabel !== null ? (
             <PluginAuthorByline
@@ -177,13 +135,16 @@ export function InstalledPluginRow({
             </PluginAuthorByline>
           ) : null
         }
-        footerMeta={
-          (catalogEntry?.category ?? plugin.category) !== undefined ? (
-            <PluginCategoryLabel
-              categoryId={catalogEntry?.categoryId ?? plugin.categoryId}
-              label={catalogEntry?.category ?? plugin.category ?? ""}
-            />
-          ) : null
+        badge={
+          isLocal
+            ? { kind: "local" }
+            : category === undefined
+              ? null
+              : {
+                  kind: "category",
+                  categoryId: catalogEntry?.categoryId ?? plugin.categoryId,
+                  label: category,
+                }
         }
         description={
           runtimeStatus === null ? (
