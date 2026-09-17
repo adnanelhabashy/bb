@@ -113,7 +113,9 @@ function formatCheckedAt(now: () => number): string {
 export function shouldEnableDesktopAutoUpdate(
   args: ShouldEnableDesktopAutoUpdateArgs,
 ): boolean {
-  return args.isPackaged || args.env.BB_DESKTOP_AUTO_UPDATE === "1";
+  // Arc Agent fork: no built-in update feed ships with the app, so keep the
+  // auto-updater off unless explicitly forced (development only).
+  return args.env.BB_DESKTOP_AUTO_UPDATE === "1";
 }
 
 export function createElectronAutoUpdaterAdapter(

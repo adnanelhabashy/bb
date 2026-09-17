@@ -2468,7 +2468,8 @@ async function runDesktopApp(): Promise<void> {
     currentVersion: desktopVersion,
     enabled:
       desktopUpdateSupport.versionCheck &&
-      (app.isPackaged || process.env.BB_DESKTOP_VERSION_CHECK === "1"),
+      // Arc Agent fork: no upstream version feed; opt-in via env only.
+      process.env.BB_DESKTOP_VERSION_CHECK === "1",
     feedUrl: desktopUpdateFeedUrl,
     logger: desktopLogger,
     platform: desktopPlatform,

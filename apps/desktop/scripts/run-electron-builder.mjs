@@ -4,7 +4,6 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   createDesktopReleaseConfig,
-  createDesktopUpdateReleaseBaseUrl,
   resolveDesktopReleaseChannel,
 } from "./desktop-release-channel.mjs";
 
@@ -187,13 +186,11 @@ function resolveElectronBuilderConfig(baseConfig, env) {
   config.appId = releaseConfig.appId;
   config.artifactName = releaseConfig.artifactName;
   config.productName = releaseConfig.applicationName;
-  config.publish = [
-    {
-      channel: releaseChannel,
-      provider: "generic",
-      url: createDesktopUpdateReleaseBaseUrl(releaseConfig.releaseTag),
-    },
-  ];
+  // Arc Agent fork: no built-in update feed. electron-builder then ships no
+  // app-update.yml, so electron-updater has nothing to fetch and the app never
+  // reverts the rebrand via an upstream update. Re-enable by restoring the
+  // publish block below (and point it at an Arc Agent release channel).
+
 
   return {
     config,
