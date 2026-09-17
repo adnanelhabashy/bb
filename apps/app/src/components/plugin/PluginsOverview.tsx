@@ -255,7 +255,7 @@ export function PluginsOverview({
               <>
                 <ResourceMultiSelectMenu
                   label="Source"
-                  icon="Package"
+                  icon="FolderGit"
                   compact
                   options={sourceFilterOptions}
                   selectedValues={activeSourceFilters}
