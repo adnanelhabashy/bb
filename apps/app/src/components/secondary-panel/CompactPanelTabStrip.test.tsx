@@ -10,7 +10,7 @@ import type { SecondaryPanelRenderableTab } from "./secondaryPanelTab";
 afterEach(cleanup);
 
 function NavigationFixture() {
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [activeTabId, setActiveTabId] = useState("thread-info");
   const [fileOpen, setFileOpen] = useState(true);
   const fixedTabs: SecondaryPanelFixedTab[] = [
     {
@@ -59,20 +59,18 @@ function NavigationFixture() {
         activeTabId={activeTabId}
         fixedTabs={fixedTabs}
         tabs={tabs}
-        mainTab={{ label: "Chat", onSelect: () => setActiveTabId(null) }}
       />
-      <output>{activeTabId ?? "chat"}</output>
+      <output>{activeTabId}</output>
     </>
   );
 }
 
 describe("compact page navigation", () => {
-  it("selects adjacent pages in visible order, including Chat, and stops at both ends", () => {
+  it("selects adjacent pages in visible order, and stops at both ends", () => {
     render(<NavigationFixture />);
     const previous = screen.getByRole("button", { name: "Previous tab" });
     const next = screen.getByRole("button", { name: "Next tab" });
     expect(previous.hasAttribute("disabled")).toBe(true);
-    fireEvent.click(next);
     expect(screen.getByRole("status").textContent).toBe("thread-info");
     expect(
       screen.getByRole("button", { name: "Info" }).getAttribute("aria-pressed"),
@@ -82,8 +80,7 @@ describe("compact page navigation", () => {
     expect(next.hasAttribute("disabled")).toBe(true);
     expect(screen.queryByText("Hidden tab")).toBeNull();
     fireEvent.click(previous);
-    fireEvent.click(previous);
-    expect(screen.getByRole("status").textContent).toBe("chat");
+    expect(screen.getByRole("status").textContent).toBe("thread-info");
     expect(previous.hasAttribute("disabled")).toBe(true);
   });
 
@@ -98,7 +95,6 @@ describe("compact page navigation", () => {
       screen.getByRole("button", { name: "Next tab" }).hasAttribute("disabled"),
     ).toBe(true);
     expect(screen.queryByRole("button", { name: "Close Info" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Chat" }));
-    expect(screen.getByRole("status").textContent).toBe("chat");
+    expect(screen.queryByRole("button", { name: "Chat" })).toBeNull();
   });
 });

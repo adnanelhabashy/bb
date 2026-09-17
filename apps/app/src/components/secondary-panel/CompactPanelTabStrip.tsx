@@ -6,16 +6,10 @@ import { cn } from "@bb/shared-ui/lib/utils";
 import type { SecondaryPanelFixedTab } from "./ThreadSecondaryPanel";
 import type { SecondaryPanelRenderableTab } from "./secondaryPanelTab";
 
-export interface CompactPanelMainTab {
-  label: string;
-  onSelect: () => void;
-}
-
 interface CompactPanelTabStripProps {
   activeTabId: string | null;
   fixedTabs: readonly SecondaryPanelFixedTab[];
   tabs: readonly SecondaryPanelRenderableTab[];
-  mainTab?: CompactPanelMainTab;
   onOpenNewTab?: () => void;
 }
 
@@ -36,15 +30,11 @@ export function CompactPanelTabStrip({
   activeTabId,
   fixedTabs,
   tabs,
-  mainTab,
   onOpenNewTab,
 }: CompactPanelTabStripProps) {
   const activeTabRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const items: CompactTab[] = [
-    ...(mainTab
-      ? [{ id: null, ...mainTab, ariaLabel: mainTab.label, onClose: null }]
-      : []),
     ...fixedTabs.map((tab) => ({
       id: tab.tab.id,
       label: tab.label,
