@@ -1,0 +1,9 @@
+# Adnan's customization layer inside the BB fork.
+# The repo-root .gitignore globally ignores `dist`; re-include our prebuilt
+# plugin bundles (needed for installs without Node.js), keep node_modules out.
+!plugins/adnan-mission-control/dist/
+!plugins/cyberpunk-terminal/dist/
+.DS_Store
+*.log
+.env
+.env.*
