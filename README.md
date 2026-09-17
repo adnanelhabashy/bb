@@ -18,8 +18,8 @@ Node.js and no npm** — just the BB app and git.
 
 ## Install on a fresh machine
 
-Prerequisite: BB app installed and `bb` CLI on PATH. Nothing else — plugin
-sources are plain TS; BB compiles them with its shipped toolchain.
+Prerequisites: BB app installed, `bb` CLI and `git` on PATH. Node.js is **not**
+needed — BB installs plugin dependencies with its own bundled npm.
 
 ```powershell
 # Windows (PowerShell)
@@ -35,9 +35,12 @@ cd bb-setup
 ./install.sh
 ```
 
-The scripts copy the theme into `~/.bb/theme/cyber-punk` (or `%USERPROFILE%\.bb\...`)
-and register both plugins by path. Not included, by design: provider auth,
-account-pool credentials, and `bb.db` state — re-authenticate on each machine.
+The scripts copy the theme into `~/.bb/theme/cyber-punk` (or
+`%USERPROFILE%\.bb\...`) and install both plugins **from the clone's git
+origin** via BB's subdirectory install (`bb plugin install git:<origin>
+--subdirectory plugins/<name>`). Managed git installs stay updatable with
+`bb plugin update <id>`. Not included, by design: provider auth, account-pool
+credentials, and `bb.db` state — re-authenticate on each machine.
 
 ## Day-to-day
 
@@ -46,9 +49,11 @@ account-pool credentials, and `bb.db` state — re-authenticate on each machine.
   → `bb plugin reload <id>` → commit the updated `dist/` with the source.
 - **Change the theme:** edit `theme/cyber-punk/theme.css` (live copy at
   `$(bb theme dir)/cyber-punk/theme.css`), then `bb theme set cyber-punk`.
-- **Propagate to another machine:** commit + push here, then `git pull` there.
-  Plugin registrations survive a pull (paths don't move); if a plugin dir ever
-  moves, `bb plugin install path:<new dir>` re-points it and keeps its config.
+- **Propagate updates to another machine:** commit + push here, then `git pull`
+  in the clone there and `bb plugin update adnan-mission-control` /
+  `bb plugin update cyberpunk-terminal` (managed git installs track the repo).
+- **Moving a plugin's directory:** `bb plugin install path:<new dir>` re-points
+  it and keeps its config.
 
 ## Updating from a machine where the plugins live elsewhere
 
