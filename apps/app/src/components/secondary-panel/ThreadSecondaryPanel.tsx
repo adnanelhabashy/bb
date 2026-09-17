@@ -1119,6 +1119,7 @@ function NewTabButton({
       size="sm"
       className={cn(
         SECONDARY_PANEL_CHROME_ICON_BUTTON_CLASS,
+        "text-muted-foreground/70 hover:text-foreground [&_[data-icon-root]]:size-3 max-md:pointer-coarse:[&_[data-icon-root]]:size-3.5",
         usesDesktopChrome && MACOS_WINDOW_NO_DRAG_CLASS,
       )}
       onClick={onOpenNewTab}
