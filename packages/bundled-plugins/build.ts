@@ -1,4 +1,5 @@
 import { cp, mkdir, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { BUNDLED_PLUGINS } from "../../apps/server/src/services/plugins/builtin-registry.js";
 import {
@@ -20,9 +21,12 @@ await cp(
   resolve(output, BUNDLED_MARKETPLACE_FILENAME),
 );
 for (const { name } of BUNDLED_PLUGINS) {
-  await cp(
-    resolve(root, "plugins", name, ".bundled-runtime"),
-    resolve(output, name),
-    { recursive: true },
-  );
+  // Arc Agent fork: plugin sources no longer live in this checkout, so a
+  // plugin without a prepared .bundled-runtime simply is not bundled here.
+  const staged = resolve(root, "plugins", name, ".bundled-runtime");
+  if (!existsSync(staged)) {
+    console.warn(`bundled-plugins: ${name} has no .bundled-runtime; skipping`);
+    continue;
+  }
+  await cp(staged, resolve(output, name), { recursive: true });
 }

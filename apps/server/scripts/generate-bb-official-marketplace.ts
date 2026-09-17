@@ -226,8 +226,17 @@ export async function generateBbOfficialMarketplace(args: {
     plugins: args.plugins,
     warn: args.warn,
   });
+  // Arc Agent fork: bundled plugins no longer live in the source checkout
+  // (they ship via packages/bundled-plugins), so skip identities whose
+  // plugin directory is absent instead of failing the whole generation.
+  const presentPlugins = args.plugins.filter((plugin) => {
+    const pluginDirectory = path.join(args.repositoryRoot, "plugins", plugin.name);
+    if (existsSync(pluginDirectory)) return true;
+    args.warn(`bundled plugin ${plugin.name} has no source directory; skipping`);
+    return false;
+  });
   const entries = await Promise.all(
-    args.plugins.map(async (plugin) => {
+    presentPlugins.map(async (plugin) => {
       const pluginDirectory = path.join(
         args.repositoryRoot,
         "plugins",
