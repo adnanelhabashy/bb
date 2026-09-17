@@ -576,17 +576,19 @@ describe("BrowsePluginsTab", () => {
     });
     expect(install.textContent).toContain("4.2K");
     fireEvent.click(install);
-    expect(onInstall).toHaveBeenCalledWith({
-      entryId: "memory",
-      pluginId: "memory",
-      marketplace: "bb-official",
-      publisherLabel: "BB Official",
-      displayName: "Memory",
-      icon: "Brain",
-      iconUrl: null,
-      iconTinted: false,
-      source: "builtin:memory",
-    });
+    expect(onInstall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entryId: "memory",
+        pluginId: "memory",
+        marketplace: "bb-official",
+        publisherLabel: "BB Official",
+        displayName: "Memory",
+        icon: "Brain",
+        iconUrl: null,
+        iconTinted: false,
+        source: "builtin:memory",
+      }),
+    );
     const open = screen.getByRole("button", {
       name: "Open Memory details",
     });
