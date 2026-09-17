@@ -48,7 +48,7 @@ export function createDesktopReleaseConfig(channel) {
 
   return {
     appId: "dev.bb.desktop",
-    applicationName: "bb",
+    applicationName: "Arc Agent",
     artifactName: "${productName}-${version}-${arch}.${ext}",
     iconFileName: "icon.png",
     linuxExecutableName: "bb",

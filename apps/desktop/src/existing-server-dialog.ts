@@ -179,7 +179,7 @@ export function openExistingServerDialog(
   const dialogWindow = createDesktopDialogWindow({
     parentWindow: args.parentWindow,
     preloadPath: args.preloadPath,
-    title: "bb is already running",
+    title: "Arc Agent is already running",
     width: 460,
   });
 

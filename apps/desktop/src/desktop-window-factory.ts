@@ -16,6 +16,7 @@ import {
   type StatefulBrowserWindow,
 } from "./window-state.js";
 import type { DesktopContextMenuWebContents } from "./desktop-context-menu.js";
+import { DESKTOP_RELEASE_INFO } from "./desktop-update-provider.js";
 
 type DesktopWindowIcon = BrowserWindowConstructorOptions["icon"];
 
@@ -176,7 +177,7 @@ function createWindowOptions(
     minHeight: MIN_WINDOW_HEIGHT,
     minWidth: MIN_WINDOW_WIDTH,
     show: false,
-    title: "bb",
+    title: DESKTOP_RELEASE_INFO.applicationName,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

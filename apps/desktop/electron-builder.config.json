@@ -1,6 +1,6 @@
 {
   "appId": "dev.bb.desktop",
-  "productName": "bb",
+  "productName": "Arc Agent",
   "artifactName": "${productName}-${version}-${arch}.${ext}",
   "toolsets": {
     "appimage": "1.0.3"

@@ -1638,7 +1638,7 @@ async function loadLogViewerWindow(
     minHeight: 520,
     minWidth: 840,
     show: false,
-    title: "bb - Server & Daemon Logs",
+    title: "Arc Agent - Server & Daemon Logs",
     titleBarStyle: "default",
     webPreferences: {
       contextIsolation: true,
@@ -2010,7 +2010,7 @@ async function spawnOwnedRuntime(
       )}.`,
       logs: bbProcess.logs.text(),
       retryable: false,
-      title: "bb stopped",
+      title: "Arc Agent stopped",
     });
   });
   return { bbProcess, runtime };
@@ -2149,7 +2149,7 @@ async function decideOnExistingServer(
   }
   if (stopResult.kind === "still-running") {
     await loadStartupError({
-      details: `bb could not stop process ${String(stopResult.pid)}, even after SIGKILL.`,
+      details: `Arc Agent could not stop process ${String(stopResult.pid)}, even after SIGKILL.`,
       logs: "",
       retryable: false,
       title: "Could not stop the running bb",

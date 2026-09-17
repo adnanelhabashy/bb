@@ -300,7 +300,7 @@ export function formatServerMovedNotice(
   move: DesktopServerMove,
 ): ServerMovedNotice {
   return {
-    detail: `bb now opens the server on ${move.toHostName}. This computer stays connected to it as a regular machine.`,
+    detail: `Arc Agent now opens the server on ${move.toHostName}. This computer stays connected to it as a regular machine.`,
     message: `Your bb server moved to ${move.toHostName}`,
   };
 }
