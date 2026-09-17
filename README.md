@@ -12,6 +12,10 @@ Adnan's BB customization layer — one repo, one command per machine.
 
 Built against BB 0.43.1 (plugin SDK 0.4.87).
 
+Each plugin ships its prebuilt bundle in `dist/` (committed). BB prefers the
+prebuilt bundle over compiling from source, so **the install scripts need no
+Node.js and no npm** — just the BB app and git.
+
 ## Install on a fresh machine
 
 Prerequisite: BB app installed and `bb` CLI on PATH. Nothing else — plugin
@@ -37,7 +41,9 @@ account-pool credentials, and `bb.db` state — re-authenticate on each machine.
 
 ## Day-to-day
 
-- **Edit a plugin:** change files in `plugins/<name>/`, then `bb plugin reload <id>`.
+- **Edit a plugin:** change files in `plugins/<name>/`, then rebuild and reload:
+  `npm install` (first time only, needs Node) → `bb plugin build plugins/<name>`
+  → `bb plugin reload <id>` → commit the updated `dist/` with the source.
 - **Change the theme:** edit `theme/cyber-punk/theme.css` (live copy at
   `$(bb theme dir)/cyber-punk/theme.css`), then `bb theme set cyber-punk`.
 - **Propagate to another machine:** commit + push here, then `git pull` there.
