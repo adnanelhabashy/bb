@@ -7,10 +7,14 @@
     "bbPluginSdk": ">=0.4.87"
   },
   "bb": {
-    "name": "Adnan Mission Control",
-    "description": "A personal engineering cockpit: workflow state with provenance, a live agent thread tree, and provider capability probes.",
+    "name": "Arc Agent",
+    "description": "A developer-first control plane for orchestrating AI coding agents: workflow state with provenance, a live agent thread tree, and provider capability probes.",
     "branding": {
-      "icon": "Gauge"
+      "icon": "./assets/arc-glyph.svg",
+      "logo": {
+        "light": "./assets/arc-agent-icon-light.png",
+        "dark": "./assets/arc-agent-icon-dark.png"
+      }
     },
     "server": "./server.ts",
     "app": "./app.tsx"

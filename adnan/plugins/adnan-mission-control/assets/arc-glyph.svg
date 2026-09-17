@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Arc Agent compact glyph: swept A legs + orbital ring + sphere.
+       Rendered by BB as a CSS mask (single color, shape only). -->
+  <g fill="none" stroke="#d8d8d8" stroke-linecap="round">
+    <!-- left leg: apex sweeping down to a flicked lower-left tip -->
+    <path d="M10.8 2.9 L4.2 19.9" stroke-width="2.9"/>
+    <!-- right leg -->
+    <path d="M11.5 2.9 L18.1 20.5" stroke-width="2.9"/>
+    <!-- orbital ring passing as the crossbar -->
+    <ellipse cx="11.2" cy="12.6" rx="9.4" ry="2.2" transform="rotate(-17 11.2 12.6)" stroke-width="1.35"/>
+    <!-- orbital sphere, upper right -->
+    <circle cx="18.5" cy="8.9" r="1.95" fill="#d8d8d8" stroke="none"/>
+  </g>
+</svg>
