@@ -186,9 +186,11 @@ const WAITING_ICONS = {
 function ThreadDraftIndicator({
   hideIdleLabel = false,
   isWorking,
+  size,
 }: {
   hideIdleLabel?: boolean;
   isWorking: boolean;
+  size: "default" | "compact";
 }) {
   const label = getThreadListIndicatorLabel(
     isWorking ? "working-draft" : "draft",
@@ -198,7 +200,7 @@ function ThreadDraftIndicator({
       name="Edit"
       className={cn(
         "pointer-events-none shrink-0",
-        COARSE_POINTER_ICON_SIZE_CLASS,
+        size === "compact" ? "size-3.5" : COARSE_POINTER_ICON_SIZE_CLASS,
         isWorking
           ? ["animate-shine-icon", SIDEBAR_WORKING_STATUS_COLOR_CLASS]
           : "text-muted-foreground",
@@ -304,6 +306,7 @@ function renderThreadRowContainer({
 
 interface ThreadStatusGlyphProps extends ThreadListIndicatorState {
   hideIdleDraftLabel?: boolean;
+  size?: "default" | "compact";
 }
 
 export function ThreadStatusGlyph({
@@ -319,7 +322,10 @@ export function ThreadStatusGlyph({
   isRuntimeActive,
   isWorkflowActive,
   queuedWork,
+  size = "default",
 }: ThreadStatusGlyphProps) {
+  const iconSizeClass =
+    size === "compact" ? "size-4" : COARSE_POINTER_ICON_SIZE_CLASS;
   const kind = resolveThreadListIndicator({
     hasPendingInteraction,
     hasUnsubmittedDraft,
@@ -340,7 +346,7 @@ export function ThreadStatusGlyph({
       return (
         <Icon
           name="CircleX"
-          className={cn("text-destructive", COARSE_POINTER_ICON_SIZE_CLASS)}
+          className={cn("text-destructive", iconSizeClass)}
           aria-label={getThreadListIndicatorLabel(kind) ?? undefined}
         />
       );
@@ -349,15 +355,12 @@ export function ThreadStatusGlyph({
       return (
         <Icon
           name={WAITING_ICONS[kind]}
-          className={cn(
-            "text-muted-foreground/75",
-            COARSE_POINTER_ICON_SIZE_CLASS,
-          )}
+          className={cn("text-muted-foreground/75", iconSizeClass)}
           aria-label={getThreadListIndicatorLabel(kind) ?? undefined}
         />
       );
     case "working-draft":
-      return <ThreadDraftIndicator isWorking />;
+      return <ThreadDraftIndicator isWorking size={size} />;
     case "workflow":
     case "background-agent":
     case "background-command":
@@ -369,7 +372,7 @@ export function ThreadStatusGlyph({
           className={cn(
             "animate-shine-icon",
             SIDEBAR_WORKING_STATUS_COLOR_CLASS,
-            COARSE_POINTER_ICON_SIZE_CLASS,
+            iconSizeClass,
           )}
           aria-label={getThreadListIndicatorLabel(kind) ?? undefined}
         />
@@ -381,7 +384,7 @@ export function ThreadStatusGlyph({
           className={cn(
             "animate-spin",
             SIDEBAR_WORKING_STATUS_COLOR_CLASS,
-            COARSE_POINTER_ICON_SIZE_CLASS,
+            iconSizeClass,
           )}
           aria-label={getThreadListIndicatorLabel(kind) ?? undefined}
         />
@@ -391,6 +394,7 @@ export function ThreadStatusGlyph({
         <ThreadDraftIndicator
           hideIdleLabel={hideIdleDraftLabel}
           isWorking={false}
+          size={size}
         />
       );
     case "unread-success":
