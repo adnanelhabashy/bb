@@ -1,3 +1,14 @@
+# The Arc
+
+**The Arc** is Adnan's personal distribution of [bb](https://github.com/get-bb/bb),
+the open-source agent IDE — full BB source, plus a customization layer in
+[`adnan/`](adnan/README.md) (plugins, theme, one-command installers for
+macOS/Linux/Windows).
+
+Built on bb, which is [MIT licensed](LICENSE) — © its authors.
+
+---
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/e40bda56-54a4-47f8-a417-6bbadf2e5b40">
