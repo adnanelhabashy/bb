@@ -1,0 +1,93 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap");
+
+/* ============================================================
+   cyber-punk — custom bb theme
+   Neon-dystopia developer palette.
+   Anchors: deep indigo canvas, pale-violet ink.
+   Accents: electric cyan primary, hot magenta file tint.
+   Terminal: full neon ANSI ramp.
+   ============================================================ */
+
+:root,
+.light {
+  /* ---- text tiers (derive from whichever anchors are active) ---- */
+  --muted-foreground: color-mix(in oklch, var(--ink) 70%, var(--canvas));
+  --subtle-foreground: color-mix(in oklch, var(--ink) 58%, var(--canvas));
+  --readback-foreground: color-mix(in oklch, var(--ink) 64%, var(--canvas));
+
+  /* ---- fonts ---- */
+  --font-mono: "JetBrains Mono", "SF Mono", Menlo, monospace;
+
+  /* ---- semantic (mode-independent hues) ---- */
+  --diff-added: #00ffa3;
+  --diff-removed: #ff2f6d;
+  --pr-merged: #b967ff;
+  --attention: #ffc857;
+
+  /* ---- terminal: neon ANSI ramp ---- */
+  --ansi-0: #120e24;
+  --ansi-1: #ff2f6d;
+  --ansi-2: #00ffa3;
+  --ansi-3: #ffc857;
+  --ansi-4: #00e5ff;
+  --ansi-5: #ff2fd6;
+  --ansi-6: #00ffc8;
+  --ansi-7: #c8c2e8;
+  --ansi-8: #4d4470;
+  --ansi-9: #ff6b9d;
+  --ansi-10: #5fffc4;
+  --ansi-11: #ffe08a;
+  --ansi-12: #5ff2ff;
+  --ansi-13: #ff6fe3;
+  --ansi-14: #7dffe0;
+  --ansi-15: #f2efff;
+  --ansi-bg-fg-0: #f2efff;
+  --ansi-bg-fg-1: #ffffff;
+  --ansi-bg-fg-2: #0a0817;
+  --ansi-bg-fg-3: #1a1000;
+  --ansi-bg-fg-4: #00222b;
+  --ansi-bg-fg-5: #ffffff;
+  --ansi-bg-fg-6: #002b22;
+  --ansi-bg-fg-7: #120e24;
+  --ansi-bg-fg-8: #ffffff;
+  --ansi-bg-fg-9: #ffffff;
+  --ansi-bg-fg-10: #0a0817;
+  --ansi-bg-fg-11: #1a1000;
+  --ansi-bg-fg-12: #00222b;
+  --ansi-bg-fg-13: #ffffff;
+  --ansi-bg-fg-14: #002b22;
+  --ansi-bg-fg-15: #120e24;
+}
+
+/* ============ light mode: pale lavender chrome ============ */
+:root,
+.light {
+  --canvas: #f0edfa;
+  --ink: #1c1740;
+
+  --primary: #0090c8;
+  --primary-foreground: #ffffff;
+
+  --destructive: #d6004a;
+  --destructive-text: #b0003c;
+  --warning: #b97a00;
+  --warning-text: #8f5f00;
+  --success: #008f5f;
+  --file-accent: #d1009c;
+}
+
+/* ============ dark mode: night-city neon ============ */
+.dark {
+  --canvas: #0b0918;
+  --ink: #e4e0fb;
+
+  --primary: #00e5ff;
+  --primary-foreground: #06121a;
+
+  --destructive: #ff2f6d;
+  --destructive-text: #ff7fa4;
+  --warning: #ffc857;
+  --warning-text: #ffd88a;
+  --success: #00ffa3;
+  --file-accent: #ff2fd6;
+}
