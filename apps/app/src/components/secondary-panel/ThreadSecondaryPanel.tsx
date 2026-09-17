@@ -1,3 +1,4 @@
+import { CompactPanelTabStrip } from "./CompactPanelTabStrip";
 import { usePluginDetailPanelProps } from "@/components/plugin/plugin-detail-navigation";
 import {
   type CSSProperties,
@@ -41,7 +42,6 @@ import {
   THREAD_SECONDARY_PANEL_MIN_SIZE_PERCENT,
 } from "./secondaryPanelSizing";
 import {
-  getCompactPanelPresentation,
   RIGHT_PANEL_TOGGLE_ICON_NAME,
   resolveConversationCollapseControl,
 } from "./panelToggleControlState";
@@ -165,6 +165,7 @@ export interface SecondaryPanelFixedTab {
 }
 
 export interface ThreadSecondaryPanelProps {
+  compactMainTabLabel?: string;
   activeTab: SecondaryFixedPanelTab | MarketplacePluginDetailPanelTab | null;
   canUseGitUi: boolean;
   gitDiffTabStatus?: GitDiffTabStatus;
@@ -207,6 +208,7 @@ export function ThreadSecondaryPanel(props: ThreadSecondaryPanelProps) {
 }
 
 function ThreadSecondaryPanelContent({
+  compactMainTabLabel,
   activeTab,
   canUseGitUi,
   gitDiffTabStatus,
@@ -248,12 +250,6 @@ function ThreadSecondaryPanelContent({
     () => tabs.filter((tab) => tab.isHidden !== true),
     [tabs],
   );
-  const reservesCompactSidebarToggle =
-    renderAsDrawer &&
-    getCompactPanelPresentation(
-      activeTab?.kind,
-      fixedTabs[0]?.tab.kind ?? visibleTabs[0]?.tab.kind,
-    ) === "full";
   const activeRenderableTab =
     tabs.find((tab) => tab.tab.id === activeTab?.id) ??
     (activeTab === null && fixedTabs.length === 0 ? visibleTabs[0] : undefined);
@@ -707,7 +703,8 @@ function ThreadSecondaryPanelContent({
             className={cn(
               CHROME_ROW_CLASS,
               "min-w-0 justify-between gap-2 px-4",
-              reservesCompactSidebarToggle && "pl-14",
+              renderAsDrawer && "gap-0 px-0",
+              renderAsDrawer && "pl-14",
               usesDesktopChrome && usesWindowChrome && MACOS_WINDOW_DRAG_CLASS,
               usesDesktopChrome &&
                 usesWindowChrome &&
@@ -725,22 +722,42 @@ function ThreadSecondaryPanelContent({
               role="toolbar"
               aria-label="Right panel views"
             >
-              {renderPanelTabGroup({
-                activeSurfaceFixedTab,
-                activeSurfaceTabId,
-                surfaceTabs,
-                fixedSurfaceTabs,
-                newTabAriaLabel:
-                  onRemoveSplit === undefined
-                    ? "Open new tab"
-                    : "Open new tab in this pane",
-                onBeginTabDrag,
-                onSurfaceTabReorder,
-                reserveNewTabButton: reserveNewTabControl,
-                showNewTabButton: showNewTabControl,
-              })}
+              {renderAsDrawer ? (
+                <CompactPanelTabStrip
+                  activeTabId={
+                    activeSurfaceTabId ??
+                    activeSurfaceFixedTab?.tab.id ??
+                    fixedSurfaceTabs[0]?.tab.id ??
+                    visibleTabs[0]?.tab.id ??
+                    null
+                  }
+                  fixedTabs={fixedSurfaceTabs}
+                  tabs={surfaceTabs}
+                  mainTab={
+                    compactMainTabLabel
+                      ? { label: compactMainTabLabel, onSelect: onClose }
+                      : undefined
+                  }
+                  onOpenNewTab={showNewTabControl ? onOpenNewTab : undefined}
+                />
+              ) : (
+                renderPanelTabGroup({
+                  activeSurfaceFixedTab,
+                  activeSurfaceTabId,
+                  surfaceTabs,
+                  fixedSurfaceTabs,
+                  newTabAriaLabel:
+                    onRemoveSplit === undefined
+                      ? "Open new tab"
+                      : "Open new tab in this pane",
+                  onBeginTabDrag,
+                  onSurfaceTabReorder,
+                  reserveNewTabButton: reserveNewTabControl,
+                  showNewTabButton: showNewTabControl,
+                })
+              )}
             </div>
-            {showOuterControls ||
+            {(showOuterControls && !(renderAsDrawer && compactMainTabLabel)) ||
             onRemoveSplit ||
             usesPaneArrangementControl ? (
               <div

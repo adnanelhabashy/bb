@@ -1,3 +1,5 @@
+import { CompactPanelTabStrip } from "@/components/secondary-panel/CompactPanelTabStrip";
+import { useIsCompactViewport } from "@bb/shared-ui/hooks/use-compact-viewport";
 import { useMemo, type ComponentProps, type ReactNode } from "react";
 import { Skeleton } from "@bb/shared-ui/skeleton";
 import { cn } from "@bb/shared-ui/lib/utils";
@@ -16,7 +18,6 @@ import {
 import { DETAIL_GRID_CLASS } from "@/components/ui/detail-card.js";
 import { useThreads } from "@/hooks/queries/thread-queries";
 import { ThreadTimelinePane } from "./ThreadTimelinePane";
-import { getCompactPanelPresentation } from "@/components/secondary-panel/panelToggleControlState";
 
 type ThreadTimelinePaneProps = Omit<
   ComponentProps<typeof ThreadTimelinePane>,
@@ -79,6 +80,7 @@ function ThreadDetailSecondaryContentBody({
   timeline,
 }: ThreadDetailSecondaryContentProps) {
   const composerHost = usePluginComposerHost();
+  const isCompactViewport = useIsCompactViewport();
   const { renderBrowserDeck, ...threadSecondaryPanelProps } = secondaryPanel;
 
   const forksQuery = useThreads(
@@ -124,19 +126,32 @@ function ThreadDetailSecondaryContentBody({
         drawerLabel="Thread details"
         drawerFallback={<ThreadMetadataLoadingSkeleton />}
         mainPanelId="thread-detail-timeline-panel"
-        mainHeader={header}
+        mainHeader={
+          <>
+            {header}
+            {isCompactViewport ? (
+              <div className="flex min-w-0 shrink-0 bg-sidebar">
+                <CompactPanelTabStrip
+                  activeTabId={null}
+                  mainTab={{
+                    label: "Chat",
+                    onSelect: threadSecondaryPanelProps.onClose,
+                  }}
+                  fixedTabs={threadSecondaryPanelProps.fixedTabs}
+                  tabs={threadSecondaryPanelProps.tabs}
+                  onOpenNewTab={threadSecondaryPanelProps.onOpenNewTab}
+                />
+              </div>
+            ) : null}
+          </>
+        }
         main={<ThreadTimelinePane {...timeline} footer={footer} />}
         collapse={{
           active: isConversationCollapsed,
           onToggle: onToggleConversationCollapse,
         }}
         composerHost={composerHost}
-        compactPresentation={getCompactPanelPresentation(
-          threadSecondaryPanelProps.activeTab?.kind,
-          threadSecondaryPanelProps.fixedTabs[0]?.tab.kind ??
-            threadSecondaryPanelProps.tabs.find((tab) => tab.isHidden !== true)
-              ?.tab.kind,
-        )}
+        compactPresentation="full"
         renderHostedPanel={renderHostedPanel}
         renderPanel={({
           presentation,
@@ -147,6 +162,7 @@ function ThreadDetailSecondaryContentBody({
         }) => (
           <LazyThreadSecondaryPanel
             {...threadSecondaryPanelProps}
+            compactMainTabLabel="Chat"
             drawerFallback={<ThreadMetadataLoadingSkeleton />}
             renderBrowserDeck={(activeBrowserTabId, pane) =>
               renderBrowserDeck?.({
