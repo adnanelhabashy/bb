@@ -1,4 +1,3 @@
-import { CompactPanelTabStrip } from "./CompactPanelTabStrip";
 import { usePluginDetailPanelProps } from "@/components/plugin/plugin-detail-navigation";
 import {
   type CSSProperties,
@@ -701,7 +700,6 @@ function ThreadSecondaryPanelContent({
             className={cn(
               CHROME_ROW_CLASS,
               "min-w-0 justify-between gap-2 px-4",
-              renderAsDrawer && "gap-0 px-0",
               renderAsDrawer && "pl-14",
               usesDesktopChrome && usesWindowChrome && MACOS_WINDOW_DRAG_CLASS,
               usesDesktopChrome &&
@@ -720,35 +718,20 @@ function ThreadSecondaryPanelContent({
               role="toolbar"
               aria-label="Right panel views"
             >
-              {renderAsDrawer ? (
-                <CompactPanelTabStrip
-                  activeTabId={
-                    activeSurfaceTabId ??
-                    activeSurfaceFixedTab?.tab.id ??
-                    fixedSurfaceTabs[0]?.tab.id ??
-                    visibleTabs[0]?.tab.id ??
-                    null
-                  }
-                  fixedTabs={fixedSurfaceTabs}
-                  tabs={surfaceTabs}
-                  onOpenNewTab={showNewTabControl ? onOpenNewTab : undefined}
-                />
-              ) : (
-                renderPanelTabGroup({
-                  activeSurfaceFixedTab,
-                  activeSurfaceTabId,
-                  surfaceTabs,
-                  fixedSurfaceTabs,
-                  newTabAriaLabel:
-                    onRemoveSplit === undefined
-                      ? "Open new tab"
-                      : "Open new tab in this pane",
-                  onBeginTabDrag,
-                  onSurfaceTabReorder,
-                  reserveNewTabButton: reserveNewTabControl,
-                  showNewTabButton: showNewTabControl,
-                })
-              )}
+              {renderPanelTabGroup({
+                activeSurfaceFixedTab,
+                activeSurfaceTabId,
+                surfaceTabs,
+                fixedSurfaceTabs,
+                newTabAriaLabel:
+                  onRemoveSplit === undefined
+                    ? "Open new tab"
+                    : "Open new tab in this pane",
+                onBeginTabDrag,
+                onSurfaceTabReorder,
+                reserveNewTabButton: reserveNewTabControl,
+                showNewTabButton: showNewTabControl,
+              })}
             </div>
             {showOuterControls ||
             onRemoveSplit ||
