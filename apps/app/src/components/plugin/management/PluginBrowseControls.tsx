@@ -8,6 +8,7 @@ import { ResourceSortMenu, ResourceToolbar } from "@bb/shared-ui/resource-list";
 import { useScrollOverflowState } from "@/components/thread/timeline/useScrollOverflowState";
 import type {
   PluginBrowseSort,
+  PluginBrowseCategoryOption,
   PluginBrowseSortDirection,
 } from "./plugin-browse-discovery";
 
@@ -45,12 +46,6 @@ export function pluginBrowseSortOptions(hasInstallCounts: boolean) {
     leading: <Icon name={PLUGIN_BROWSE_SORT_ICONS[sort]} className="size-4" />,
     disabled: sort === "most-installed" && !hasInstallCounts,
   }));
-}
-
-export interface PluginBrowseCategoryOption {
-  id: string;
-  label: string;
-  count: number;
 }
 
 export function PluginBrowseToolbar({

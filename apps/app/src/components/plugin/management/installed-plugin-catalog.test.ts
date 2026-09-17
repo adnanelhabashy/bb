@@ -24,6 +24,7 @@ describe("installed plugin catalog identity", () => {
           source: "git:https://github.com/alice/notes.git@v1",
         },
         [official, community],
+        { allowSourceFallback: false },
       ),
     ).toBe(community);
   });
@@ -57,5 +58,20 @@ describe("installed plugin catalog identity", () => {
         [community, official],
       ),
     ).toBe(official);
+  });
+  it("requires complete installation metadata when source fallback is disabled", () => {
+    for (const metadata of [
+      { catalogEntryId: null, catalogMarketplaceName: null },
+      { catalogEntryId: "notes", catalogMarketplaceName: null },
+      { catalogEntryId: null, catalogMarketplaceName: "bb-official" },
+    ]) {
+      expect(
+        installedPluginCatalogEntry(
+          { id: "notes", source: "builtin:notes", ...metadata },
+          [community, official],
+          { allowSourceFallback: false },
+        ),
+      ).toBeUndefined();
+    }
   });
 });

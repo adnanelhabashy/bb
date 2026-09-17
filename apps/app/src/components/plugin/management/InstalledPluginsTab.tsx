@@ -3,10 +3,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { EmptyState } from "@bb/shared-ui/empty-state";
 import { Switch } from "@bb/shared-ui/switch";
-import {
-  ResourceBrowseGrid,
-  ResourceIconFrame,
-} from "@bb/shared-ui/resource-list";
+import { ResourceIconFrame } from "@bb/shared-ui/resource-list";
 import { appToast } from "@/components/ui/app-toast.js";
 import { invalidatePluginList } from "@/hooks/cache-owners/plugin-cache-owner";
 import type { PluginListItem } from "@/hooks/queries/plugin-settings-queries";
@@ -17,7 +14,12 @@ import {
   pluginRuntimeStatusPresentation,
 } from "./plugin-status";
 import { PluginRowSignalView, PluginSignalLogo } from "./PluginRowSignal";
-import { PluginCard, PluginCardAuthor, PluginAuthorByline } from "./PluginCard";
+import {
+  PluginCard,
+  PluginCardGrid,
+  PluginCardAuthor,
+  PluginAuthorByline,
+} from "./PluginCard";
 import { installedPluginCatalogEntry } from "./installed-plugin-catalog";
 import {
   usePluginCatalogSearch,
@@ -48,7 +50,7 @@ export function InstalledPluginsTab({
 
   return (
     <>
-      <ResourceBrowseGrid className="w-full grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-2">
+      <PluginCardGrid>
         {plugins.map((plugin) => (
           <InstalledPluginRow
             key={plugin.id}
@@ -61,7 +63,7 @@ export function InstalledPluginsTab({
             onOpenPlugin={onOpenPlugin}
           />
         ))}
-      </ResourceBrowseGrid>
+      </PluginCardGrid>
       {updateTarget !== null ? (
         <UpdatePluginDialog
           plugin={updateTarget}

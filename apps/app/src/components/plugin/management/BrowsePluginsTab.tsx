@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@bb/shared-ui/button";
-import { PLUGIN_CATALOG_CATEGORIES, pluginCatalogCategory } from "@bb/domain";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,10 +13,7 @@ import { OpenPluginGuideButton } from "./OpenPluginGuideButton";
 import { cn } from "@bb/shared-ui/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
-  ResourceBrowseGrid,
   ResourceCollectionViewport,
-  ResourceInstallControl,
-  ResourceInstalledControl,
   ResourceListState,
   ResourceShelfAction,
   ResourceSourceShelf,
@@ -33,25 +29,20 @@ import {
   type PluginCatalogSearchEntry,
 } from "@/hooks/queries/plugin-catalog-queries";
 import type { AddPluginInitial } from "./AddPluginDialog";
-import { PluginCard, PluginCardAuthor } from "./PluginCard";
+import { PluginCatalogCard, PluginCatalogGrid } from "./PluginCatalogCard";
 import {
   PluginBrowseToolbar,
   pluginBrowseSort,
   pluginBrowseSortDirection,
-  type PluginBrowseCategoryOption,
 } from "./PluginBrowseControls";
 import {
-  UNCATEGORIZED_PLUGIN_CATEGORY_ID,
   pluginBrowseShelves,
   pluginCategoryFilterId,
+  pluginCategoryFilterOptions,
   sortPluginEntries,
   type PluginBrowseShelf,
 } from "./plugin-browse-discovery";
-import {
-  CatalogEntryIconChip,
-  pluginCatalogCategoryMutedAccentStyle,
-  pluginInstallCountPresentation,
-} from "./plugin-ui";
+import { pluginCatalogCategoryMutedAccentStyle } from "./plugin-ui";
 
 const SHELF_ENTRY_LIMIT = 6;
 
@@ -353,60 +344,6 @@ export function BrowsePluginsTab({
   );
 }
 
-export function pluginCategoryFilterOptions(
-  entries: readonly PluginCatalogSearchEntry[],
-  selected: readonly string[],
-): PluginBrowseCategoryOption[] {
-  const labels = new Map<string, string>();
-  const counts = new Map<string, number>();
-  const unknownIds: string[] = [];
-  for (const entry of entries) {
-    const id = pluginCategoryFilterId(entry);
-    if (!labels.has(id)) {
-      labels.set(
-        id,
-        id === UNCATEGORIZED_PLUGIN_CATEGORY_ID
-          ? "Uncategorized"
-          : (entry.category ?? id),
-      );
-      if (
-        id !== UNCATEGORIZED_PLUGIN_CATEGORY_ID &&
-        pluginCatalogCategory(id) === undefined
-      ) {
-        unknownIds.push(id);
-      }
-    }
-    counts.set(id, (counts.get(id) ?? 0) + 1);
-  }
-  for (const id of selected) {
-    if (labels.has(id)) continue;
-    const category = pluginCatalogCategory(id);
-    labels.set(
-      id,
-      id === UNCATEGORIZED_PLUGIN_CATEGORY_ID
-        ? "Uncategorized"
-        : (category?.displayName ?? id),
-    );
-    if (id !== UNCATEGORIZED_PLUGIN_CATEGORY_ID && category === undefined) {
-      unknownIds.push(id);
-    }
-  }
-  const orderedIds = [
-    ...PLUGIN_CATALOG_CATEGORIES.map((category) => category.id).filter((id) =>
-      labels.has(id),
-    ),
-    ...unknownIds,
-    ...(labels.has(UNCATEGORIZED_PLUGIN_CATEGORY_ID)
-      ? [UNCATEGORIZED_PLUGIN_CATEGORY_ID]
-      : []),
-  ];
-  return orderedIds.map((id) => ({
-    id,
-    label: labels.get(id) ?? id,
-    count: counts.get(id) ?? 0,
-  }));
-}
-
 function BrowseShelf({
   shelf,
   onInstall,
@@ -481,93 +418,5 @@ function BrowseShelf({
         </div>
       </div>
     </ResourceSourceShelf>
-  );
-}
-
-export function PluginCatalogGrid({
-  entries,
-  showCategory = true,
-  onInstall,
-  onOpenPlugin,
-}: {
-  entries: readonly PluginCatalogSearchEntry[];
-  showCategory?: boolean;
-  onInstall: (initial: AddPluginInitial) => void;
-  onOpenPlugin: (pluginId: string, trigger: HTMLButtonElement) => void;
-}) {
-  return (
-    <ResourceBrowseGrid className="mx-auto w-full max-w-3xl grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-2">
-      {entries.map((entry) => (
-        <PluginCatalogCard
-          key={`${entry.marketplace}/${entry.entryId}`}
-          entry={entry}
-          showCategory={showCategory}
-          onInstall={onInstall}
-          onOpenPlugin={onOpenPlugin}
-        />
-      ))}
-    </ResourceBrowseGrid>
-  );
-}
-
-function PluginCatalogCard({
-  entry,
-  showCategory,
-  onInstall,
-  onOpenPlugin,
-}: {
-  entry: PluginCatalogSearchEntry;
-  showCategory: boolean;
-  onInstall: (initial: AddPluginInitial) => void;
-  onOpenPlugin: (pluginId: string, trigger: HTMLButtonElement) => void;
-}) {
-  const count = pluginInstallCountPresentation(entry.installs);
-  return (
-    <PluginCard
-      leading={<CatalogEntryIconChip entry={entry} compact />}
-      title={entry.displayName}
-      description={entry.description || undefined}
-      byline={<PluginCardAuthor entry={entry} />}
-      badge={
-        showCategory && entry.category !== undefined
-          ? {
-              kind: "category",
-              categoryId: entry.categoryId,
-              label: entry.category,
-            }
-          : null
-      }
-      headerAction={
-        entry.installed ? (
-          <ResourceInstalledControl accessibleLabel="Installed" count={count} />
-        ) : (
-          <ResourceInstallControl
-            accessibleLabel={`Install ${entry.displayName}${
-              count === undefined ? "" : ` — ${count.accessibleLabel}`
-            }`}
-            disabled={!entry.compatible}
-            presentation="compact"
-            tooltip={`Install ${entry.displayName}`}
-            count={count}
-            className="border-border/80 bg-background text-foreground shadow-none hover:bg-state-hover"
-            onAction={() =>
-              onInstall({
-                entryId: entry.entryId,
-                marketplace: entry.marketplace,
-                pluginId: entry.pluginId,
-                publisherLabel: entry.publisherLabel,
-                displayName: entry.displayName,
-                icon: entry.icon,
-                iconUrl: entry.iconUrl,
-                iconTinted: entry.iconTinted,
-                source: entry.source,
-              })
-            }
-          />
-        )
-      }
-      openLabel={`Open ${entry.displayName} details`}
-      onOpen={(trigger) => onOpenPlugin(entry.pluginId, trigger)}
-    />
   );
 }

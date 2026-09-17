@@ -14,10 +14,7 @@ import {
 } from "@/hooks/queries/plugin-catalog-queries";
 import { getPluginsRoutePath } from "@/lib/route-paths";
 import type { AddPluginInitial } from "./AddPluginDialog";
-import {
-  PluginCatalogGrid,
-  pluginCategoryFilterOptions,
-} from "./BrowsePluginsTab";
+import { PluginCatalogGrid } from "./PluginCatalogCard";
 import { PluginAuthorAvatar } from "./PluginAuthorAvatar";
 import {
   PluginBrowseToolbar,
@@ -26,6 +23,7 @@ import {
 } from "./PluginBrowseControls";
 import {
   pluginCategoryFilterId,
+  pluginCategoryFilterOptions,
   sortPluginEntries,
 } from "./plugin-browse-discovery";
 import {
