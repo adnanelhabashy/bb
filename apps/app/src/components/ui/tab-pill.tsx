@@ -60,7 +60,7 @@ export function TabPill({
         closeAction.onClose();
       }}
       className={cn(
-        `group/tab-pill relative inline-flex h-7 shrink-0 items-center rounded-md ${LIST_HOVER_TRANSITION} max-md:pointer-coarse:h-9`,
+        `group/tab-pill relative inline-flex h-7 max-w-full shrink-0 items-center rounded-md ${LIST_HOVER_TRANSITION} max-md:pointer-coarse:h-9`,
         COARSE_POINTER_TEXT_SM_CLASS,
         isActive
           ? cn(CONTEXT_SELECTION_SURFACE_CLASS, "text-foreground")

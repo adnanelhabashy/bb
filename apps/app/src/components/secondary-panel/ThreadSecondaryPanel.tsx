@@ -572,45 +572,45 @@ function ThreadSecondaryPanelContent({
 
     return (
       <>
-        {fixedSurfaceTabs.map((fixedTab) => {
-          const shortcut =
-            fixedTab.tab.kind === "git-diff" ? diffShortcut : null;
-          return (
-            <PinnedIconTab
-              key={fixedTab.tab.id}
-              ariaLabel={
-                shortcut
-                  ? `${fixedTab.ariaLabel} (${shortcut.label})`
-                  : fixedTab.ariaLabel
-              }
-              ariaKeyshortcuts={shortcut?.ariaKeyshortcuts}
-              isActive={
-                activeSurfaceFixedTab?.tab.id === fixedTab.tab.id &&
-                !hasActiveSurfaceTab
-              }
-              label={fixedTab.label}
-              leadingVisual={fixedTab.leadingVisual}
-              onClick={fixedTab.onSelect}
-              onPointerDown={
-                onBeginTabDrag
-                  ? (event) => onBeginTabDrag(fixedTab.tab.id, event)
-                  : undefined
-              }
-              title={fixedTab.title}
-              usesDesktopChrome={usesDesktopChrome}
-            />
-          );
-        })}
-        {visibleSurfaceTabs.length > 0 ? (
-          <SecondaryPanelTabStrip
-            activeTabId={activeSurfaceTabId}
-            tabs={visibleSurfaceTabs}
-            onBeginTabDrag={onBeginTabDrag}
-            onReorderTab={onSurfaceTabReorder}
-            usesDesktopChrome={usesDesktopChrome}
-            isPanelOpen={isOpen}
-          />
-        ) : null}
+        <SecondaryPanelTabStrip
+          activeTabId={
+            activeSurfaceTabId ?? activeSurfaceFixedTab?.tab.id ?? null
+          }
+          tabs={visibleSurfaceTabs}
+          leadingTabs={fixedSurfaceTabs.map((fixedTab) => {
+            const shortcut =
+              fixedTab.tab.kind === "git-diff" ? diffShortcut : null;
+            return (
+              <PinnedIconTab
+                key={fixedTab.tab.id}
+                ariaLabel={
+                  shortcut
+                    ? `${fixedTab.ariaLabel} (${shortcut.label})`
+                    : fixedTab.ariaLabel
+                }
+                ariaKeyshortcuts={shortcut?.ariaKeyshortcuts}
+                isActive={
+                  activeSurfaceFixedTab?.tab.id === fixedTab.tab.id &&
+                  !hasActiveSurfaceTab
+                }
+                label={fixedTab.label}
+                leadingVisual={fixedTab.leadingVisual}
+                onClick={fixedTab.onSelect}
+                onPointerDown={
+                  onBeginTabDrag
+                    ? (event) => onBeginTabDrag(fixedTab.tab.id, event)
+                    : undefined
+                }
+                title={fixedTab.title}
+                usesDesktopChrome={usesDesktopChrome}
+              />
+            );
+          })}
+          onBeginTabDrag={onBeginTabDrag}
+          onReorderTab={onSurfaceTabReorder}
+          usesDesktopChrome={usesDesktopChrome}
+          isPanelOpen={isOpen}
+        />
         {showGroupNewTabButton ? (
           <NewTabButton
             ariaLabel={newTabAriaLabel}

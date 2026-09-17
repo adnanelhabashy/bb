@@ -3,6 +3,7 @@ import {
   type MouseEventHandler,
   type PointerEvent as ReactPointerEvent,
   type RefObject,
+  type ReactNode,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -84,6 +85,7 @@ const INITIAL_OVERFLOW_STATE: TabStripOverflowState = {
 export interface SecondaryPanelTabStripProps {
   activeTabId: string | null;
   tabs: readonly SecondaryPanelRenderableTab[];
+  leadingTabs?: ReactNode;
   onBeginTabDrag?: (
     tabId: string,
     event: ReactPointerEvent<HTMLElement>,
@@ -131,6 +133,7 @@ interface SortablePanelTabProps {
 export function SecondaryPanelTabStrip({
   activeTabId,
   tabs,
+  leadingTabs,
   onBeginTabDrag,
   onReorderTab,
   usesDesktopChrome,
@@ -248,7 +251,10 @@ export function SecondaryPanelTabStrip({
   }, [measureCapacity]);
 
   useLayoutEffect(() => {
-    const activeTabElement = activeTabRef.current;
+    const activeTabElement =
+      contentRef.current?.querySelector<HTMLElement>(
+        'button[aria-pressed="true"]',
+      )?.parentElement ?? activeTabRef.current;
     if (activeTabElement === null) {
       return;
     }
@@ -258,7 +264,9 @@ export function SecondaryPanelTabStrip({
   useLayoutEffect(() => {
     const focusedElement = document.activeElement;
     const activeTabButton =
-      activeTabRef.current?.querySelector<HTMLButtonElement>("button") ?? null;
+      contentRef.current?.querySelector<HTMLButtonElement>(
+        'button[aria-pressed="true"]',
+      ) ?? null;
     if (
       !overflow.canScrollLeft &&
       focusedElement === leftScrollButtonRef.current
@@ -455,7 +463,7 @@ export function SecondaryPanelTabStrip({
       />
       <div
         data-secondary-panel-tab-scroll-region
-        className="relative min-w-0 flex-1"
+        className="relative min-w-0 flex-1 [container-type:inline-size]"
       >
         <OverflowFade
           placement="left"
@@ -486,6 +494,7 @@ export function SecondaryPanelTabStrip({
             data-secondary-panel-tab-content
             className="flex w-max items-center gap-1"
           >
+            {leadingTabs}
             {dndTabs}
           </div>
         </div>
@@ -551,7 +560,7 @@ function SortablePanelTab({
           ref={setTabRef}
           style={style}
           className={cn(
-            "shrink-0",
+            "max-w-[100cqw] shrink-0",
             !dragDisabled && "cursor-grab active:cursor-grabbing",
             isDragging && "opacity-40",
             noDragClass,

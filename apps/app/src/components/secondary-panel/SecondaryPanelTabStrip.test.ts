@@ -54,6 +54,44 @@ describe("secondary panel tab-strip edge fades", () => {
     ).not.toContain("app-region");
   });
 
+  it("reveals Info when switching back from a document tab", () => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const reveal = vi.spyOn(Element.prototype, "scrollIntoView");
+    try {
+      const fixture = (activeTabId: string) =>
+        createElement(SecondaryPanelTabStrip, {
+          activeTabId,
+          tabs: makeCloseMenuTabs(),
+          leadingTabs: createElement(
+            "div",
+            null,
+            createElement(
+              "button",
+              { "aria-pressed": activeTabId === "info" },
+              "Info",
+            ),
+          ),
+          onReorderTab: vi.fn(),
+          usesDesktopChrome: false,
+          isPanelOpen: true,
+        });
+      const view = render(fixture("tab-0"));
+      reveal.mockClear();
+      view.rerender(fixture("info"));
+      expect(reveal.mock.instances.at(-1)).toBe(
+        screen.getByRole("button", { name: "Info" }).parentElement,
+      );
+    } finally {
+      reveal.mockRestore();
+    }
+  });
+
   it("enlarges coarse-pointer close targets only for file previews", () => {
     vi.stubGlobal(
       "ResizeObserver",
