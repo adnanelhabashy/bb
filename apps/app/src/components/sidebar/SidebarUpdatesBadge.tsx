@@ -75,7 +75,7 @@ export function SidebarUpdatesBadge({ onNavigate }: SidebarUpdatesBadgeProps) {
 
   const updatesRoutePath = getSettingsRoutePath("updates");
   const bbLabel =
-    bbUpdateCount === 1 ? "bb update available" : "bb updates available";
+    bbUpdateCount === 1 ? "Arc Agent update available" : "Arc Agent updates available";
   const providerLabel = `${joinNames(
     staleProviders.map((stale) => stale.displayName),
   )} ${staleProviders.length === 1 ? "update" : "updates"} available`;

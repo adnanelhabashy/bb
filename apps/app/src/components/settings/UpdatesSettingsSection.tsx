@@ -596,7 +596,7 @@ export function ChangelogPreviewCard() {
                         variant="ghost"
                         size="icon"
                         className="size-7 text-muted-foreground hover:text-foreground"
-                        aria-label={`Dismiss bb ${entry.version} changelog preview`}
+                        aria-label={`Dismiss Arc Agent ${entry.version} changelog preview`}
                         onClick={() => {
                           rawStringLocalStorage.setItem(
                             CHANGELOG_DISMISSED_VERSION_STORAGE_KEY,
@@ -668,7 +668,7 @@ export function ChangelogPreviewCard() {
               <button
                 type="button"
                 disabled={!releaseVisible}
-                aria-label={`Open the full bb ${entry.version} changelog`}
+                aria-label={`Open the full Arc Agent ${entry.version} changelog`}
                 onClick={() =>
                   openUrlInExternalBrowser(
                     `${CHANGELOG_URL}#${entry.version.replaceAll(".", "-")}`,
@@ -761,7 +761,7 @@ export function BbAppUpdateRows({
   );
   if (isDesktop && desktopInfo === null) {
     return row(
-      <RowName name="bb app" current={null} latest={null} />,
+      <RowName name="Arc Agent app" current={null} latest={null} />,
       <RowStateControl live state="in-progress" />,
     );
   }
@@ -771,7 +771,7 @@ export function BbAppUpdateRows({
       desktopInfo.pendingVersion ?? desktopInfo.latestVersion;
     const latest = desktopInfo.updateAvailable ? pendingVersion : null;
     const name = (
-      <RowName name="bb app" current={desktopInfo.version} latest={latest} />
+      <RowName name="Arc Agent app" current={desktopInfo.version} latest={latest} />
     );
 
     if (desktopInfo.updateDownloaded) {
@@ -781,7 +781,7 @@ export function BbAppUpdateRows({
           state="restart-required"
           buttonLeading={<BbLogo className="size-3" />}
           buttonLabel="Relaunch"
-          actionLabel="Relaunch bb to finish updating"
+          actionLabel="Relaunch Arc Agent to finish updating"
           onClick={() => onRelaunchDesktop?.()}
         />,
       );
@@ -809,7 +809,7 @@ export function BbAppUpdateRows({
 
   if (systemVersion === undefined) {
     return row(
-      <RowName name="bb app" current={null} latest={null} />,
+      <RowName name="Arc Agent app" current={null} latest={null} />,
       <RowStateControl state="in-progress" />,
     );
   }
@@ -1267,6 +1267,9 @@ export function UpdatesSettingsSection({
     .map((machine) => machine.host.id);
 
   function handleCheckForUpdates(): void {
+    // Arc Agent fork: with no update feed, app-update checks cannot succeed;
+    // only the provider/machine-side refreshes below still mean anything.
+    if (desktopInfo?.appUpdateManagementEnabled === false) return;
     startAppUpdateCheck(async () => {
       if (desktopApi !== null) {
         await desktopApi.checkForUpdates();
@@ -1413,7 +1416,9 @@ export function UpdatesSettingsSection({
                     isDesktop={isDesktop}
                     isChecking={isChecking}
                     onRelaunchDesktop={
-                      desktopApi === null || showFallbackBbStatus
+                      desktopApi === null ||
+                      showFallbackBbStatus ||
+                      desktopInfo?.appUpdateManagementEnabled === false
                         ? null
                         : () => {
                             void desktopApi.installUpdate().catch((error) => {
@@ -1424,7 +1429,9 @@ export function UpdatesSettingsSection({
                           }
                     }
                     onRetryDesktop={
-                      desktopApi === null || showFallbackBbStatus
+                      desktopApi === null ||
+                      showFallbackBbStatus ||
+                      desktopInfo?.appUpdateManagementEnabled === false
                         ? null
                         : () => {
                             void desktopApi.checkForUpdates().catch((error) => {

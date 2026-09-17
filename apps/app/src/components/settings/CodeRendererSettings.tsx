@@ -12,7 +12,7 @@ export function CodeRendererSettings() {
       <ReplacementProviderSetting
         label="Source code"
         triggerAriaLabel="Source code"
-        description="Choose automatic activation, BB's viewer, or a specific plugin on this device."
+        description="Choose automatic activation, the built-in viewer, or a specific plugin on this device."
         builtInDescription="Syntax highlighting and gutters from the bb code theme."
         preferenceAtom={sourceCodeRendererProviderAtom}
         slots={sourceCodeRenderers}

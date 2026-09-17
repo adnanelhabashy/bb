@@ -346,6 +346,7 @@ let currentAppKeybindings: AppKeybindings = [];
 let currentApplicationMenuAccelerators = DEFAULT_APPLICATION_MENU_ACCELERATORS;
 let desktopUpdateService: DesktopUpdateService | null = null;
 let desktopAutoUpdateService: DesktopAutoUpdateService | null = null;
+let desktopAppUpdateManagementEnabled = false;
 let currentRuntime: DesktopRuntime | null = null;
 let currentWindowUrl: string | null = null;
 let logViewerLineBuffer: LogLineBuffer | null = null;
@@ -482,6 +483,7 @@ function getCurrentDesktopInfo(): BbDesktopInfo | null {
   }
   return {
     ...info,
+    appUpdateManagementEnabled: desktopAppUpdateManagementEnabled,
     serverDaemonLogsAvailable: shouldEnableServerDaemonLogsMenu(),
   };
 }
@@ -2488,6 +2490,12 @@ async function runDesktopApp(): Promise<void> {
     platform: desktopPlatform,
     updater: createElectronAutoUpdaterAdapter(autoUpdater),
   });
+  desktopAppUpdateManagementEnabled =
+    desktopUpdateSupport.autoUpdate &&
+    shouldEnableDesktopAutoUpdate({
+      env: process.env,
+      isPackaged: app.isPackaged,
+    });
   desktopUpdateService.subscribe(() => {
     sendDesktopInfoChanged();
   });

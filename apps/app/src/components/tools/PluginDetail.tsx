@@ -168,7 +168,7 @@ export function CatalogPluginDetailBanner({
     <PluginBannerBar
       tone="warning"
       icon="AlertTriangle"
-      title="Update bb to install this plugin"
+      title="Update Arc Agent to install this plugin"
       detail={entry.incompatibleReason}
     />
   );

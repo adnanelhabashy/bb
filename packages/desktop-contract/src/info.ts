@@ -13,6 +13,9 @@ const bbDesktopDownloadStateSchema = z.enum([
 ]);
 
 export const bbDesktopInfoSchema = z.object({
+  // Arc Agent fork: false when the build ships no update feed, so the
+  // renderer must not present app-update flows that cannot complete.
+  appUpdateManagementEnabled: z.boolean().optional(),
   downloadState: bbDesktopDownloadStateSchema.optional(),
   lastCheckedAt: isoUtcDateTimeSchema.nullable(),
   latestVersion: z.string().min(1).nullable(),

@@ -273,7 +273,7 @@ function SidebarTriggerOverlay({
 }
 
 const routeTitles: Record<string, { title: string }> = {
-  "/": { title: "bb" },
+  "/": { title: "Arc Agent" },
   "/settings": { title: "Settings" },
   "/automations": { title: "Automations" },
   "/skills": { title: "Skills" },
@@ -620,7 +620,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       return pluginPanel.title;
     }
     if (documentTitleBreadcrumbs) {
-      const sectionLabel = documentTitleBreadcrumbs[0]?.label ?? "BB";
+      const sectionLabel = documentTitleBreadcrumbs[0]?.label ?? "Arc Agent";
       const pageLabel = documentTitleBreadcrumbs.at(-1)?.label ?? sectionLabel;
       return pageLabel === sectionLabel
         ? sectionLabel
@@ -638,7 +638,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       return projectLabel ?? projectId;
     }
     const routeTitle = resolveRouteTitle(location.pathname)?.title;
-    return routeTitle && routeTitle.length > 0 ? routeTitle : "BB";
+    return routeTitle && routeTitle.length > 0 ? routeTitle : "Arc Agent";
   })();
   const currentThreadPendingInteractionsQuery = useThreadPendingInteractions(
     threadId ?? "",

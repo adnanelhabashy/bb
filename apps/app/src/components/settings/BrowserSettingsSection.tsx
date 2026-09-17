@@ -234,7 +234,7 @@ export function BrowserSettingsSectionContent({
     <>
       <SettingsSection
         title="Browsers"
-        description="Bring signed-in sessions from a browser on this machine into the BB browser, so previews and agent tabs open already logged in."
+        description="Bring signed-in sessions from a browser on this machine into the Arc Agent browser, so previews and agent tabs open already logged in."
         action={
           supported ? (
             <Button
