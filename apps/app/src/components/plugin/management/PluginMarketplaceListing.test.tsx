@@ -1,5 +1,6 @@
-import { PluginCardAuthor } from "@/components/plugin/management/PluginCard";
 // @vitest-environment jsdom
+
+import { PluginCardAuthor } from "./PluginCard";
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -97,6 +98,7 @@ describe("plugin marketplace author links", () => {
       </MemoryRouter>,
     );
 
+    expect(screen.queryByText(/^By/u)).toBeNull();
     expect(
       screen.getByRole("link", { name: "Pat Lee" }).getAttribute("href"),
     ).toBe(

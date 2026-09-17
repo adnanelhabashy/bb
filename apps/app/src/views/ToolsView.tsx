@@ -1,5 +1,8 @@
 import { useAtom } from "jotai";
-import { CompactViewportOverrideProvider } from "@bb/shared-ui/hooks/use-compact-viewport";
+import {
+  CompactViewportOverrideProvider,
+  useIsCompactViewport,
+} from "@bb/shared-ui/hooks/use-compact-viewport";
 import { useMediaQuery } from "@bb/shared-ui/hooks/use-media-query";
 import { Button } from "@bb/shared-ui/button";
 import { Icon } from "@bb/shared-ui/icon";
@@ -449,9 +452,11 @@ export function PluginsView({ pluginId }: { pluginId?: string } = {}) {
   const focusReturnRef = useRef<HTMLButtonElement | null>(null);
   const [isPluginDetailFullPage, setIsPluginDetailFullPage] = useState(false);
   const [workspace, setWorkspace] = useAtom(pluginWorkspaceAtom);
-  const compactDetail = useMediaQuery("(max-width: 1023px)");
+  const compactViewport = useIsCompactViewport();
+  const compactDetail = useMediaQuery("(max-width: 1023px)") || compactViewport;
   const activePluginId = pluginId ?? workspace.activePluginId;
-  const isPanelOpen = activePluginId !== null;
+  const isPanelOpen =
+    activePluginId !== null && (!compactDetail || pluginId !== undefined);
   const catalogQuery = usePluginCatalogSearch("", { enabled: isPanelOpen });
   const listQuery = usePluginList({ enabled: true });
   const openIds = useMemo(

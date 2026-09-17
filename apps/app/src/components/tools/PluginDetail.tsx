@@ -69,7 +69,9 @@ import { useClipboardCopy } from "@/lib/clipboard";
 
 export function PluginProvenancePill({ plugin }: { plugin: PluginListItem }) {
   const label = plugin.publisherLabel;
-  return label === null ? null : <ProvenancePill label={label} />;
+  return label === null || label === "BB Official" ? null : (
+    <ProvenancePill label={label} />
+  );
 }
 
 export function pluginIsLocalSource(plugin: PluginListItem): boolean {
@@ -405,9 +407,18 @@ export function PluginDetail({
       leading={<PluginLogo plugin={plugin} className="size-4" />}
       title={pluginName}
       metadata={
-        catalogEntry === undefined ? undefined : (
+        catalogEntry !== undefined ? (
           <PluginCardAuthor entry={catalogEntry} />
-        )
+        ) : plugin.provenance === "builtin" ||
+          plugin.catalogMarketplaceName === "bb-official" ? (
+          <PluginCardAuthor
+            entry={{
+              author: null,
+              marketplace: "bb-official",
+              publisherLabel: "BB Official",
+            }}
+          />
+        ) : undefined
       }
       actions={
         <>
