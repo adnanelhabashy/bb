@@ -1,6 +1,6 @@
 {
-  "name": "bb",
-  "short_name": "bb",
+  "name": "Arc Agent",
+  "short_name": "Arc Agent",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

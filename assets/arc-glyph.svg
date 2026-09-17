@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Arc Agent compact glyph (dark variant for light surfaces; hosts
+       apply dark:invert). Same geometry as the Arc emblem. -->
+  <g fill="none" stroke="#1a1a1c" stroke-linecap="round">
+    <path d="M10.8 2.9 L4.2 19.9" stroke-width="2.9"/>
+    <path d="M11.5 2.9 L18.1 20.5" stroke-width="2.9"/>
+    <ellipse cx="11.2" cy="12.6" rx="9.4" ry="2.2" transform="rotate(-17 11.2 12.6)" stroke-width="1.35"/>
+    <circle cx="18.5" cy="8.9" r="1.95" fill="#1a1a1c" stroke="none"/>
+  </g>
+</svg>

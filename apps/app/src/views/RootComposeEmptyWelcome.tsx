@@ -1,6 +1,5 @@
 import { Icon, type IconName } from "@bb/shared-ui/icon";
-import { usePrefersReducedMotion } from "@bb/shared-ui/hooks/use-media-query";
-import bbLogoUrl from "../../../../assets/bb-logo.svg";
+import arcEmblemUrl from "../../../../assets/arc-emblem.png";
 
 interface RootComposeEmptyWelcomeProps {
   onCompose: (prompt?: string) => void;
@@ -54,79 +53,24 @@ export function RootComposeEmptyWelcome({
   onAddProject,
   addProjectDisabled,
 }: RootComposeEmptyWelcomeProps) {
-  const reducedMotion = usePrefersReducedMotion();
   return (
     <div className="flex flex-col items-center gap-12 duration-500 animate-in fade-in-0 slide-in-from-bottom-2">
-      <svg aria-hidden className="absolute h-0 w-0" focusable="false">
-        <defs>
-          <filter
-            id="bb-gloss"
-            x="-40%"
-            y="-40%"
-            width="180%"
-            height="180%"
-            colorInterpolationFilters="sRGB"
-          >
-            <feGaussianBlur in="SourceAlpha" stdDeviation="5" result="bump" />
-            <feSpecularLighting
-              in="bump"
-              surfaceScale="5"
-              specularConstant="0.85"
-              specularExponent="18"
-              lightingColor="#ffffff"
-              result="spec"
-            >
-              <fePointLight x="40" y="10" z="80">
-                {reducedMotion ? null : (
-                  <animate
-                    attributeName="x"
-                    dur="5s"
-                    repeatCount="indefinite"
-                    calcMode="spline"
-                    keyTimes="0;0.5;1"
-                    values="-170;270;-170"
-                    keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
-                  />
-                )}
-              </fePointLight>
-            </feSpecularLighting>
-            <feMorphology
-              in="SourceAlpha"
-              operator="erode"
-              radius="0.75"
-              result="innerAlpha"
-            />
-            <feComposite
-              in="spec"
-              in2="innerAlpha"
-              operator="in"
-              result="specClip"
-            />
-            <feComposite
-              in="SourceGraphic"
-              in2="specClip"
-              operator="arithmetic"
-              k1="0"
-              k2="1"
-              k3="1"
-              k4="0"
-            />
-          </filter>
-        </defs>
-      </svg>
-      <div
-        role="img"
-        aria-label="bb"
-        className="h-24 w-28 select-none"
-        style={{ filter: "url(#bb-gloss)" }}
-      >
+      <div className="flex select-none flex-col items-center gap-4" role="img" aria-label="Arc Agent">
         <img
-          src={bbLogoUrl}
+          src={arcEmblemUrl}
           alt=""
           aria-hidden
           draggable={false}
-          className="size-full object-contain dark:invert"
+          className="h-28 w-auto object-contain"
         />
+        <div className="flex flex-col items-center gap-1.5">
+          <span className="text-sm font-semibold uppercase tracking-[0.42em] text-foreground [margin-right:-0.42em]">
+            Arc Agent
+          </span>
+          <span className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground [margin-right:-0.28em]">
+            Orchestrate intelligence
+          </span>
+        </div>
       </div>
       <div className="flex w-full max-w-[360px] flex-col gap-1">
         <WelcomeAction
@@ -150,7 +94,7 @@ export function RootComposeEmptyWelcome({
         />
         <WelcomeAction
           icon="Explore"
-          title="Learn what bb can do"
+          title="Learn what Arc Agent can do"
           description="Get a tour of its capabilities"
           onClick={() => onCompose(LEARN_PROMPT)}
         />

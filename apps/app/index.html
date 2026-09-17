@@ -17,8 +17,8 @@
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
     />
-    <meta name="apple-mobile-web-app-title" content="bb" />
-    <title>bb</title>
+    <meta name="apple-mobile-web-app-title" content="Arc Agent" />
+    <title>Arc Agent</title>
     <link
       rel="icon"
       type="image/png"
@@ -100,7 +100,91 @@
     </script>
   </head>
   <body class="bb-app-shell">
-    <div id="root"></div>
+    <div id="root">
+      <!-- Arc Agent boot splash: replaced by the app on mount. -->
+      <style>
+        .arc-boot {
+          position: fixed;
+          inset: 0;
+          display: grid;
+          place-items: center;
+          background: #ffffff;
+          color: #1a1a1c;
+          font-family:
+            ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        }
+        .dark .arc-boot {
+          background: #151515;
+          color: #e8e8ea;
+        }
+        .arc-boot-inner {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 18px;
+        }
+        .arc-boot-glyph {
+          width: 72px;
+          height: 72px;
+          color: #b98a2e;
+        }
+        .arc-boot-word {
+          font-size: 13px;
+          font-weight: 600;
+          letter-spacing: 0.42em;
+          margin-right: -0.42em;
+          text-transform: uppercase;
+        }
+        .arc-boot-status {
+          font-size: 12px;
+          letter-spacing: 0.06em;
+          opacity: 0.55;
+        }
+        .arc-boot-orbit {
+          transform-box: view-box;
+          transform-origin: 11.2px 12.6px;
+          animation: arc-boot-sweep 2.6s linear infinite;
+        }
+        @keyframes arc-boot-sweep {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .arc-boot-orbit {
+            animation: none;
+          }
+        }
+      </style>
+      <div class="arc-boot" role="status" aria-label="Arc Agent is loading">
+        <div class="arc-boot-inner">
+          <svg
+            class="arc-boot-glyph"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <path d="M10.8 2.9 L4.2 19.9" stroke-width="2.9" />
+            <path d="M11.5 2.9 L18.1 20.5" stroke-width="2.9" />
+            <g class="arc-boot-orbit">
+              <ellipse
+                cx="11.2"
+                cy="12.6"
+                rx="9.4"
+                ry="2.2"
+                transform="rotate(-17 11.2 12.6)"
+                stroke-width="1.35"
+              />
+              <circle cx="18.5" cy="8.9" r="1.95" fill="currentColor" stroke="none" />
+            </g>
+          </svg>
+          <div class="arc-boot-word">Arc Agent</div>
+          <div class="arc-boot-status">Initializing orchestration…</div>
+        </div>
+      </div>
+    </div>
     <script>
       // Pre-paint the palette (Nord, Dracula, a custom theme, ...) cached by
       // applyAppThemeCss from the previous load, so a non-default palette does
