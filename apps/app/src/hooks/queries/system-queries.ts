@@ -533,6 +533,10 @@ export function useSystemProviderUsageLimits(
     isFetching: queries.some((query) => query.isFetching),
     isLoading: queries.some((query) => query.isLoading),
     providerStates,
+    updatedAt: queries.reduce(
+      (latest, query) => Math.max(latest, query.dataUpdatedAt),
+      0,
+    ),
     refetch: async () => {
       await Promise.all(queries.map((query) => query.refetch()));
     },

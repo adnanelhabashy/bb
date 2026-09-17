@@ -2018,6 +2018,12 @@ export function ThreadDetailPromptArea({
       focusEndKey={bottomFocusEndKey}
       environmentSummary={environmentSummary}
       contextWindowUsage={contextWindowUsage ?? null}
+      usageProviderId={selectedProviderId}
+      usageModelLabel={
+        activeModel != null && activeModel.model === effectiveSelectedModel
+          ? activeModel.displayName
+          : effectiveSelectedModel
+      }
       execution={bottomExecutionConfig}
       permission={bottomPermissionConfig}
       typeahead={typeaheadConfig}

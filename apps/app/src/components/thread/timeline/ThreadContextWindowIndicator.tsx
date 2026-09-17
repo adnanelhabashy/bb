@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@bb/shared-ui/popover";
 import type { ThreadContextWindowUsage } from "@bb/server-contract";
 import { useHoverPopover } from "../../ui/hooks/use-hover-popover.js";
@@ -7,6 +7,7 @@ import {
   calculateContextWindowUsagePercent,
   formatCompactTokenCount,
 } from "./thread-context-window-usage.js";
+import { ProviderUsageSection } from "./ProviderUsageSection.js";
 
 import {
   ContextWindowReveal,
@@ -17,17 +18,22 @@ import {
 interface ThreadContextWindowCardProps {
   usage: ThreadContextWindowUsage;
   className?: string;
+  title?: string;
+  usageLimits?: ReactNode;
 }
 
 interface ThreadContextWindowIndicatorProps {
   usage: ThreadContextWindowUsage;
   defaultOpen?: boolean;
+  providerId?: string;
+  modelLabel?: string;
 }
 
-const CONTEXT_WINDOW_POPOVER_CLOSE_DELAY_MS = 60;
 export function ThreadContextWindowCard({
   usage,
   className,
+  title,
+  usageLimits,
 }: ThreadContextWindowCardProps) {
   const details = usage.snapshot?.categories.length
     ? usage.snapshot
@@ -52,7 +58,7 @@ export function ThreadContextWindowCard({
   return (
     <div
       className={cn(
-        "@container/context-window w-56 rounded-md border bg-popover p-2 text-popover-foreground shadow-md max-md:px-4",
+        "@container/context-window w-72 rounded-md border bg-popover p-2 text-popover-foreground shadow-md max-md:px-4",
         details &&
           "transition-[width] duration-200 ease-out motion-reduce:transition-none",
         details && detailsExpanded && "w-90",
@@ -60,6 +66,13 @@ export function ThreadContextWindowCard({
       )}
     >
       <div className="flex flex-col gap-2 max-md:gap-3">
+        {title ? (
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-2xs font-medium tracking-wider text-muted-foreground uppercase">
+              {title}
+            </span>
+          </div>
+        ) : null}
         <div className="flex items-baseline justify-between gap-2 text-xs max-md:text-sm">
           <span
             className={cn(
@@ -149,6 +162,12 @@ export function ThreadContextWindowCard({
           </button>
         </>
       ) : null}
+      {usageLimits ? (
+        <>
+          <div className="-mx-2 mt-2 border-t border-border-hairline max-md:-mx-4" />
+          {usageLimits}
+        </>
+      ) : null}
     </div>
   );
 }
@@ -156,18 +175,17 @@ export function ThreadContextWindowCard({
 export function ThreadContextWindowIndicator({
   usage,
   defaultOpen,
+  providerId,
+  modelLabel,
 }: ThreadContextWindowIndicatorProps) {
-  const details = usage.snapshot?.categories.length
-    ? usage.snapshot
-    : undefined;
   const {
     open: hoverOpen,
     triggerHoverProps,
     contentHoverProps,
     handleOpenChange,
   } = useHoverPopover({
-    closeDelayMs: details ? 200 : CONTEXT_WINDOW_POPOVER_CLOSE_DELAY_MS,
-    hoverableContent: details !== undefined,
+    closeDelayMs: 200,
+    hoverableContent: true,
   });
   const open = defaultOpen || hoverOpen;
 
@@ -234,6 +252,16 @@ export function ThreadContextWindowIndicator({
       >
         <ThreadContextWindowCard
           usage={usage}
+          title="Usage & Limits"
+          usageLimits={
+            providerId !== undefined ? (
+              <ProviderUsageSection
+                active={open}
+                providerId={providerId}
+                modelLabel={modelLabel}
+              />
+            ) : undefined
+          }
           className="max-md:w-full max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:px-4 max-md:pt-2 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:shadow-none"
         />
       </PopoverContent>
