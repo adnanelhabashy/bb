@@ -13,6 +13,7 @@ import {
   buildPromptInputs,
   parsePermissionMode,
   PERMISSION_MODE_HELP,
+  uploadClientAttachmentInputs,
 } from "./helpers.js";
 import {
   buildSpawnEnvironment,
@@ -32,6 +33,7 @@ interface ThreadForkCommandOptions {
   prompt?: string;
   sourceSeqEnd?: string;
   title?: string;
+  lifecycleOwnerThread?: string;
   visibility?: string;
 }
 
@@ -94,6 +96,10 @@ export function registerForkCommand(
   parent
     .command("fork <source-thread-id>")
     .description("Fork a thread at its tip or a source event sequence")
+    .option(
+      "--lifecycle-owner-thread <id>",
+      "Archive/delete this thread with its lifecycle owner",
+    )
     .option("--prompt <prompt>", "Optional first prompt; omit for an idle fork")
     .option("--title <title>", "Thread title")
     .option(
@@ -120,13 +126,13 @@ export function registerForkCommand(
     )
     .option(
       "--file <path>",
-      "Pass a host-readable absolute or uploaded attachment file path (repeatable)",
+      "Upload an absolute path or file: URL from this CLI machine or pass an uploaded attachment path (repeatable)",
       collectOption,
       [],
     )
     .option(
       "--image <path>",
-      "Pass a host-readable absolute or uploaded attachment image path (repeatable)",
+      "Upload an absolute path or file: URL from this CLI machine or pass an uploaded attachment path (repeatable)",
       collectOption,
       [],
     )
@@ -141,7 +147,7 @@ export function registerForkCommand(
           if (!sourceThreadId) {
             throw new Error("Source thread ID is required.");
           }
-          const input = buildForkInput(opts);
+          const requestedInput = buildForkInput(opts);
           const sourceSeqEnd = parseSourceSeqEnd(opts.sourceSeqEnd);
           const permissionMode = parsePermissionMode(opts.permissionMode);
           const visibility =
@@ -156,6 +162,19 @@ export function registerForkCommand(
           let environment: EnvironmentArgs | undefined;
           try {
             const sdk = createCliBbSdk(getUrl());
+            const input =
+              requestedInput === undefined
+                ? undefined
+                : await uploadClientAttachmentInputs({
+                    input: requestedInput,
+                    resolveProjectId: async () =>
+                      (
+                        await sdk.threads.get({
+                          threadId: sourceThreadId,
+                        })
+                      ).projectId,
+                    sdk,
+                  });
             const needsHostId =
               Boolean(opts.newEnvironment) ||
               (environmentValue !== undefined &&
@@ -189,6 +208,9 @@ export function registerForkCommand(
             }
             thread = await sdk.threads.fork({
               sourceThreadId,
+              ...(opts.lifecycleOwnerThread !== undefined
+                ? { lifecycleOwnerThreadId: opts.lifecycleOwnerThread }
+                : {}),
               origin: "cli",
               ...(environment === undefined ? {} : { environment }),
               ...(input === undefined ? {} : { input }),

@@ -29,6 +29,7 @@ import {
   PERMISSION_MODE_HELP,
   PLAN_HELP,
   buildPromptInputs,
+  uploadClientAttachmentInputs,
 } from "./helpers.js";
 import { SEND_AT_HELP, parseSendAt } from "./send-time.js";
 
@@ -441,13 +442,13 @@ export function registerActionsCommands(
     .option("--plan", PLAN_HELP)
     .option(
       "--file <path>",
-      "Pass a host-readable absolute or uploaded attachment file path (repeatable)",
+      "Upload an absolute path or file: URL from this CLI machine or pass an uploaded attachment path (repeatable)",
       collectOption,
       [],
     )
     .option(
       "--image <path>",
-      "Pass a host-readable absolute or uploaded attachment image path (repeatable)",
+      "Upload an absolute path or file: URL from this CLI machine or pass an uploaded attachment path (repeatable)",
       collectOption,
       [],
     )
@@ -563,14 +564,20 @@ async function postThreadMessage(
   args: PostThreadMessageArgs,
 ): Promise<PostThreadMessageResult> {
   const sdk = createCliBbSdk(args.getUrl());
-  const response = await sdk.threads.send({
-    threadId: args.threadId,
+  const input = await uploadClientAttachmentInputs({
     input: buildPromptInputs({
       message: args.message,
       plan: args.plan,
       files: args.files,
       images: args.images,
     }),
+    resolveProjectId: async () =>
+      (await sdk.threads.get({ threadId: args.threadId })).projectId,
+    sdk,
+  });
+  const response = await sdk.threads.send({
+    threadId: args.threadId,
+    input,
     mode:
       args.mode === "steer"
         ? "steer-if-active"
@@ -630,6 +637,8 @@ export function describeQueueWait(row: {
         : `scheduled for ${new Date(row.sendAt).toLocaleString()}`;
     case "thread-busy":
       return "waiting for the current turn to finish";
+    case "stopping":
+      return "sending once the thread finishes stopping";
     case "turn-starting":
       return "waiting for the current turn to start";
     case "provisioning":

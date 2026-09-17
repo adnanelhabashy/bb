@@ -19,6 +19,7 @@ import {
   ConfirmDeleteDialogContent,
 } from "@/components/dialogs/ConfirmDeleteDialog";
 import { AddPluginDialog } from "@/components/plugin/management/AddPluginDialog";
+import { installedPluginCatalogEntry } from "@/components/plugin/management/installed-plugin-catalog";
 import {
   ResourceListState,
   useResourceRouteLabel,
@@ -200,8 +201,15 @@ function PluginDetailToolView({ pluginId }: { pluginId: string }) {
   const selectedPlugin =
     plugins.find((plugin) => plugin.id === pluginId) ?? null;
   const selectedCatalogEntry =
-    catalogQuery.data?.entries.find((entry) => entry.pluginId === pluginId) ??
-    null;
+    selectedPlugin === null
+      ? (catalogQuery.data?.entries.find(
+          (entry) => entry.pluginId === pluginId,
+        ) ?? null)
+      : (installedPluginCatalogEntry(
+          selectedPlugin,
+          catalogQuery.data?.entries ?? [],
+          { allowSourceFallback: false },
+        ) ?? null);
   useResourceRouteLabel(
     selectedPlugin?.name ??
       selectedPlugin?.id ??
@@ -367,21 +375,7 @@ function PluginDetailToolView({ pluginId }: { pluginId: string }) {
           </ConfirmDeleteDialog>
           <AddPluginDialog
             open={installTarget !== null}
-            initial={
-              installTarget === null
-                ? null
-                : {
-                    entryId: installTarget.entryId,
-                    marketplace: installTarget.marketplace,
-                    pluginId: installTarget.pluginId,
-                    publisherLabel: installTarget.publisherLabel,
-                    displayName: installTarget.displayName,
-                    icon: installTarget.icon,
-                    iconUrl: installTarget.iconUrl,
-                    iconTinted: installTarget.iconTinted,
-                    source: installTarget.source,
-                  }
-            }
+            initial={installTarget}
             onOpenChange={(open) => {
               if (!open) setInstallTarget(null);
             }}
@@ -410,10 +404,7 @@ export function PluginsView({ pluginId }: { pluginId?: string } = {}) {
   const navigate = useNavigate();
   const focusReturnRef = useRef<HTMLButtonElement | null>(null);
   const [isPluginDetailFullPage, setIsPluginDetailFullPage] = useState(false);
-  const isInstalledDetail =
-    pluginId !== undefined &&
-    new URLSearchParams(location.search).get("view") === "installed";
-  const isPanelOpen = pluginId !== undefined && !isInstalledDetail;
+  const isPanelOpen = pluginId !== undefined;
   const catalogQuery = usePluginCatalogSearch("", { enabled: isPanelOpen });
   const listQuery = usePluginList({ enabled: true });
 
@@ -438,12 +429,15 @@ export function PluginsView({ pluginId }: { pluginId?: string } = {}) {
       if (focusTarget?.isConnected) focusTarget.focus({ preventScroll: true });
     });
   }, [location.search, navigate]);
-  const catalogEntry = catalogQuery.data?.entries.find(
-    (entry) => entry.pluginId === pluginId,
-  );
   const installedPlugin = listQuery.data?.plugins.find(
     (entry) => entry.id === pluginId,
   );
+  const catalogEntry = installedPlugin
+    ? installedPluginCatalogEntry(
+        installedPlugin,
+        catalogQuery.data?.entries ?? [],
+      )
+    : catalogQuery.data?.entries.find((entry) => entry.pluginId === pluginId);
   const panelLabel =
     catalogEntry?.displayName ??
     installedPlugin?.name ??
@@ -488,11 +482,7 @@ export function PluginsView({ pluginId }: { pluginId?: string } = {}) {
   const mainContent = (
     <div className="min-h-0 flex-1 overflow-hidden">
       <Suspense fallback={<ResourceBodyFallback />}>
-        {isInstalledDetail && pluginId !== undefined ? (
-          <PluginDetailToolView pluginId={pluginId} />
-        ) : (
-          <PluginsToolView onOpenPlugin={openPlugin} />
-        )}
+        <PluginsToolView onOpenPlugin={openPlugin} />
       </Suspense>
     </div>
   );
