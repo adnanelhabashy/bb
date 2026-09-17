@@ -21,6 +21,7 @@ import { ResourceSortMenu, ResourceToolbar } from "@bb/shared-ui/resource-list";
 import { useScrollOverflowState } from "@/components/thread/timeline/useScrollOverflowState";
 import type {
   PluginBrowseSort,
+  PluginBrowseCategoryOption,
   PluginBrowseSortDirection,
 } from "./plugin-browse-discovery";
 
@@ -42,18 +43,6 @@ const PLUGIN_BROWSE_SORT_ICONS: Record<PluginBrowseSort, IconName> = {
   "most-installed": "Download",
 };
 
-export function pluginBrowseSort(
-  value: string | null,
-): PluginBrowseSort | null {
-  return PLUGIN_BROWSE_SORTS.find((sort) => sort === value) ?? null;
-}
-
-export function pluginBrowseSortDirection(
-  value: string | null,
-): PluginBrowseSortDirection | null {
-  return value === "asc" || value === "desc" ? value : null;
-}
-
 export function pluginBrowseSortOptions(hasInstallCounts: boolean) {
   return PLUGIN_BROWSE_SORTS.map((sort) => ({
     id: sort,
@@ -63,16 +52,11 @@ export function pluginBrowseSortOptions(hasInstallCounts: boolean) {
   }));
 }
 
-export interface PluginBrowseCategoryOption {
-  id: string;
-  label: string;
-  count: number;
-}
-
 export function PluginCollectionToolbar({
   query,
   selectedCategories,
   categoryOptions,
+  showCategoryFilter = true,
   sort,
   sortDirection,
   installsKnown,
@@ -89,6 +73,7 @@ export function PluginCollectionToolbar({
   query: string;
   selectedCategories: readonly string[];
   categoryOptions: readonly PluginBrowseCategoryOption[];
+  showCategoryFilter?: boolean;
   sort: PluginBrowseSort | null;
   sortDirection: PluginBrowseSortDirection;
   installsKnown: boolean;
@@ -136,18 +121,20 @@ export function PluginCollectionToolbar({
                 })
               }
             />
-            <PluginBrowseCategoryFilter
-              value={selectedCategories}
-              options={categoryOptions}
-              onChange={(values) =>
-                changeSearchParams((next) => {
-                  next.delete("category");
-                  for (const value of values) {
-                    next.append("category", value);
-                  }
-                })
-              }
-            />
+            {showCategoryFilter ? (
+              <PluginBrowseCategoryFilter
+                value={selectedCategories}
+                options={categoryOptions}
+                onChange={(values) =>
+                  changeSearchParams((next) => {
+                    next.delete("category");
+                    for (const value of values) {
+                      next.append("category", value);
+                    }
+                  })
+                }
+              />
+            ) : null}
             {additionalControls}
           </>
         }

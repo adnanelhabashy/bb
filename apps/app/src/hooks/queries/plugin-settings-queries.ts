@@ -52,7 +52,7 @@ export interface PluginListItem {
   source: string;
   isOrphanedBuiltin: boolean;
   catalogEntryId: string | null;
-  catalogMarketplaceName?: string;
+  catalogMarketplaceName: string | null;
   categoryId?: InstalledPlugin["categoryId"];
   category?: string;
   publisherLabel: string | null;
@@ -111,7 +111,7 @@ export function toPluginListItem(plugin: InstalledPlugin): PluginListItem {
     source: plugin.source,
     isOrphanedBuiltin: plugin.isOrphanedBuiltin,
     catalogEntryId: plugin.catalogEntryId ?? null,
-    catalogMarketplaceName: plugin.catalogMarketplaceName,
+    catalogMarketplaceName: plugin.catalogMarketplaceName ?? null,
     categoryId: plugin.categoryId,
     category: plugin.category,
     publisherLabel: plugin.publisherLabel,

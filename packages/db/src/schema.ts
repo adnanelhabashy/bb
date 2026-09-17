@@ -572,6 +572,10 @@ export const threads = sqliteTable(
       (): AnySQLiteColumn => threads.id,
       { onDelete: "set null" },
     ),
+    lifecycleOwnerThreadId: text("lifecycle_owner_thread_id").references(
+      (): AnySQLiteColumn => threads.id,
+      { onDelete: "restrict" },
+    ),
     sourceThreadId: text("source_thread_id").references(
       (): AnySQLiteColumn => threads.id,
       { onDelete: "set null" },
@@ -587,12 +591,14 @@ export const threads = sqliteTable(
     pinnedAt: integer("pinned_at"),
     pinSortKey: text("pin_sort_key"),
     deletedAt: integer("deleted_at"),
+    storageDeletedAt: integer("storage_deleted_at"),
     lastReadAt: integer("last_read_at"),
     latestAttentionAt: integer("latest_attention_at").notNull(),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
+    index("threads_project_id_idx").on(table.projectId, table.id),
     index("threads_project_updated_idx").on(table.projectId, table.updatedAt),
     index("threads_project_archived_deleted_idx").on(
       table.projectId,
@@ -604,6 +610,7 @@ export const threads = sqliteTable(
       .on(table.archivedAt, table.deletedAt, table.pinSortKey, table.id)
       .where(sql`${table.pinnedAt} IS NOT NULL`),
     index("threads_environment_idx").on(table.environmentId),
+    index("threads_lifecycle_owner_idx").on(table.lifecycleOwnerThreadId),
     index("threads_parent_idx").on(table.parentThreadId),
     index("threads_source_origin_idx").on(
       table.sourceThreadId,
@@ -1142,6 +1149,78 @@ export const environmentHookOperations = sqliteTable(
     kind: text("kind").$type<"setup" | "teardown">().notNull(),
     startedAt: integer("started_at").notNull(),
     finishedAt: integer("finished_at"),
+    error: text("error"),
+  },
+);
+
+export const projectAttachments = sqliteTable(
+  "project_attachments",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    storedPath: text("stored_path").notNull(),
+    originalName: text("original_name").notNull(),
+    mimeType: text("mime_type"),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdAt: integer("created_at").notNull(),
+    readyAt: integer("ready_at"),
+    deletionClaimedAt: integer("deletion_claimed_at"),
+  },
+  (table) => [
+    uniqueIndex("project_attachments_project_path_idx").on(
+      table.projectId,
+      table.storedPath,
+    ),
+    index("project_attachments_project_created_idx").on(
+      table.projectId,
+      table.createdAt,
+    ),
+    index("project_attachments_deletion_idx")
+      .on(table.projectId, table.deletionClaimedAt, table.id)
+      .where(sql`${table.deletionClaimedAt} IS NOT NULL`),
+    check("project_attachments_size_check", sql`${table.sizeBytes} >= 0`),
+  ],
+);
+
+export const projectAttachmentThreads = sqliteTable(
+  "project_attachment_threads",
+  {
+    attachmentId: text("attachment_id")
+      .notNull()
+      .references(() => projectAttachments.id, { onDelete: "cascade" }),
+    threadId: text("thread_id")
+      .notNull()
+      .references(() => threads.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.attachmentId, table.threadId] }),
+    index("project_attachment_threads_thread_idx").on(table.threadId),
+  ],
+);
+
+export const projectAttachmentBackfills = sqliteTable(
+  "project_attachment_backfills",
+  {
+    projectId: text("project_id")
+      .primaryKey()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    phase: text("phase")
+      .$type<
+        | "files"
+        | "events"
+        | "queue"
+        | "history-thread"
+        | "history-project"
+        | "done"
+      >()
+      .notNull(),
+    threadCursor: text("thread_cursor").notNull(),
+    inputCursor: integer("input_cursor").notNull(),
+    inputId: text("input_id").notNull(),
+    inputSequence: integer("input_sequence").notNull(),
+    attemptedAt: integer("attempted_at").notNull(),
     error: text("error"),
   },
 );

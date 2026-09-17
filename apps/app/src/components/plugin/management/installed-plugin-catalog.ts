@@ -12,14 +12,21 @@ export function installedPluginCatalogEntry<
     "id" | "source" | "catalogEntryId" | "catalogMarketplaceName"
   >,
   entries: readonly Entry[],
+  { allowSourceFallback = true }: { allowSourceFallback?: boolean } = {},
 ): Entry | undefined {
   if (plugin.source.startsWith("path:")) return undefined;
+  if (
+    !allowSourceFallback &&
+    (plugin.catalogEntryId === null || plugin.catalogMarketplaceName === null)
+  ) {
+    return undefined;
+  }
   return entries.find(
     (entry) =>
       entry.pluginId === plugin.id &&
       (plugin.catalogEntryId === null ||
         entry.entryId === plugin.catalogEntryId) &&
-      (plugin.catalogMarketplaceName === undefined
+      (plugin.catalogMarketplaceName === null
         ? entry.source === plugin.source
         : entry.marketplace === plugin.catalogMarketplaceName),
   );
