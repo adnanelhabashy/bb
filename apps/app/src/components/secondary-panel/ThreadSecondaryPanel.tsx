@@ -165,7 +165,6 @@ export interface SecondaryPanelFixedTab {
 }
 
 export interface ThreadSecondaryPanelProps {
-  compactMainTabLabel?: string;
   activeTab: SecondaryFixedPanelTab | MarketplacePluginDetailPanelTab | null;
   canUseGitUi: boolean;
   gitDiffTabStatus?: GitDiffTabStatus;
@@ -208,7 +207,6 @@ export function ThreadSecondaryPanel(props: ThreadSecondaryPanelProps) {
 }
 
 function ThreadSecondaryPanelContent({
-  compactMainTabLabel,
   activeTab,
   canUseGitUi,
   gitDiffTabStatus,
@@ -733,11 +731,6 @@ function ThreadSecondaryPanelContent({
                   }
                   fixedTabs={fixedSurfaceTabs}
                   tabs={surfaceTabs}
-                  mainTab={
-                    compactMainTabLabel
-                      ? { label: compactMainTabLabel, onSelect: onClose }
-                      : undefined
-                  }
                   onOpenNewTab={showNewTabControl ? onOpenNewTab : undefined}
                 />
               ) : (
@@ -757,7 +750,7 @@ function ThreadSecondaryPanelContent({
                 })
               )}
             </div>
-            {(showOuterControls && !(renderAsDrawer && compactMainTabLabel)) ||
+            {showOuterControls ||
             onRemoveSplit ||
             usesPaneArrangementControl ? (
               <div

@@ -1,5 +1,3 @@
-import { CompactPanelTabStrip } from "@/components/secondary-panel/CompactPanelTabStrip";
-import { useIsCompactViewport } from "@bb/shared-ui/hooks/use-compact-viewport";
 import { useMemo, type ComponentProps, type ReactNode } from "react";
 import { Skeleton } from "@bb/shared-ui/skeleton";
 import { cn } from "@bb/shared-ui/lib/utils";
@@ -80,7 +78,6 @@ function ThreadDetailSecondaryContentBody({
   timeline,
 }: ThreadDetailSecondaryContentProps) {
   const composerHost = usePluginComposerHost();
-  const isCompactViewport = useIsCompactViewport();
   const { renderBrowserDeck, ...threadSecondaryPanelProps } = secondaryPanel;
 
   const forksQuery = useThreads(
@@ -126,25 +123,7 @@ function ThreadDetailSecondaryContentBody({
         drawerLabel="Thread details"
         drawerFallback={<ThreadMetadataLoadingSkeleton />}
         mainPanelId="thread-detail-timeline-panel"
-        mainHeader={
-          <>
-            {header}
-            {isCompactViewport ? (
-              <div className="flex min-w-0 shrink-0 bg-sidebar">
-                <CompactPanelTabStrip
-                  activeTabId={null}
-                  mainTab={{
-                    label: "Chat",
-                    onSelect: threadSecondaryPanelProps.onClose,
-                  }}
-                  fixedTabs={threadSecondaryPanelProps.fixedTabs}
-                  tabs={threadSecondaryPanelProps.tabs}
-                  onOpenNewTab={threadSecondaryPanelProps.onOpenNewTab}
-                />
-              </div>
-            ) : null}
-          </>
-        }
+        mainHeader={header}
         main={<ThreadTimelinePane {...timeline} footer={footer} />}
         collapse={{
           active: isConversationCollapsed,
@@ -162,7 +141,6 @@ function ThreadDetailSecondaryContentBody({
         }) => (
           <LazyThreadSecondaryPanel
             {...threadSecondaryPanelProps}
-            compactMainTabLabel="Chat"
             drawerFallback={<ThreadMetadataLoadingSkeleton />}
             renderBrowserDeck={(activeBrowserTabId, pane) =>
               renderBrowserDeck?.({
