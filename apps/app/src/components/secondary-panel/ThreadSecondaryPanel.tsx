@@ -704,7 +704,7 @@ function ThreadSecondaryPanelContent({
               CHROME_ROW_CLASS,
               "min-w-0 justify-between gap-2 px-4",
               renderAsDrawer && "gap-0 px-0",
-              renderAsDrawer && "pl-14",
+              renderAsDrawer && "pl-12",
               usesDesktopChrome && usesWindowChrome && MACOS_WINDOW_DRAG_CLASS,
               usesDesktopChrome &&
                 usesWindowChrome &&

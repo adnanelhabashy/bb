@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { Button } from "@bb/shared-ui/button";
+import { COARSE_POINTER_HEADER_ICON_BUTTON_CLASS } from "@bb/shared-ui/coarse-pointer-sizing";
 import { Icon } from "@bb/shared-ui/icon";
 import { cn } from "@bb/shared-ui/lib/utils";
 import type { SecondaryPanelFixedTab } from "./ThreadSecondaryPanel";
@@ -26,7 +27,10 @@ interface CompactTab {
   onClose: (() => void) | null;
 }
 
-const NAVIGATION_BUTTON_CLASS = "size-11 shrink-0 rounded-md p-0";
+const NAVIGATION_BUTTON_CLASS = cn(
+  "shrink-0",
+  COARSE_POINTER_HEADER_ICON_BUTTON_CLASS,
+);
 
 export function CompactPanelTabStrip({
   activeTabId,
