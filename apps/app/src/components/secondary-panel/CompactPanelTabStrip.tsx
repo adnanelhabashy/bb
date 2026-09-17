@@ -21,6 +21,7 @@ interface CompactPanelTabStripProps {
 interface CompactTab {
   id: string | null;
   label: string;
+  ariaLabel: string;
   onSelect: () => void;
   onClose: (() => void) | null;
 }
@@ -37,10 +38,13 @@ export function CompactPanelTabStrip({
   const activeTabRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const items: CompactTab[] = [
-    ...(mainTab ? [{ id: null, ...mainTab, onClose: null }] : []),
+    ...(mainTab
+      ? [{ id: null, ...mainTab, ariaLabel: mainTab.label, onClose: null }]
+      : []),
     ...fixedTabs.map((tab) => ({
       id: tab.tab.id,
       label: tab.label,
+      ariaLabel: tab.ariaLabel,
       onSelect: tab.onSelect,
       onClose: null,
     })),
@@ -49,6 +53,7 @@ export function CompactPanelTabStrip({
       .map((tab) => ({
         id: tab.tab.id,
         label: tab.label,
+        ariaLabel: tab.label,
         onSelect: tab.onSelect,
         onClose: tab.isPinned ? null : tab.onClose,
       })),
@@ -111,6 +116,7 @@ export function CompactPanelTabStrip({
               <Button
                 variant="ghost"
                 className="h-11 min-w-11 max-w-40 px-3 text-sm"
+                aria-label={tab.ariaLabel}
                 aria-pressed={tab.id === activeTabId}
                 onClick={tab.onSelect}
               >

@@ -16,7 +16,7 @@ function NavigationFixture() {
     {
       tab: { id: "thread-info", kind: "thread-info" },
       label: "Info",
-      ariaLabel: "Thread info",
+      ariaLabel: "Info",
       title: "Thread info",
       leadingVisual: null,
       onSelect: () => setActiveTabId("thread-info"),
