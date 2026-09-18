@@ -39,10 +39,18 @@ import {
 import { z } from "zod";
 import {
   assertPathExists,
+  resolveArcRuntimeSeedRoot,
   resolveDesktopBridgePath,
   resolveDesktopIconPath,
   type DesktopPathContext,
 } from "./app-paths.js";
+import { prepareArcManagedRuntimes } from "./arc-runtime/bootstrap.js";
+import {
+  buildArcManagedRuntimeEnvironment,
+  resolveActiveArcRuntimes,
+} from "./arc-runtime/environment.js";
+import { resolveArcPlatformIdentity } from "./arc-runtime/manifest.js";
+import { createArcRuntimePaths } from "./arc-runtime/paths.js";
 import {
   resolveBbAppProcessRuntime,
   type BbAppProcess,
@@ -1965,11 +1973,53 @@ function registerDesktopBrowserWindowLifecycle({
 async function spawnOwnedRuntime(
   args: StartOwnedRuntimeArgs,
 ): Promise<OwnedRuntime> {
+  const arcRuntimePaths = createArcRuntimePaths({
+    userDataPath: args.userDataPath,
+  });
+  const arcPlatform = resolveArcPlatformIdentity({
+    arch: process.arch,
+    platform: process.platform,
+  });
+  try {
+    const bootstrapResults = await prepareArcManagedRuntimes({
+      createdByArcVersion: app.getVersion(),
+      onDiagnostic: (message) => {
+        desktopLogger.warn(message);
+      },
+      platform: arcPlatform,
+      runtimePaths: arcRuntimePaths,
+      seedRoot: resolveArcRuntimeSeedRoot({ paths: createDesktopPathContext() }),
+    });
+    for (const result of bootstrapResults) {
+      if (result.action === "installed" || result.action === "repaired") {
+        desktopLogger.info(`[arc-runtime] ${result.detail}`);
+      }
+    }
+  } catch (error) {
+    desktopLogger.warn(
+      `[arc-runtime] managed runtime bootstrap failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+  const activeArcRuntimes = await resolveActiveArcRuntimes({
+    createdByArcVersion: app.getVersion(),
+    onDiagnostic: (message) => {
+      desktopLogger.warn(message);
+    },
+    platform: arcPlatform,
+    runtimePaths: arcRuntimePaths,
+  });
   const bbProcess = startBbAppProcess({
     bridgePath: args.bridgePath,
     cwd: homedir(),
     env: {
-      ...process.env,
+      ...buildArcManagedRuntimeEnvironment({
+        activeRuntimes: activeArcRuntimes,
+        env: process.env,
+        platform: process.platform,
+        runtimePaths: arcRuntimePaths,
+      }),
       [APP_SURFACE_ENV_NAME]: APP_SURFACE_DESKTOP,
     },
     logLineLimit: PROCESS_LOG_LINE_LIMIT,

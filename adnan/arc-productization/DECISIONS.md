@@ -1,0 +1,147 @@
+# Arc Productization — Architecture Decision Record
+
+Initialized from `ARC_AGENT_PRODUCTIZATION_EXECUTION_PLAN.md` §37 during Phase 0 (2026-09-18).
+Status legend: Accepted · Pending verification · Blocked.
+Every later architectural deviation requires adding or updating an ADR here.
+
+## ADR-001 Arc exposes three agent engines only: OMP, Codex, Claude Code
+
+Status: **Accepted** (verified against source)
+Upstream registers `codex`, `claude-code`, `acp-omp` plus `pi` (own plugin) and ACP known agents `acp-opencode`, `acp-cursor`, `acp-grok`, `acp-hermes-agent`. Arc will gate presentation of the non-target agents; provider IDs `codex` / `claude-code` / `acp-omp` stay stable to protect persisted threads and role mappings.
+
+## ADR-002 Codex and OMP are intended as Arc-managed runtimes
+
+Status: **Accepted** (with implementation notes)
+Codex is Apache-2.0, OMP is MIT; both provide standalone darwin-arm64 release artifacts with digests. Arc-managed copies live under Application Support, seeded from the signed bundle, verified by digest + `--version`.
+Implementation notes from Phase 0: Codex needs a small plugin patch (env passthrough for `BB_CODEX_BRIDGE_APP_SERVER_COMMAND/_ARGS` + a `codexExecutable()` probe helper) for honest health/status; OMP resolves via child-PATH (`omp acp` bare command), so PATH injection suffices without a plugin patch.
+
+## ADR-003 Claude Code uses an Anthropic-supported managed installation until redistribution rights are confirmed
+
+Status: **Accepted**
+Claude Code is © Anthropic PBC, all rights reserved / Commercial Terms — NOT redistributable. Arc drives Anthropic's official installer through the existing host-daemon PTY install channel (already streams progress to UI, no Terminal needed) and pins the result via `BB_CLAUDE_CODE_EXECUTABLE` (verified: sole declared passthrough, X_OK-validated, honored by execution/probe/health/install/usage). Open item: sign-in is currently a hint string only; an authenticate action over the same PTY channel is required later.
+
+## ADR-004 Arc does not modify the user's global PATH
+
+Status: **Accepted**
+No writes to `.zshrc`/`.bashrc`/`~/.profile`; no global installs as the product design. Verified: no existing code path does this.
+
+## ADR-005 Arc may inject its own runtime paths into its owned child processes
+
+Status: **Accepted** (verified seam)
+`spawnOwnedRuntime` (apps/desktop/src/main.ts:1965) constructs the owned BB child env (`{...process.env, APP_SURFACE: desktop}`). Private runtime bin dirs will be prepended there — child's PATH only, user shell untouched.
+
+## ADR-006 Underlying systems remain owners of credentials
+
+Status: **Accepted**
+Codex credentials → Codex / Account Pool; Claude credentials → Claude / Account Pool; OMP credentials → OMP auth storage/broker. Mission Control KV stores metadata only. Verified: Account Pool secrets are 0600 files outside plugin KV; providers keep their own auth stores.
+
+## ADR-007 Account Pool is reused for Codex/Claude multi-account functionality
+
+Status: **Accepted** (verified)
+Account Pool upstream provides both providers' login flows (Codex device-code, Claude PKCE + import), 0600 atomic secret storage, enable/disable, priority/reorder, per-account usage refresh, routing hub, and stable identity (`accountUuid`, `codexAccountId`). Arc builds presentation ("AI Accounts") on top; no rewrite.
+
+## ADR-008 OMP remains owner of OMP provider accounts
+
+Status: **Accepted**
+Arc gets an `OmpAccountAdapter`, not per-vendor services. OMP owns provider auth and exposes machine-readable account/usage interfaces; exact CLI/API surface must be verified against the pinned Arc-managed OMP binary before parsing (plan §3.5).
+
+## ADR-009 Usage becomes source-agnostic
+
+Status: **Pending verification** (port required)
+The generic `provider-usage.v1.listResources` / `getResource` contract exists ONLY upstream (`plugins/provider-usage/*`, implementers: codex, claude-code, acp, account-pool). Local checkout and installed app use the old per-provider `provider.usage` host RPC; Mission Control uses its own direct+pool dashboard. Port/adopt the upstream contract (Phase 9), then migrate Mission Control incrementally (plan §34).
+
+## ADR-010 Accounts are deduplicated only using trustworthy canonical identity, never by email alone
+
+Status: **Accepted**
+Canonical keys verified available: `openai:chatgpt:<accountId>`, `anthropic:account:<accountUuid>`. OMP-side equivalence must be proven against real OMP output before merging OMP-exposed accounts with direct/pool ones; email alone never merges.
+
+## ADR-011 Arc update channel is independent from BB
+
+Status: **Pending verification** (currently VIOLATED at source level)
+Generated Electron config still contains `publish.url = https://github.com/get-bb/bb/releases/download/desktop-latest/` and `appId = dev.bb.desktop`. Runtime auto-update is disabled by default (`BB_DESKTOP_AUTO_UPDATE=1` gate) and the installed app ships no app-update.yml, so no live overwrite risk today — but the config-level fix is mandatory in Phase 12. Arc identity (appId, release tags, feed URL) pending user approval.
+
+## ADR-012 BB upstream updates are maintainer-controlled syncs, never end-user updates
+
+Status: **Accepted** (verified)
+`upstream` remote exists → get-bb/bb. Sync flow: upstream/main → sync branch → Arc integration/tests → Arc release. No auto-merge into production. Arc invariant checker (plan §13) to be added.
+
+## ADR-013 No automatic quota-driven model rerouting in v1
+
+Status: **Accepted**
+Role Router keeps current mappings; account/usage health is advisory metadata only. Pooled routing is opt-in and visible, never silent rotation to evade limits.
+
+## ADR-014 First polished target is macOS Apple Silicon
+
+Status: **Accepted**
+Local dev machine darwin-arm64; desktop config builds dmg/zip arm64 only; entitlements/hardenedRuntime configured. Linux AppImage path exists upstream but is out of v1 polish scope.
+
+## ADR-015 Arc-managed Claude executable wins for Arc-owned runtimes; otherwise existing override untouched
+
+Status: **Accepted** (implemented in Phase 1)
+`buildArcManagedRuntimeEnvironment` (apps/desktop/src/arc-runtime/environment.ts) sets `BB_CLAUDE_CODE_EXECUTABLE` only when an active verified Arc-managed Claude runtime exists, and that value overrides any pre-existing environment value for the Arc-owned BB child process. When no Arc Claude is active, a user-supplied `BB_CLAUDE_CODE_EXECUTABLE` in the environment passes through untouched. Codex and OMP have no env override in Phase 1: Codex relies on prepended private PATH (explicit override deferred to the Codex provider-source port), OMP resolves `omp acp` via private PATH.
+
+## ADR-016 Runtime manifest is authoritative for activation, but filesystem existence is required
+
+Status: **Accepted** (implemented in Phase 2)
+A runtime is active only when `runtime-manifest.json` names an `activeVersion` AND the resolved executable exists, is a regular file, and is executable (X_OK on POSIX). A manifest entry whose binary is missing is stale metadata: it is skipped, diagnosed, and never activated. The manifest lives at `<userData>/arc-runtimes/runtime-manifest.json` (schema version 1, Zod-validated), written atomically (tmp file with `wx` + rename, mode 0600) following the `packages/config/src/managed-json-file.ts` pattern. `createdByArcVersion` temporarily records the desktop app version (`app.getVersion()`) until independent Arc version metadata exists.
+
+## ADR-017 Unmanaged binaries are never auto-activated
+
+Status: **Accepted** (implemented in Phase 2)
+A runtime binary on disk without a manifest `activeVersion` is never activated. Activation is explicit managed state only. This protects rollback and staging semantics (`staging/`, previous-version dirs).
+
+## ADR-018 Newer-than-tested runtime versions are "untested", not automatically supported
+
+Status: **Accepted** (implemented in Phase 2)
+`evaluateArcRuntimeCompatibility` (apps/desktop/src/arc-runtime/compatibility.ts, semver-based) returns: below minimum → blocked; explicit known-bad list → blocked; newer than `maximumTested` → untested; within a recorded tested range → supported. No `maximumTested` recorded → untested. Malformed versions and runtimes without policy → untested, never crash, never silently "supported". The shipped bootstrap policy records only Codex `minimum: 0.136.0` (source: upstream `plugins/provider-codex` `minimumSupportedVersion`, fetched during Phase 0; provider sources absent locally). Tested maximums are pinned when runtimes are introduced in Phases 3–5 — no untested version is claimed supported.
+
+## ADR-019 Future manifest schema versions are never overwritten by an older Arc release
+
+Status: **Accepted** (implemented in Phase 2)
+`readArcRuntimeManifest` returns a distinct `unsupported-version` result when `schemaVersion` exceeds the release's supported version; the file is preserved byte-for-byte, no managed runtimes are activated, and startup continues on system PATH. Missing/malformed/invalid manifests recover to a default empty manifest without crashing the desktop app.
+
+## ADR-020 Codex ships as an immutable verified seed; Arc executes a userData copy, never the seed
+
+Status: **Accepted** (implemented in Phase 3)
+The signed application bundle carries the pinned Codex executable as a read-only seed at `Contents/Resources/arc-runtimes/codex/0.155.1/codex`. On first launch Arc copies it to `<userData>/arc-runtimes/runtimes/codex/0.155.1/codex` and executes only that copy. This keeps the signed bundle immutable while allowing later independent runtime updates and rollback without touching the app bundle.
+
+## ADR-021 Runtime assets are digest-verified and version-probed before packaging and before activation; manifest activation is the last step
+
+Status: **Accepted** (implemented in Phase 3)
+Build acquisition (`scripts/prepare-arc-runtimes.mts` → `src/arc-runtime/acquire.ts`) verifies the downloaded archive SHA-256, rejects unexpected archive structure (single-entry enforcement, no absolute paths, no `..`, exact expected entry name, regular-file check after extraction), renames the executable to exactly `codex`, and probes `<binary> --version` against the pinned expected version before staging. Runtime bootstrap (`src/arc-runtime/bootstrap.ts`) repeats seed digest + probe, then verifies the staged copy's digest + probe, moves it into place, and only then writes the runtime manifest. Any failure leaves the manifest unchanged.
+
+## ADR-022 The bundled seed never force-downgrades a valid managed runtime; a broken different-version runtime is not silently replaced
+
+Status: **Accepted** (implemented in Phase 3)
+If the manifest records a valid active Codex version different from the bundled pin, the existing runtime is kept (seed is a bootstrap fallback, not a downgrade mechanism). If a different active version is broken (executable missing), Arc reports a `kept-broken` diagnostic state and leaves recovery to the explicit repair/update flow (Phase 11). Same-pin damage (active version equals the pin but binary missing/broken) is repaired from the trusted seed with full re-verification.
+
+## ADR-023 Codex uses the Arc child PATH; no explicit executable override is added in Phase 3
+
+Status: **Accepted** (verified against the installed provider artifact)
+The prebuilt provider-codex host artifact resolves a bare `"codex"` command from `process.env.PATH` at launch, version probe, and health sites (verified by inspecting `~/.bb/plugin-host-artifacts/provider-codex/*/host.mjs`). Phase 1's private PATH injection therefore suffices; no provider source was ported and no new env override invented. Honest install-source/health cosmetics (npm-global detection) remain a known gap for a later provider-source phase.
+
+## ADR-024 Steady-state startup trusts the recorded manifest digest; full verification runs on install, repair, and anomaly
+
+Status: **Accepted** (implemented in Phase 3)
+On a normal launch with the pinned version already active and its executable present and runnable, Arc reuses the managed copy without re-hashing the ~229 MB binary or re-probing it; the digest recorded in the manifest at install time is the integrity anchor, and the runtime directory lives privately under userData. If the executable is missing/broken, or the manifest digest is absent, full verification (re-hash and/or re-probe) runs before any manifest change. Security never relies on filename alone: activation still requires manifest state plus filesystem checks.
+
+## ADR-025 The runtime release model supports both archive and direct-executable artifact kinds in one pipeline
+
+Status: **Accepted** (implemented in Phase 4)
+Pinned release metadata carries an `artifactKind` of `"archive"` (Codex `.tar.gz`, single extracted executable) or `"executable"` (OMP standalone binary, staged directly). Download caching, SHA-256 verification, version probing, seed publishing, bootstrap, and manifest activation are shared; only the staging step branches on the kind. For direct assets `sha256` and `executableSha256` are the same file and must be identical. No parallel OMP-only pipeline was created. Trusted download URL allowlists are per-runtime; runtimes without a recorded origin are rejected at validation.
+
+## ADR-026 Arc-managed OMP is config-isolated via OMP's own verified path overrides, set only on Arc's child environment
+
+Status: **Accepted** (implemented in Phase 4)
+Arc's managed OMP receives `PI_CODING_AGENT_DIR=<userData>/omp/agent` and, when the userData directory sits inside the user's home (the macOS case), `PI_CONFIG_DIR` as the home-relative path to `<userData>/omp`. Both variables are verified oh-my-pi v18.2.6 overrides (`packages/utils/src/dirs.ts`); no invented `OMP_*` variables are used. They are set exclusively on the Arc-owned BB child environment, so the user's standalone OMP installation and normal terminals are untouched. External `~/.claude`/`~/.codex`/`~/.gemini` model-config reads remain capability-gated and shared by design.
+
+## ADR-027 OMP compatibility is exactly the first tested pin until evidence exists
+
+Status: **Accepted** (implemented in Phase 4)
+No minimum OMP version is verifiable from the BB ACP integration, so the policy records `18.2.6` as both minimum and tested maximum: exactly `18.2.6` is "supported", newer is "untested", older is "blocked" from auto-activation. The range is widened only with per-version compatibility evidence, never because a release is newer.
+
+## ADR-028 The prebuilt ACP provider launches Arc OMP through the private child PATH; no provider source is ported
+
+Status: **Accepted** (verified in Phase 4)
+The installed provider-acp host artifact declares `acp-omp` with launch `command: "omp"`, `args: ["acp"]`, and resolves commands against the process PATH (bundled `resolveCommand`/`which` machinery). Arc's Phase 1 PATH injection therefore suffices end to end; the integration is proven at protocol level by an ACP `initialize` handshake against the real pinned binary running from the Arc runtime directory. Provider-acp source remains unported, consistent with ADR-023.
+

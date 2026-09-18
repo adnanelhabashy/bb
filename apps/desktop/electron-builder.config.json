@@ -8,6 +8,12 @@
   "afterPack": "scripts/prepare-native-modules.cjs",
   "asar": true,
   "asarUnpack": ["dist/bb-app-bridge.mjs", "node_modules/**"],
+  "extraResources": [
+    {
+      "from": "resources/arc-runtimes",
+      "to": "arc-runtimes"
+    }
+  ],
   "directories": {
     "buildResources": "assets",
     "output": "release"

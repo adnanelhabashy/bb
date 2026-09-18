@@ -16,6 +16,19 @@ interface ResolveDesktopIconPathArgs {
   paths: DesktopPathContext;
 }
 
+interface ResolveArcRuntimeSeedRootArgs {
+  paths: DesktopPathContext;
+}
+
+export function resolveArcRuntimeSeedRoot(
+  args: ResolveArcRuntimeSeedRootArgs,
+): string {
+  if (args.paths.isPackaged) {
+    return join(args.paths.resourcesPath, "arc-runtimes");
+  }
+  return join(args.paths.appPath, "resources", "arc-runtimes");
+}
+
 interface AssertPathExistsArgs {
   label: string;
   path: string;
