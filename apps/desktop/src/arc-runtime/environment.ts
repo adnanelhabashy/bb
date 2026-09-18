@@ -19,6 +19,14 @@ export const BB_CLAUDE_CODE_EXECUTABLE_ENV = "BB_CLAUDE_CODE_EXECUTABLE";
 export const OMP_CONFIG_DIR_ENV = "PI_CONFIG_DIR";
 export const OMP_CODING_AGENT_DIR_ENV = "PI_CODING_AGENT_DIR";
 
+// Verified against Anthropic's Claude Code installation docs: these env vars
+// disable background auto-updates for the Claude process that sees them
+// (`claude doctor` reports "disabled (set by env: DISABLE_UPDATES)"). They are
+// set only on Arc's owned child environment; the user's independent Claude
+// installations keep their own update policy.
+export const CLAUDE_DISABLE_AUTOUPDATER_ENV = "DISABLE_AUTOUPDATER";
+export const CLAUDE_DISABLE_UPDATES_ENV = "DISABLE_UPDATES";
+
 const PATH_PRECEDENCE: readonly ArcRuntimeId[] = [
   "codex",
   "omp",
@@ -159,6 +167,11 @@ export function buildArcManagedRuntimeEnvironment(
     nextEnv[BB_CLAUDE_CODE_EXECUTABLE_ENV] = resolve(
       activeClaude.executablePath,
     );
+    // Arc decides when its managed Claude updates (Phase 11); the Arc-owned
+    // provider process must not self-mutate underneath the manifest. The
+    // user's independent Claude installs never see these variables.
+    nextEnv[CLAUDE_DISABLE_AUTOUPDATER_ENV] = "1";
+    nextEnv[CLAUDE_DISABLE_UPDATES_ENV] = "1";
   }
 
   const activeOmp = activeById.get("omp");

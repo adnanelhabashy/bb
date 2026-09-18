@@ -1,0 +1,404 @@
+import { prepareArcManagedRuntimes } from "../arc-runtime/bootstrap.js";
+import {
+  prepareManagedClaudeCode,
+  type PrepareManagedClaudeCodeArgs,
+} from "../arc-runtime/claude-setup.js";
+import {
+  ARC_RUNTIME_COMPATIBILITY_POLICY,
+  evaluateArcRuntimeCompatibility,
+} from "../arc-runtime/compatibility.js";
+import { readArcRuntimeManifest } from "../arc-runtime/manifest.js";
+import type { ArcRuntimePaths } from "../arc-runtime/paths.js";
+import {
+  ARC_CLAUDE_CODE_RELEASE,
+  ARC_CODEX_RELEASE,
+  ARC_OMP_RELEASE,
+  type ArcRuntimeRelease,
+} from "../arc-runtime/releases.js";
+import type { ArcRuntimeId } from "../arc-runtime/types.js";
+import {
+  ARC_AGENT_CATALOG,
+  getArcAgentDescriptor,
+} from "./catalog.js";
+import { isExecutableFile } from "../arc-runtime/claude-discovery.js";
+import {
+  ArcAgentError,
+  type ArcAgentAccountState,
+  type ArcAgentAction,
+  type ArcAgentId,
+  type ArcAgentOverallState,
+  type ArcAgentProviderState,
+  type ArcAgentRuntimeState,
+  type ArcAgentRuntimeStatus,
+  type ArcAgentStatus,
+} from "./types.js";
+
+// Provider health is not yet queryable from the desktop layer without
+// coupling to BB internals, so the default source reports "unknown" rather
+// than fabricating readiness. A real implementation (server RPC, host
+// maintenance API) can be injected later without touching the manager.
+export interface ArcProviderStatusSource {
+  getProviderStatus(providerId: string): Promise<ArcAgentProviderState>;
+}
+
+export class UnknownArcProviderStatusSource implements ArcProviderStatusSource {
+  async getProviderStatus(): Promise<ArcAgentProviderState> {
+    return "unknown";
+  }
+}
+
+export interface ArcAgentManagerArgs {
+  createdByArcVersion: string;
+  platform: string;
+  runtimePaths: ArcRuntimePaths;
+  seedRoot?: string;
+  providerStatusSource?: ArcProviderStatusSource;
+  onDiagnostic?: (message: string) => void;
+  now?: () => number;
+  // Test seams forwarded to the lower-level runtime services.
+  releases?: Partial<Record<ArcRuntimeId, ArcRuntimeRelease>>;
+  download?: PrepareManagedClaudeCodeArgs["download"];
+  runDoctor?: PrepareManagedClaudeCodeArgs["runDoctor"];
+  verifyCodeSignature?: PrepareManagedClaudeCodeArgs["verifyCodeSignature"];
+}
+
+export class ArcAgentManager {
+  private readonly createdByArcVersion: string;
+  private readonly platform: string;
+  private readonly runtimePaths: ArcRuntimePaths;
+  private readonly seedRoot: string | undefined;
+  private readonly providerStatusSource: ArcProviderStatusSource;
+  private readonly onDiagnostic: ((message: string) => void) | undefined;
+  private readonly now: () => number;
+  private readonly releases:
+    | Partial<Record<ArcRuntimeId, ArcRuntimeRelease>>
+    | undefined;
+  private readonly download: PrepareManagedClaudeCodeArgs["download"];
+  private readonly runDoctor: PrepareManagedClaudeCodeArgs["runDoctor"];
+  private readonly verifyCodeSignature: PrepareManagedClaudeCodeArgs["verifyCodeSignature"];
+  private readonly inFlight = new Map<ArcAgentId, Promise<void>>();
+
+  constructor(args: ArcAgentManagerArgs) {
+    this.createdByArcVersion = args.createdByArcVersion;
+    this.platform = args.platform;
+    this.runtimePaths = args.runtimePaths;
+    this.seedRoot = args.seedRoot;
+    this.providerStatusSource =
+      args.providerStatusSource ?? new UnknownArcProviderStatusSource();
+    this.onDiagnostic = args.onDiagnostic;
+    this.now = args.now ?? Date.now;
+    this.releases = args.releases;
+    this.download = args.download;
+    this.runDoctor = args.runDoctor;
+    this.verifyCodeSignature = args.verifyCodeSignature;
+  }
+
+  // Side-effect-free: never downloads, repairs, or writes. Status reads may
+  // race with an in-flight operation; the atomic manifest write means they
+  // observe the manifest before or after, never a torn state.
+  async listArcAgents(): Promise<ArcAgentStatus[]> {
+    return Promise.all(
+      ARC_AGENT_CATALOG.map((descriptor) => this.getArcAgent(descriptor.id)),
+    );
+  }
+
+  async getArcAgent(id: ArcAgentId): Promise<ArcAgentStatus> {
+    const descriptor = getArcAgentDescriptor(id);
+    if (descriptor === undefined) {
+      throw new ArcAgentError("unsupported-agent", `unknown Arc agent "${id}"`);
+    }
+
+    const preparing = this.inFlight.has(id);
+    const runtime = await this.resolveRuntimeStatus(
+      descriptor.runtimeId,
+      preparing,
+    );
+    const providerState = await this.providerStatusSource.getProviderStatus(
+      descriptor.providerId,
+    );
+    const accountState: ArcAgentAccountState = "unknown";
+    const overallState = resolveOverallState(
+      runtime.state,
+      accountState,
+    );
+
+    return {
+      id: descriptor.id,
+      displayName: descriptor.displayName,
+      runtimeId: descriptor.runtimeId,
+      providerId: descriptor.providerId,
+      runtime,
+      provider: { state: providerState },
+      account: { state: accountState },
+      overallState,
+      actions: resolveActions(runtime.state),
+      observedAt: this.now(),
+    };
+  }
+
+  // Restores an Arc-managed runtime for the agent. Idempotent: a healthy
+  // runtime is reused, never re-downloaded or reinstalled. Resolves with the
+  // refreshed status observed after the operation completes.
+  async prepareAgent(id: ArcAgentId): Promise<ArcAgentStatus> {
+    await this.runExclusive(id, async () => {
+      if (id === "claude-code") {
+        const result = await prepareManagedClaudeCode({
+          createdByArcVersion: this.createdByArcVersion,
+          download: this.download,
+          onDiagnostic: this.onDiagnostic,
+          platform: this.platform,
+          release: this.releases?.["claude-code"] ?? ARC_CLAUDE_CODE_RELEASE,
+          runDoctor: this.runDoctor,
+          runtimePaths: this.runtimePaths,
+          verifyCodeSignature: this.verifyCodeSignature,
+        });
+        if (result.state !== "ready") {
+          throw new ArcAgentError("runtime-prepare-failed", result.detail);
+        }
+      } else {
+        await this.prepareBundledManagedRuntime(
+          id,
+          "runtime-prepare-failed",
+        );
+      }
+    });
+    return this.getArcAgent(id);
+  }
+
+  // Repairs the currently intended managed runtime in place: same-version
+  // restoration from the trusted seed (Codex/OMP) or the official setup flow
+  // (Claude). Repair never changes the active version and never touches
+  // credentials or account data.
+  async repairAgent(id: ArcAgentId): Promise<ArcAgentStatus> {
+    const current = await this.getArcAgent(id);
+    if (current.runtime.state === "not-prepared") {
+      throw new ArcAgentError(
+        "runtime-repair-failed",
+        `${id} has no managed runtime recorded; use prepare instead`,
+      );
+    }
+    await this.runExclusive(id, async () => {
+      if (id === "claude-code") {
+        const result = await prepareManagedClaudeCode({
+          createdByArcVersion: this.createdByArcVersion,
+          download: this.download,
+          onDiagnostic: this.onDiagnostic,
+          platform: this.platform,
+          release: this.releases?.["claude-code"] ?? ARC_CLAUDE_CODE_RELEASE,
+          runDoctor: this.runDoctor,
+          runtimePaths: this.runtimePaths,
+          verifyCodeSignature: this.verifyCodeSignature,
+        });
+        if (result.state !== "ready") {
+          throw new ArcAgentError("runtime-repair-failed", result.detail);
+        }
+      } else {
+        await this.prepareBundledManagedRuntime(id, "runtime-repair-failed");
+      }
+    });
+    return this.getArcAgent(id);
+  }
+
+  // Single-flight per agent: a duplicate prepare/repair for the same agent
+  // joins the in-flight operation instead of racing it (two Claude setup
+  // clicks must not start two downloads). Operations for different agents
+  // run concurrently; the serialized manifest mutation is their only shared
+  // critical section.
+  private async runExclusive(
+    id: ArcAgentId,
+    operation: () => Promise<void>,
+  ): Promise<void> {
+    const existing = this.inFlight.get(id);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const pending = operation()
+      .then(() => undefined)
+      .finally(() => {
+        if (this.inFlight.get(id) === pending) {
+          this.inFlight.delete(id);
+        }
+      });
+    this.inFlight.set(id, pending);
+    return pending;
+  }
+
+  private async prepareBundledManagedRuntime(
+    id: ArcAgentId & ("codex" | "omp"),
+    errorCode: "runtime-prepare-failed" | "runtime-repair-failed",
+  ): Promise<void> {
+    if (this.seedRoot === undefined) {
+      throw new ArcAgentError(
+        errorCode,
+        `${id} uses a bundled-managed runtime but no seed root is configured`,
+      );
+    }
+    const pinned = this.releases?.[id] ??
+      (id === "codex" ? ARC_CODEX_RELEASE : ARC_OMP_RELEASE);
+    const results = await prepareArcManagedRuntimes({
+      createdByArcVersion: this.createdByArcVersion,
+      onDiagnostic: this.onDiagnostic,
+      platform: this.platform,
+      releases: [pinned],
+      runtimePaths: this.runtimePaths,
+      seedRoot: this.seedRoot,
+    });
+    const result = results[0];
+    if (
+      result === undefined ||
+      (result.action !== "installed" &&
+        result.action !== "already-active" &&
+        result.action !== "repaired" &&
+        result.action !== "kept-existing")
+    ) {
+      throw new ArcAgentError(
+        errorCode,
+        result?.detail ?? "bundled runtime bootstrap produced no result",
+      );
+    }
+  }
+
+  private async resolveRuntimeStatus(
+    runtimeId: ArcRuntimeId,
+    preparing: boolean,
+  ): Promise<ArcAgentRuntimeStatus> {
+    const manifestResult = await readArcRuntimeManifest({
+      createdByArcVersion: this.createdByArcVersion,
+      manifestPath: this.runtimePaths.manifestPath,
+      platform: this.platform,
+    });
+
+    if (manifestResult.kind === "unsupported-version") {
+      return {
+        state: "unavailable",
+        version: null,
+        compatibility: null,
+        compatibilityReason: `manifest declares unsupported schema version ${manifestResult.schemaVersion}`,
+        source: null,
+      };
+    }
+    if (manifestResult.kind === "invalid") {
+      return {
+        state: "unavailable",
+        version: null,
+        compatibility: null,
+        compatibilityReason: manifestResult.problem,
+        source: null,
+      };
+    }
+
+    const entry = manifestResult.manifest.runtimes[runtimeId];
+    if (entry.activeVersion === null) {
+      return {
+        state: preparing ? "preparing" : "not-prepared",
+        version: null,
+        compatibility: null,
+        compatibilityReason: null,
+        source: null,
+      };
+    }
+
+    const version = entry.activeVersion;
+    const evaluation = evaluateArcRuntimeCompatibility({
+      policy: ARC_RUNTIME_COMPATIBILITY_POLICY,
+      runtimeId,
+      version,
+    });
+    const runnable = await isExecutableFile(
+      this.runtimePaths.executablePath(runtimeId, version),
+    );
+
+    let state: ArcAgentRuntimeState;
+    if (!runnable) {
+      state = "broken";
+    } else if (evaluation.compatibility === "blocked") {
+      state = "unsupported";
+    } else if (evaluation.compatibility === "untested") {
+      state = "ready-with-warning";
+    } else {
+      state = "ready";
+    }
+    if (preparing) {
+      state = "preparing";
+    }
+
+    return {
+      state,
+      version,
+      compatibility: evaluation.compatibility,
+      compatibilityReason: evaluation.reason,
+      source: entry.source,
+    };
+  }
+}
+
+function resolveOverallState(
+  runtimeState: ArcAgentRuntimeState,
+  accountState: ArcAgentAccountState,
+): ArcAgentOverallState {
+  switch (runtimeState) {
+    case "unavailable":
+      return "unavailable";
+    case "broken":
+      return "broken";
+    case "unsupported":
+      return "unsupported";
+    case "not-prepared":
+      return "not-prepared";
+    case "preparing":
+      return "preparing";
+    case "ready":
+    case "ready-with-warning":
+      // A runtime can execute; whether a real coding turn can run depends on
+      // the account, which Phase 6 does not inspect. Account "connected" is
+      // the only honest "ready" today; anything else is runtime-ready.
+      return accountState === "connected" ? "ready" : "runtime-ready";
+  }
+}
+
+function resolveActions(runtimeState: ArcAgentRuntimeState): ArcAgentAction[] {
+  const prepareAvailable = runtimeState === "not-prepared";
+  const repairAvailable = runtimeState === "broken";
+  return [
+    {
+      id: "prepare",
+      available: prepareAvailable,
+      reason: prepareAvailable
+        ? undefined
+        : runtimeState === "broken"
+          ? "runtime is prepared but broken; use repair"
+          : "runtime is already prepared",
+    },
+    {
+      id: "repair",
+      available: repairAvailable,
+      reason: repairAvailable
+        ? undefined
+        : runtimeState === "not-prepared"
+          ? "nothing recorded to repair; use prepare"
+          : runtimeState === "unsupported"
+            ? "compatibility is blocked; repair cannot change the version"
+            : "runtime is not broken",
+    },
+    {
+      id: "connect-account",
+      available: false,
+      reason: "Account connection arrives in a later Arc release",
+    },
+    {
+      id: "update",
+      available: false,
+      reason: "Runtime updates arrive in a later Arc release",
+    },
+    {
+      id: "rollback",
+      available: false,
+      reason: "Runtime rollback arrives in a later Arc release",
+    },
+    {
+      id: "open-settings",
+      available: false,
+      reason: "No agent settings surface exists yet",
+    },
+  ];
+}

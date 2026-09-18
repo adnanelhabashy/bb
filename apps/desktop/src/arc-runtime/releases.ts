@@ -1,7 +1,10 @@
 import { valid } from "semver";
 import type { ArcRuntimeId } from "./types.js";
 
-export type ArcRuntimeArtifactKind = "archive" | "executable";
+export type ArcRuntimeArtifactKind =
+  | "archive"
+  | "executable"
+  | "direct-official";
 
 export interface ArcRuntimeRelease {
   runtimeId: ArcRuntimeId;
@@ -17,15 +20,26 @@ export interface ArcRuntimeRelease {
   license: string;
 }
 
-const TRUSTED_RELEASE_DOWNLOAD_ORIGIN = "https://github.com";
-const TRUSTED_RELEASE_DOWNLOAD_HOST = "github.com";
+interface TrustedReleaseOrigin {
+  host: string;
+  pathPrefix: string;
+}
 
-const TRUSTED_RELEASE_DOWNLOAD_PATH_PREFIXES: Partial<
-  Record<ArcRuntimeId, string>
-> = {
-  codex: "/openai/codex/releases/download/",
-  omp: "/can1357/oh-my-pi/releases/download/",
-};
+const TRUSTED_RELEASE_ORIGINS: Partial<Record<ArcRuntimeId, TrustedReleaseOrigin>> =
+  {
+    codex: {
+      host: "github.com",
+      pathPrefix: "/openai/codex/releases/download/",
+    },
+    omp: {
+      host: "github.com",
+      pathPrefix: "/can1357/oh-my-pi/releases/download/",
+    },
+    "claude-code": {
+      host: "downloads.claude.ai",
+      pathPrefix: "/claude-code-releases/",
+    },
+  };
 
 export const ARC_CODEX_RELEASE: ArcRuntimeRelease = {
   runtimeId: "codex",
@@ -65,6 +79,30 @@ export const ARC_RUNTIME_RELEASES: readonly ArcRuntimeRelease[] = [
   ARC_CODEX_RELEASE,
   ARC_OMP_RELEASE,
 ];
+
+// Claude Code is proprietary (© Anthropic PBC, Commercial Terms) and is never
+// bundled or redistributed inside Arc. Arc's setup downloads this exact pinned
+// build directly from Anthropic's official release endpoint on the user's
+// machine. The pinned checksum was extracted from the GPG-signed release
+// manifest (key fingerprint 31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE,
+// manifest.json.sig verified during Arc release engineering) — see
+// adnan/arc-productization/IMPLEMENTATION_LOG.md Phase 5.
+export const ARC_CLAUDE_CODE_RELEASE: ArcRuntimeRelease = {
+  runtimeId: "claude-code",
+  artifactKind: "direct-official",
+  version: "2.1.276",
+  platform: "darwin-arm64",
+  releaseTag: "v2.1.276",
+  assetName: "claude",
+  downloadUrl:
+    "https://downloads.claude.ai/claude-code-releases/2.1.276/darwin-arm64/claude",
+  sha256:
+    "9de364db11a410d53cbbb0f6b1f18c66c90053efc9a63370072856d10db66329",
+  executableSha256:
+    "9de364db11a410d53cbbb0f6b1f18c66c90053efc9a63370072856d10db66329",
+  expectedExecutableVersion: "2.1.276",
+  license: "Anthropic Commercial Terms",
+};
 
 export type ArcRuntimeReleaseValidation =
   | { kind: "ok" }
@@ -107,7 +145,11 @@ export function validateArcRuntimeRelease(
       problem: "executableSha256 must be a lowercase 64-character hex digest",
     };
   }
-  if (release.artifactKind !== "archive" && release.artifactKind !== "executable") {
+  if (
+    release.artifactKind !== "archive" &&
+    release.artifactKind !== "executable" &&
+    release.artifactKind !== "direct-official"
+  ) {
     return {
       kind: "invalid",
       problem: `artifactKind "${String(release.artifactKind)}" is not supported`,
@@ -125,27 +167,39 @@ export function validateArcRuntimeRelease(
       problem: `downloadUrl must use https, got ${parsed.protocol}`,
     };
   }
-  const trustedPathPrefix =
-    TRUSTED_RELEASE_DOWNLOAD_PATH_PREFIXES[release.runtimeId];
-  if (trustedPathPrefix === undefined) {
+  const trustedOrigin = TRUSTED_RELEASE_ORIGINS[release.runtimeId];
+  if (trustedOrigin === undefined) {
     return {
       kind: "invalid",
       problem: `no trusted download origin is recorded for runtime "${release.runtimeId}"`,
     };
   }
   if (
-    parsed.host !== TRUSTED_RELEASE_DOWNLOAD_HOST ||
-    !parsed.pathname.startsWith(trustedPathPrefix)
+    parsed.host !== trustedOrigin.host ||
+    !parsed.pathname.startsWith(trustedOrigin.pathPrefix)
   ) {
     return {
       kind: "invalid",
-      problem: `downloadUrl must be a ${TRUSTED_RELEASE_DOWNLOAD_ORIGIN} release asset under ${trustedPathPrefix}`,
+      problem: `downloadUrl must be a ${trustedOrigin.host} release asset under ${trustedOrigin.pathPrefix}`,
     };
   }
-  if (!parsed.pathname.endsWith(`/${release.assetName}`)) {
+  if (
+    release.artifactKind !== "direct-official" &&
+    !parsed.pathname.endsWith(`/${release.assetName}`)
+  ) {
     return {
       kind: "invalid",
       problem: "downloadUrl must end with the exact pinned asset name",
+    };
+  }
+  if (
+    release.artifactKind === "direct-official" &&
+    !parsed.pathname.endsWith(`/${release.version}/${release.platform}/${release.assetName}`)
+  ) {
+    return {
+      kind: "invalid",
+      problem:
+        "direct-official downloadUrl must end with the exact pinned /<version>/<platform>/<binary> path",
     };
   }
   if (

@@ -8,6 +8,10 @@ export interface ArcRuntimeCompatibilityRule {
   minimum?: string;
   maximumTested?: string;
   blockedVersions?: readonly string[];
+  // Versions below this are "untested" rather than "blocked" — used when no
+  // verified minimum exists and older versions are merely unproven, not known
+  // bad (the plan's rule: unknown is never silently supported).
+  untestedBelow?: string;
 }
 
 export type ArcRuntimeCompatibilityPolicy = Partial<
@@ -34,6 +38,13 @@ const arcCodexTestedMaximumVersion = "0.155.1";
 // "blocked" from auto-activation until compatibility evidence exists.
 const arcOmpFirstTestedVersion = "18.2.6";
 
+// The BB Claude provider records no minimum supported version (verified in the
+// prebuilt provider artifact: minimumSupportedVersion is null), so per the
+// plan's conservative rule exactly the tested pin is "supported", newer is
+// "untested", and older is "untested" — never silently supported, never
+// blocked without evidence.
+const arcClaudeCodeTestedVersion = "2.1.276";
+
 export const ARC_RUNTIME_COMPATIBILITY_POLICY: ArcRuntimeCompatibilityPolicy =
   {
     codex: {
@@ -43,6 +54,10 @@ export const ARC_RUNTIME_COMPATIBILITY_POLICY: ArcRuntimeCompatibilityPolicy =
     omp: {
       minimum: arcOmpFirstTestedVersion,
       maximumTested: arcOmpFirstTestedVersion,
+    },
+    "claude-code": {
+      maximumTested: arcClaudeCodeTestedVersion,
+      untestedBelow: arcClaudeCodeTestedVersion,
     },
   };
 
@@ -107,6 +122,19 @@ export function evaluateArcRuntimeCompatibility(
       compatibility: "untested",
       reason: `version ${parsedVersion} is newer than the tested maximum ${maximumTested}`,
     };
+  }
+
+  if (rule.untestedBelow !== undefined) {
+    const untestedBelow = valid(rule.untestedBelow);
+    if (
+      untestedBelow !== null &&
+      compare(parsedVersion, untestedBelow) < 0
+    ) {
+      return {
+        compatibility: "untested",
+        reason: `version ${parsedVersion} is older than the first tested version ${untestedBelow}`,
+      };
+    }
   }
 
   return {

@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildArcManagedRuntimeEnvironment } from "../src/arc-runtime/environment.js";
 import { createArcRuntimePaths } from "../src/arc-runtime/paths.js";
@@ -234,5 +234,126 @@ describe("Arc-managed OMP environment resolution", () => {
 
     expect(env.PI_CODING_AGENT_DIR).toBe(join(userDataPath, "omp", "agent"));
     expect(env.PI_CONFIG_DIR).toBeUndefined();
+  });
+});
+
+async function fakeClaude(dir: string, identity: string): Promise<string> {
+  await mkdir(dir, { recursive: true });
+  const path = join(dir, "claude");
+  await writeFile(path, `#!/bin/sh\necho "${identity}"\n`, "utf8");
+  await chmod(path, 0o755);
+  return path;
+}
+
+describe("Arc-managed Claude Code environment", () => {
+  it("points BB_CLAUDE_CODE_EXECUTABLE at the managed binary and disables self-updates", async () => {
+    const root = await tempDir();
+    const userDataPath = join(root, "userData");
+    const globalBin = join(root, "global-bin");
+    const managedClaude = await fakeClaude(
+      join(userDataPath, "arc-runtimes", "runtimes", "claude-code", "2.1.276"),
+      "arc-managed-claude",
+    );
+    await fakeClaude(globalBin, "global-claude");
+
+    const runtimePaths = createArcRuntimePaths({ userDataPath });
+    const env = buildArcManagedRuntimeEnvironment({
+      activeRuntimes: [{ id: "claude-code", executablePath: managedClaude }],
+      env: { PATH: globalBin },
+      platform: "darwin",
+      runtimePaths,
+    });
+
+    expect(env.BB_CLAUDE_CODE_EXECUTABLE).toBe(managedClaude);
+    expect(env.DISABLE_AUTOUPDATER).toBe("1");
+    expect(env.DISABLE_UPDATES).toBe("1");
+  });
+
+  it("leaves update policy and executable override untouched when Claude is not active", async () => {
+    const userDataPath = join(await tempDir(), "userData");
+    const runtimePaths = createArcRuntimePaths({ userDataPath });
+    const env = buildArcManagedRuntimeEnvironment({
+      activeRuntimes: [],
+      env: {
+        PATH: "/usr/bin:/bin",
+        BB_CLAUDE_CODE_EXECUTABLE: "/Users/someone/.local/bin/claude",
+      },
+      platform: "darwin",
+      runtimePaths,
+    });
+    expect(env.BB_CLAUDE_CODE_EXECUTABLE).toBe(
+      "/Users/someone/.local/bin/claude",
+    );
+    expect(env.DISABLE_AUTOUPDATER).toBeUndefined();
+    expect(env.DISABLE_UPDATES).toBeUndefined();
+  });
+
+  it("serves all three engines from one child environment", async () => {
+    const root = await tempDir();
+    const userDataPath = join(root, "userData");
+    const homeDirectory = join(root, "home");
+    const globalBin = join(root, "global-bin");
+    const managedCodex = await fakeCodex(
+      join(userDataPath, "arc-runtimes", "runtimes", "codex", "0.155.1"),
+      "arc-managed-codex",
+    );
+    const managedOmp = await fakeOmp(
+      join(userDataPath, "arc-runtimes", "runtimes", "omp", "18.2.6"),
+      "arc-managed-omp",
+    );
+    const managedClaude = await fakeClaude(
+      join(userDataPath, "arc-runtimes", "runtimes", "claude-code", "2.1.276"),
+      "arc-managed-claude",
+    );
+    await fakeCodex(globalBin, "global-codex");
+    await fakeOmp(globalBin, "global-omp");
+    await fakeClaude(globalBin, "global-claude");
+
+    const runtimePaths = createArcRuntimePaths({ userDataPath });
+    const env = buildArcManagedRuntimeEnvironment({
+      activeRuntimes: [
+        { id: "codex", executablePath: managedCodex },
+        { id: "omp", executablePath: managedOmp },
+        { id: "claude-code", executablePath: managedClaude },
+      ],
+      env: { PATH: globalBin, HOME: homeDirectory },
+      homeDirectory,
+      platform: "darwin",
+      runtimePaths,
+    });
+
+    // PATH precedence: codex → omp → claude → original (Phase 1 ordering).
+    const entries = env.PATH?.split(":") ?? [];
+    expect(entries[0]).toBe(dirname(managedCodex));
+    expect(entries[1]).toBe(dirname(managedOmp));
+    expect(entries[2]).toBe(dirname(managedClaude));
+    expect(entries[3]).toBe(globalBin);
+
+    // Each Arc engine beats its global twin inside the child env.
+    await expect(codexVersion(env)).resolves.toBe("arc-managed-codex");
+    await expect(ompVersion(env)).resolves.toBe("arc-managed-omp");
+    await expect(
+      new Promise<string>((resolvePromise, rejectPromise) => {
+        execFile(
+          env.BB_CLAUDE_CODE_EXECUTABLE ?? "claude",
+          ["--version"],
+          { env },
+          (error, stdout) => {
+            if (error !== null) {
+              rejectPromise(error);
+              return;
+            }
+            resolvePromise(stdout.trim());
+          },
+        );
+      }),
+    ).resolves.toBe("arc-managed-claude");
+
+    // Phase 4 OMP isolation survives alongside Claude.
+    expect(env.PI_CODING_AGENT_DIR).toBe(join(userDataPath, "omp", "agent"));
+
+    // Arc-owned Claude cannot silently self-update.
+    expect(env.DISABLE_AUTOUPDATER).toBe("1");
+    expect(env.DISABLE_UPDATES).toBe("1");
   });
 });

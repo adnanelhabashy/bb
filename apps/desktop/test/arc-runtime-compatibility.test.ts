@@ -177,3 +177,60 @@ describe("OMP compatibility under the shipped policy", () => {
     expect(result.compatibility).toBe("blocked");
   });
 });
+
+describe("Claude Code compatibility under the shipped policy", () => {
+  it("supports exactly the tested pin 2.1.276", () => {
+    const result = evaluateArcRuntimeCompatibility({
+      policy: ARC_RUNTIME_COMPATIBILITY_POLICY,
+      runtimeId: "claude-code",
+      version: "2.1.276",
+    });
+
+    expect(result.compatibility).toBe("supported");
+  });
+
+  it("marks newer Claude versions untested", () => {
+    const result = evaluateArcRuntimeCompatibility({
+      policy: ARC_RUNTIME_COMPATIBILITY_POLICY,
+      runtimeId: "claude-code",
+      version: "2.1.280",
+    });
+
+    expect(result.compatibility).toBe("untested");
+  });
+
+  it("marks older Claude versions untested rather than silently supported", () => {
+    const result = evaluateArcRuntimeCompatibility({
+      policy: ARC_RUNTIME_COMPATIBILITY_POLICY,
+      runtimeId: "claude-code",
+      version: "2.1.200",
+    });
+
+    expect(result.compatibility).toBe("untested");
+    expect(result.reason).toContain("older than the first tested version");
+  });
+
+  it("treats untestedBelow as data, not a block", () => {
+    const policy: ArcRuntimeCompatibilityPolicy = {
+      "claude-code": {
+        maximumTested: "2.1.276",
+        untestedBelow: "2.1.276",
+        blockedVersions: ["2.0.0"],
+      },
+    };
+
+    const blocked = evaluateArcRuntimeCompatibility({
+      policy,
+      runtimeId: "claude-code",
+      version: "2.0.0",
+    });
+    expect(blocked.compatibility).toBe("blocked");
+
+    const olderUntested = evaluateArcRuntimeCompatibility({
+      policy,
+      runtimeId: "claude-code",
+      version: "2.1.0",
+    });
+    expect(olderUntested.compatibility).toBe("untested");
+  });
+});

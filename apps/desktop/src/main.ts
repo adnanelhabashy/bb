@@ -45,6 +45,7 @@ import {
   type DesktopPathContext,
 } from "./app-paths.js";
 import { prepareArcManagedRuntimes } from "./arc-runtime/bootstrap.js";
+import { prepareManagedClaudeCode } from "./arc-runtime/claude-setup.js";
 import {
   buildArcManagedRuntimeEnvironment,
   resolveActiveArcRuntimes,
@@ -1998,6 +1999,25 @@ async function spawnOwnedRuntime(
   } catch (error) {
     desktopLogger.warn(
       `[arc-runtime] managed runtime bootstrap failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+  try {
+    const claudeResult = await prepareManagedClaudeCode({
+      createdByArcVersion: app.getVersion(),
+      onDiagnostic: (message) => {
+        desktopLogger.warn(message);
+      },
+      platform: arcPlatform,
+      runtimePaths: arcRuntimePaths,
+    });
+    if (claudeResult.state === "ready") {
+      desktopLogger.info(`[arc-runtime] ${claudeResult.detail}`);
+    }
+  } catch (error) {
+    desktopLogger.warn(
+      `[arc-runtime] claude setup failed: ${
         error instanceof Error ? error.message : String(error)
       }`,
     );

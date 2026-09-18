@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ARC_CLAUDE_CODE_RELEASE,
   ARC_CODEX_RELEASE,
   ARC_OMP_RELEASE,
   ARC_RUNTIME_RELEASES,
@@ -176,5 +177,72 @@ describe("pinned OMP release metadata", () => {
       "codex",
       "omp",
     ]);
+  });
+});
+
+function claudeReleasePatch(
+  patch: Partial<ArcRuntimeRelease>,
+): ArcRuntimeRelease {
+  return { ...ARC_CLAUDE_CODE_RELEASE, ...patch };
+}
+
+describe("pinned Claude Code release metadata", () => {
+  it("pins Claude 2.1.276 from the Anthropic official release endpoint", () => {
+    expect(ARC_CLAUDE_CODE_RELEASE.version).toBe("2.1.276");
+    expect(ARC_CLAUDE_CODE_RELEASE.releaseTag).toBe("v2.1.276");
+    expect(ARC_CLAUDE_CODE_RELEASE.artifactKind).toBe("direct-official");
+    expect(ARC_CLAUDE_CODE_RELEASE.platform).toBe("darwin-arm64");
+    expect(ARC_CLAUDE_CODE_RELEASE.downloadUrl).toBe(
+      "https://downloads.claude.ai/claude-code-releases/2.1.276/darwin-arm64/claude",
+    );
+  });
+
+  it("pins the checksum extracted from the GPG-signed release manifest", () => {
+    expect(ARC_CLAUDE_CODE_RELEASE.sha256).toBe(
+      "9de364db11a410d53cbbb0f6b1f18c66c90053efc9a63370072856d10db66329",
+    );
+    expect(ARC_CLAUDE_CODE_RELEASE.executableSha256).toBe(
+      ARC_CLAUDE_CODE_RELEASE.sha256,
+    );
+  });
+
+  it("records the proprietary license terms", () => {
+    expect(ARC_CLAUDE_CODE_RELEASE.license).toBe("Anthropic Commercial Terms");
+  });
+
+  it("passes validation for the shipped pin", () => {
+    expect(validateArcRuntimeRelease(ARC_CLAUDE_CODE_RELEASE)).toEqual({
+      kind: "ok",
+    });
+  });
+
+  it("rejects a Claude download URL on any host other than downloads.claude.ai", () => {
+    const result = validateArcRuntimeRelease(
+      claudeReleasePatch({
+        downloadUrl:
+          "https://github.com/anthropics/claude-code/releases/download/v2.1.276/claude-darwin-arm64.tar.gz",
+      }),
+    );
+    expect(result.kind).toBe("invalid");
+  });
+
+  it("rejects a Claude URL missing the exact pinned version/platform path", () => {
+    const result = validateArcRuntimeRelease(
+      claudeReleasePatch({
+        downloadUrl:
+          "https://downloads.claude.ai/claude-code-releases/2.1.277/darwin-arm64/claude",
+      }),
+    );
+    expect(result.kind).toBe("invalid");
+    if (result.kind === "invalid") {
+      expect(result.problem).toContain("exact pinned");
+    }
+  });
+
+  it("is not part of the build-time seed release list", () => {
+    expect(ARC_RUNTIME_RELEASES).not.toContain(ARC_CLAUDE_CODE_RELEASE);
+    expect(
+      ARC_RUNTIME_RELEASES.map((release) => release.runtimeId),
+    ).not.toContain("claude-code");
   });
 });

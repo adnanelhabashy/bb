@@ -145,3 +145,48 @@ No minimum OMP version is verifiable from the BB ACP integration, so the policy 
 Status: **Accepted** (verified in Phase 4)
 The installed provider-acp host artifact declares `acp-omp` with launch `command: "omp"`, `args: ["acp"]`, and resolves commands against the process PATH (bundled `resolveCommand`/`which` machinery). Arc's Phase 1 PATH injection therefore suffices end to end; the integration is proven at protocol level by an ACP `initialize` handshake against the real pinned binary running from the Arc runtime directory. Provider-acp source remains unported, consistent with ADR-023.
 
+## ADR-029 Claude Code is never bundled or redistributed inside Arc; it is obtained directly from Anthropic on the user's machine
+
+Status: **Accepted** (implemented in Phase 5)
+`anthropics/claude-code` is © Anthropic PBC, all rights reserved, subject to Anthropic Commercial Terms — not redistributable. The Arc DMG/app bundle contains no Claude executable and never will unless explicit redistribution rights are verified. Arc's setup downloads the exact pinned build directly from Anthropic's official release endpoint (`downloads.claude.ai/claude-code-releases/<version>/<platform>/claude`) at runtime on the user's machine — download-by-end-user, not redistribution. Option A (official private install prefix) does not exist: the native installer hardcodes `~/.local` via `claude install` and supports no custom destination. Option B was chosen; Option C (running the official installer to the standard user-local destination) is the documented fallback if the direct endpoint changes.
+
+## ADR-030 Arc pins Claude Code 2.1.276 with the checksum from the GPG-signed release manifest; runtime verification needs no gpg
+
+Status: **Accepted** (implemented in Phase 5)
+At Arc release-engineering time the full chain was verified: Anthropic's published signing key (fingerprint `31DD DE24 DDFA B679 F42D 7BD2 BAA9 29FF 1A7E CACE`, matched) verifies `manifest.json.sig` over `manifest.json`, and the pinned darwin-arm64 SHA-256 (`9de364db…6329`) was extracted from that signed manifest. Arc ships the version + checksum pin; at user setup time the downloaded binary must match the pinned checksum, pass macOS code-signature verification (Developer ID Application: Anthropic PBC, Team ID Q6L2SF6YDW), and report the exact pinned version — otherwise it is never activated. Runtime verification therefore needs no gpg on the user's machine; the GPG evidence is baked into the pin.
+
+## ADR-031 Claude lives in the standard Arc runtime path with source `official-managed-install`; no manifest schema change
+
+Status: **Accepted** (implemented in Phase 5)
+The Arc-managed Claude is installed at the derived path `<userData>/arc-runtimes/runtimes/claude-code/2.1.276/claude`, so Phase 2's manifest v1 schema (`source: "official-managed-install"`, digest, installedAt) represents it without an `executablePath` field or schema bump. Executable paths still come only from backend discovery/setup, never from the renderer.
+
+## ADR-032 Arc-owned Claude execution cannot silently self-update; external Claude installs are never modified
+
+Status: **Accepted** (implemented in Phase 5)
+Arc's child environment sets `DISABLE_AUTOUPDATER=1` and `DISABLE_UPDATES=1` (officially documented controls, doctor-confirmed) whenever an Arc-managed Claude is active, so the runtime under Arc's manifest cannot mutate underneath it; Arc decides when updates happen (Phase 11). These variables exist only on Arc's owned BB child environment — the user's independent Claude installations, terminals, and update behavior are untouched. Discovery classifies external installs (official-native, homebrew, npm-legacy, explicit-override, broken-launcher, arc-managed) and Arc never deletes, downgrades, or rewrites them; a valid newer external version is never downgraded.
+
+## ADR-033 Claude credentials and settings remain Claude-owned
+
+Status: **Accepted** (implemented in Phase 5)
+Phase 5 is runtime setup only. Arc never touches `~/.claude`, `~/.claude.json`, project `.claude/`, or `.mcp.json`, stores no tokens or account data in the runtime manifest, and implements no login. Runtime readiness and account readiness remain separate states.
+
+
+## ADR-034 The Arc product catalog is closed to exactly three agents
+
+Status: **Accepted** (implemented in Phase 6)
+`ARC_AGENT_CATALOG` (apps/desktop/src/arc-agent/catalog.ts) is an explicit, statically defined list of exactly three agents — OMP, Codex, Claude Code — in a fixed documented order. Arc never enumerates upstream BB providers and filters by display name, so a newly added upstream provider cannot become an Arc product agent by drift. Pi, OpenCode, Cursor, Grok, and Hermes keep their BB/plugin sources and persisted provider IDs untouched; only their later presentation gating is affected. ArcAgentId (`"omp"`) remains separate from the BB provider ID (`"acp-omp"`); no BB provider is renamed.
+
+## ADR-035 Agent status separates runtime, provider, and account readiness; unknown is never reported as ready
+
+Status: **Accepted** (implemented in Phase 6)
+`ArcAgentStatus` models three independent axes: runtime (manifest + filesystem + compatibility), provider (injectable `ArcProviderStatusSource`), and account (placeholder in Phase 6). Provider health is not cleanly queryable from the desktop layer, so the default source reports `unknown` rather than fabricating readiness; account state is `unknown` because Phase 6 performs no credential inspection. Overall state is deterministic: `ready` requires account `connected`; a runnable runtime with unknown/not-connected account is honestly `runtime-ready`. Broken (manifest intent unfulfilled), unsupported (compatibility blocked), and untested (`ready-with-warning`) are distinct states — never collapsed to booleans, never auto-repaired from status inspection.
+
+## ADR-036 Prepare and repair are explicit, idempotent, per-agent single-flight actions; repair is never an update
+
+Status: **Accepted** (implemented in Phase 6)
+Runtime changes happen only through explicit `prepareAgent`/`repairAgent` calls; status reads are side-effect-free (test-asserted). Actions inherit the lower-level guarantees: healthy runtimes are reused (`already-active`), same-pin damage is restored from the trusted seed/official flow, valid different-version runtimes are never downgraded or upgraded, and a broken different-version runtime is reported (`runtime-repair-failed`) rather than silently replaced. Repair never changes the active version and never touches credentials. Duplicate same-agent operations are single-flight (joined, not raced); different agents run concurrently.
+
+## ADR-037 Runtime manifest mutations are serialized; concurrent agent operations cannot lose each other's updates
+
+Status: **Accepted** (implemented in Phase 6)
+Atomic tmp+rename protected the manifest from torn writes but not from lost updates: two services reading then writing disjoint runtime entries would drop one change. All manifest read-modify-write cycles (Codex/OMP bootstrap, Claude activation commit, digest backfill) route through `mutateArcRuntimeManifest`, an in-process serialized mutation chain per manifest path. The Claude commit re-validates manifest state inside the lock after its download so a concurrent activation is never clobbered. No-op decisions skip the write (no manifest is created by a no-op). Desktop v1 needs no distributed locking; the chain entry is retained per path for the process lifetime.

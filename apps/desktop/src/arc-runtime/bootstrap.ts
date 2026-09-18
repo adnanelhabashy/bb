@@ -11,8 +11,7 @@ import {
 import { dirname, join } from "node:path";
 import { sha256File } from "./digest.js";
 import {
-  readArcRuntimeManifest,
-  writeArcRuntimeManifest,
+  mutateArcRuntimeManifest,
   type ArcRuntimeManifest,
 } from "./manifest.js";
 import { arcRuntimeExecutableName, type ArcRuntimePaths } from "./paths.js";
@@ -74,25 +73,31 @@ function diagnose(
   args.onDiagnostic?.(`[arc-runtime] ${message}`);
 }
 
+interface BootstrapDecision {
+  result: ArcRuntimeBootstrapResult;
+  manifest: ArcRuntimeManifest;
+}
+
 async function installFromSeed(args: {
   manifest: ArcRuntimeManifest;
-  manifestPath: string;
   release: ArcRuntimeRelease;
   repair: boolean;
   runtimePaths: ArcRuntimePaths;
   seedPath: string;
-}): Promise<ArcRuntimeBootstrapResult> {
-  const { release, runtimePaths, seedPath, manifest, manifestPath, repair } =
-    args;
+}): Promise<BootstrapDecision> {
+  const { release, runtimePaths, seedPath, manifest, repair } = args;
   const existing = manifest.runtimes[release.runtimeId];
   const isWindows = manifest.platform.startsWith("win32");
 
   const seedDigest = await sha256File(seedPath).catch(() => null);
   if (seedDigest !== release.executableSha256) {
     return {
-      runtimeId: release.runtimeId,
-      action: "failed",
-      detail: `bundled seed digest mismatch: expected ${release.executableSha256}, got ${seedDigest ?? "unreadable"}`,
+      result: {
+        runtimeId: release.runtimeId,
+        action: "failed",
+        detail: `bundled seed digest mismatch: expected ${release.executableSha256}, got ${seedDigest ?? "unreadable"}`,
+      },
+      manifest,
     };
   }
   const seedProbe = await probeArcRuntimeVersion({ executablePath: seedPath });
@@ -101,12 +106,15 @@ async function installFromSeed(args: {
     seedProbe.version !== release.expectedExecutableVersion
   ) {
     return {
-      runtimeId: release.runtimeId,
-      action: "failed",
-      detail:
-        seedProbe.kind === "failed"
-          ? `seed version probe failed: ${seedProbe.reason}`
-          : `seed reports ${seedProbe.version}, expected ${release.expectedExecutableVersion}`,
+      result: {
+        runtimeId: release.runtimeId,
+        action: "failed",
+        detail:
+          seedProbe.kind === "failed"
+            ? `seed version probe failed: ${seedProbe.reason}`
+            : `seed reports ${seedProbe.version}, expected ${release.expectedExecutableVersion}`,
+      },
+      manifest,
     };
   }
 
@@ -132,9 +140,12 @@ async function installFromSeed(args: {
     const stagedDigest = await sha256File(stagedExecutable);
     if (stagedDigest !== release.executableSha256) {
       return {
-        runtimeId: release.runtimeId,
-        action: "failed",
-        detail: "copied executable digest mismatch; refusing to activate",
+        result: {
+          runtimeId: release.runtimeId,
+          action: "failed",
+          detail: "copied executable digest mismatch; refusing to activate",
+        },
+        manifest,
       };
     }
     const stagedProbe = await probeArcRuntimeVersion({
@@ -145,9 +156,12 @@ async function installFromSeed(args: {
       stagedProbe.version !== release.expectedExecutableVersion
     ) {
       return {
-        runtimeId: release.runtimeId,
-        action: "failed",
-        detail: "copied executable failed version verification",
+        result: {
+          runtimeId: release.runtimeId,
+          action: "failed",
+          detail: "copied executable failed version verification",
+        },
+        manifest,
       };
     }
 
@@ -155,33 +169,134 @@ async function installFromSeed(args: {
     await rm(versionRoot, { recursive: true, force: true });
     await rename(stagingDir, versionRoot);
 
-    const nextManifest: ArcRuntimeManifest = {
-      ...manifest,
-      runtimes: {
-        ...manifest.runtimes,
-        [release.runtimeId]: {
-          activeVersion: release.version,
-          previousVersion: repair
-            ? existing.previousVersion
-            : existing.activeVersion,
-          source: "arc-bundled",
-          digest: stagedDigest,
-          installedAt: Date.now(),
+    return {
+      result: {
+        runtimeId: release.runtimeId,
+        action: repair ? "repaired" : "installed",
+        detail: `${release.runtimeId} ${release.version} ${
+          repair ? "repaired from" : "installed from"
+        } bundled seed (digest ${stagedDigest})`,
+      },
+      manifest: {
+        ...manifest,
+        runtimes: {
+          ...manifest.runtimes,
+          [release.runtimeId]: {
+            activeVersion: release.version,
+            previousVersion: repair
+              ? existing.previousVersion
+              : existing.activeVersion,
+            source: "arc-bundled",
+            digest: stagedDigest,
+            installedAt: Date.now(),
+          },
         },
       },
-    };
-    await writeArcRuntimeManifest({ manifest: nextManifest, manifestPath });
-
-    return {
-      runtimeId: release.runtimeId,
-      action: repair ? "repaired" : "installed",
-      detail: `${release.runtimeId} ${release.version} ${
-        repair ? "repaired from" : "installed from"
-      } bundled seed (digest ${stagedDigest})`,
     };
   } finally {
     await rm(stagingDir, { recursive: true, force: true });
   }
+}
+
+async function decideBootstrap(
+  args: PrepareArcManagedRuntimesArgs,
+  release: ArcRuntimeRelease,
+  seedPath: string,
+  manifest: ArcRuntimeManifest,
+): Promise<BootstrapDecision> {
+  const isWindows = args.platform.startsWith("win32");
+  const entry = manifest.runtimes[release.runtimeId];
+
+  if (entry.activeVersion === release.version) {
+    const executablePath = args.runtimePaths.executablePath(
+      release.runtimeId,
+      release.version,
+    );
+    if (await isRunnableExecutable(executablePath, isWindows)) {
+      if (entry.digest === null) {
+        const digest = await sha256File(executablePath).catch(() => null);
+        if (digest !== null) {
+          return {
+            result: {
+              runtimeId: release.runtimeId,
+              action: "already-active",
+              detail: `${release.runtimeId} ${release.version} already active; reusing verified copy`,
+            },
+            manifest: {
+              ...manifest,
+              runtimes: {
+                ...manifest.runtimes,
+                [release.runtimeId]: { ...entry, digest },
+              },
+            },
+          };
+        }
+      }
+      return {
+        result: {
+          runtimeId: release.runtimeId,
+          action: "already-active",
+          detail: `${release.runtimeId} ${release.version} already active; reusing verified copy`,
+        },
+        manifest,
+      };
+    }
+    diagnose(
+      args,
+      `${release.runtimeId} ${release.version} active in manifest but ${executablePath} is missing or broken; repairing from bundled seed`,
+    );
+    const decision = await installFromSeed({
+      manifest,
+      release,
+      repair: true,
+      runtimePaths: args.runtimePaths,
+      seedPath,
+    });
+    if (decision.result.action === "repaired") {
+      return decision;
+    }
+    return {
+      result: {
+        runtimeId: release.runtimeId,
+        action: "failed",
+        detail: `repair failed: ${decision.result.detail}`,
+      },
+      manifest,
+    };
+  }
+
+  if (entry.activeVersion !== null) {
+    const executablePath = args.runtimePaths.executablePath(
+      release.runtimeId,
+      entry.activeVersion,
+    );
+    if (await isRunnableExecutable(executablePath, isWindows)) {
+      return {
+        result: {
+          runtimeId: release.runtimeId,
+          action: "kept-existing",
+          detail: `${release.runtimeId} ${entry.activeVersion} is active and valid; bundled seed ${release.version} will not force a downgrade`,
+        },
+        manifest,
+      };
+    }
+    return {
+      result: {
+        runtimeId: release.runtimeId,
+        action: "kept-broken",
+        detail: `${release.runtimeId} ${entry.activeVersion} is active but its executable is broken; recovery is deferred to the runtime repair/update flow`,
+      },
+      manifest,
+    };
+  }
+
+  return installFromSeed({
+    manifest,
+    release,
+    repair: false,
+    runtimePaths: args.runtimePaths,
+    seedPath,
+  });
 }
 
 async function bootstrapRelease(
@@ -198,99 +313,30 @@ async function bootstrapRelease(
     };
   }
 
-  const isWindows = args.platform.startsWith("win32");
-  const manifestPath = args.runtimePaths.manifestPath;
-  const manifestResult = await readArcRuntimeManifest({
-    createdByArcVersion: args.createdByArcVersion,
-    manifestPath,
-    platform: args.platform,
-  });
-  if (manifestResult.kind === "unsupported-version") {
-    return {
-      runtimeId: release.runtimeId,
-      action: "failed",
-      detail: `manifest declares unsupported schema version ${manifestResult.schemaVersion}; leaving untouched`,
-    };
-  }
-  const manifest = manifestResult.manifest;
-  const entry = manifest.runtimes[release.runtimeId];
-
-  if (entry.activeVersion === release.version) {
-    const executablePath = args.runtimePaths.executablePath(
-      release.runtimeId,
-      release.version,
-    );
-    if (await isRunnableExecutable(executablePath, isWindows)) {
-      if (entry.digest === null) {
-        const digest = await sha256File(executablePath).catch(() => null);
-        if (digest !== null) {
-          await writeArcRuntimeManifest({
-            manifest: {
-              ...manifest,
-              runtimes: {
-                ...manifest.runtimes,
-                [release.runtimeId]: { ...entry, digest },
-              },
-            },
-            manifestPath,
-          });
-        }
-      }
-      return {
-        runtimeId: release.runtimeId,
-        action: "already-active",
-        detail: `${release.runtimeId} ${release.version} already active; reusing verified copy`,
-      };
-    }
-    diagnose(
-      args,
-      `${release.runtimeId} ${release.version} active in manifest but ${executablePath} is missing or broken; repairing from bundled seed`,
-    );
-    const result = await installFromSeed({
-      manifest,
-      manifestPath,
-      release,
-      repair: true,
-      runtimePaths: args.runtimePaths,
-      seedPath,
+  let outcome: ArcRuntimeBootstrapResult | null = null;
+  try {
+    await mutateArcRuntimeManifest({
+      createdByArcVersion: args.createdByArcVersion,
+      manifestPath: args.runtimePaths.manifestPath,
+      platform: args.platform,
+      mutate: async (manifest) => {
+        const decision = await decideBootstrap(args, release, seedPath, manifest);
+        outcome = decision.result;
+        return decision.manifest;
+      },
     });
-    if (result.action === "repaired") {
-      return result;
-    }
+  } catch (error) {
     return {
       runtimeId: release.runtimeId,
       action: "failed",
-      detail: `repair failed: ${result.detail}`,
+      detail: error instanceof Error ? error.message : String(error),
     };
   }
-
-  if (entry.activeVersion !== null) {
-    const executablePath = args.runtimePaths.executablePath(
-      release.runtimeId,
-      entry.activeVersion,
-    );
-    if (await isRunnableExecutable(executablePath, isWindows)) {
-      return {
-        runtimeId: release.runtimeId,
-        action: "kept-existing",
-        detail: `${release.runtimeId} ${entry.activeVersion} is active and valid; bundled seed ${release.version} will not force a downgrade`,
-      };
-    }
-    return {
-      runtimeId: release.runtimeId,
-      action: "kept-broken",
-      detail: `${release.runtimeId} ${entry.activeVersion} is active but its executable is broken; recovery is deferred to the runtime repair/update flow`,
-    };
-  }
-
-  return installFromSeed({
-    manifest,
-    manifestPath,
-    release,
-    repair: false,
-    runtimePaths: args.runtimePaths,
-    seedPath,
-  });
+  return outcome ?? {
+    runtimeId: release.runtimeId,
+    action: "failed",
+    detail: "bootstrap did not produce a result",
+  };
 }
 
 export async function prepareArcManagedRuntimes(

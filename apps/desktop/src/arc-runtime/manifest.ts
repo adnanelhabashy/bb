@@ -72,6 +72,15 @@ export interface WriteArcRuntimeManifestArgs {
   manifest: ArcRuntimeManifest;
 }
 
+export type ArcRuntimeManifestMutator = (
+  manifest: ArcRuntimeManifest,
+) => Promise<ArcRuntimeManifest> | ArcRuntimeManifest;
+
+export interface MutateArcRuntimeManifestArgs
+  extends ReadArcRuntimeManifestArgs {
+  mutate: ArcRuntimeManifestMutator;
+}
+
 export function resolveArcPlatformIdentity(
   args: ResolveArcPlatformIdentityArgs,
 ): string {
@@ -185,4 +194,41 @@ export async function writeArcRuntimeManifest(
   } finally {
     await unlink(tempPath).catch(() => undefined);
   }
+}
+
+// In-process serialized read-modify-write for the runtime manifest. Atomic
+// tmp+rename on the file only protects against torn writes; it does not
+// protect against two services both reading the manifest, then writing
+// disjoint updates (Codex activation + Claude activation racing would lose
+// one of them). Every manifest mutation routes through this chain so the
+// read-modify-write cycle is serialized per manifest path. The map entry is
+// retained for the process lifetime; there is exactly one manifest path per
+// desktop process.
+const manifestMutationChains = new Map<string, Promise<unknown>>();
+
+export async function mutateArcRuntimeManifest(
+  args: MutateArcRuntimeManifestArgs,
+): Promise<ArcRuntimeManifest> {
+  const previous =
+    manifestMutationChains.get(args.manifestPath) ?? Promise.resolve();
+  const chain = previous.catch(() => undefined).then(async () => {
+    const result = await readArcRuntimeManifest(args);
+    if (result.kind === "unsupported-version") {
+      throw new Error(
+        `manifest declares unsupported schema version ${result.schemaVersion}; leaving untouched`,
+      );
+    }
+    const next = await args.mutate(result.manifest);
+    // Skip the write when nothing changed so no-op decisions (kept-existing,
+    // already-active) do not create or rewrite the manifest file.
+    if (JSON.stringify(next) !== JSON.stringify(result.manifest)) {
+      await writeArcRuntimeManifest({
+        manifest: next,
+        manifestPath: args.manifestPath,
+      });
+    }
+    return next;
+  });
+  manifestMutationChains.set(args.manifestPath, chain);
+  return chain;
 }

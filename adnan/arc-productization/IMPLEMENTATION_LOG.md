@@ -301,3 +301,161 @@ ADR-025 through ADR-028 added.
 ### Gate
 
 PASS.
+
+---
+
+## Phase 5 — Claude Code Managed Setup
+
+Date: 2026-09-19. Branch `self-contained` @ 006da63f8 (Phase 0–4 commit; working tree clean at start).
+
+### Legal / distribution decision
+
+- `anthropics/claude-code` LICENSE.md at v2.1.276: **"© Anthropic PBC. All rights reserved. Use is subject to Anthropic's Commercial Terms of Service."** — not redistributable.
+- **Arc does not bundle Claude.** No Claude executable exists in the app bundle (verified in the packaged `.app`; permanently guarded by `arc-runtime-no-claude-bundle.test.ts`).
+- Claude Code is obtained **directly from Anthropic on the user's machine** at setup time — download-by-end-user, not redistribution. Arc's documentation states Claude Code is obtained directly from Anthropic and remains subject to Anthropic's terms (no terms text copied).
+
+### Installation option: **OPTION B — DIRECT OFFICIAL VERIFIED DOWNLOAD**
+
+- Option A rejected with evidence: the official installer (`claude.ai/install.sh`, fetched and read) hardcodes `$HOME/.claude/downloads` and delegates to `claude install`, which owns `~/.local/bin/claude` + `~/.local/share/claude/versions/`; no custom-destination env/flag exists. Docs only support a "custom launcher" at the standard path.
+- Option B evidence: the installer itself downloads `https://downloads.claude.ai/claude-code-releases/<v>/<platform>/claude` and checksum-verifies it against the signed manifest; the docs explicitly contemplate users downloading "the binary from the GCS bucket" with manifest verification. Arc implements exactly that flow into an Arc-private runtime directory. Option C (run the official installer to `~/.local`) is the documented fallback if the endpoint changes.
+
+### Pinned release (independently verified)
+
+- Version **2.1.276**, tag `v2.1.276`, not prerelease/draft (GitHub API); official per-platform tarballs + `SHASUMS256.txt` + `.sig` on the GitHub release; native binaries served from `downloads.claude.ai/claude-code-releases/2.1.276/`
+- Signing key `https://downloads.claude.ai/keys/claude-code.asc` — fingerprint `31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE`, **matches the published fingerprint exactly** (verified with OpenPGP against the armored key)
+- `manifest.json.sig` **verifies** against `manifest.json` with that key (OpenPGP verified)
+- darwin-arm64 from the signed manifest: SHA-256 `9de364db11a410d53cbbb0f6b1f18c66c90053efc9a63370072856d10db66329`, size 215,643,408 — the pinned checksum in `releases.ts`
+- Downloaded binary: checksum **exact match**; `codesign --verify --verbose=4` → valid on disk, satisfies Designated Requirement; `codesign -dv` → Identifier `com.anthropic.claude-code`, Authority `Developer ID Application: Anthropic PBC (Q6L2SF6YDW)` → Apple Root CA; `spctl -t execute` reports "code is valid but does not seem to be an app" with origin Anthropic PBC (expected for a bare CLI binary; cryptographic verification is the gate)
+- `--version` → `2.1.276 (Claude Code)`; `doctor` (read-only, pre-auth) → `Running: native (2.1.276)`, `Config install method: native`, `No installation issues found`
+- Runtime trust model: the installer script has no stable digest pin; Arc's postconditions are independent — pinned checksum (extracted from the GPG-verified manifest at engineering time) + macOS code signature + exact version probe. No gpg needed on user machines.
+
+### Implementation
+
+- `releases.ts`: third artifact kind `direct-official`; per-runtime trusted origins (github.com for codex/omp, downloads.claude.ai for claude-code); `ARC_CLAUDE_CODE_RELEASE` excluded from the build-time `ARC_RUNTIME_RELEASES` seed list
+- `claude-discovery.ts`: classifies existing installs — not-installed / official-native (incl. custom launcher) / homebrew / npm-legacy (wrapper detection) / explicit-override / arc-managed / broken-launcher (incl. dangling symlinks); explicit `BB_CLAUDE_CODE_EXECUTABLE` wins; Arc-managed detection is path-based
+- `claude-setup.ts`: the setup operation — validate pin → manifest read (future-schema preserved) → idempotent reuse when active+runnable → no-downgrade for valid different version → broken-different-version deferred → backoff-gated download (60s/5m/30m/6h) → staged checksum gate → macOS codesign gate (Anthropic) → chmod → exact version probe → informational doctor → move into `runtimes/claude-code/2.1.276/` → **manifest written last** (`source: official-managed-install`, digest, installedAt); every failure path leaves the manifest untouched and records backoff; network failure fails safe
+- `environment.ts`: active Arc Claude → `BB_CLAUDE_CODE_EXECUTABLE` (exact path, Phase 1 mechanism) + `DISABLE_AUTOUPDATER=1` + `DISABLE_UPDATES=1` on the Arc child env only; OMP isolation untouched; Phase 1 PATH ordering unchanged
+- `main.ts`: `prepareManagedClaudeCode` runs after seed bootstrap inside the existing failure-safe try/catch; Arc opens regardless
+- `compatibility.ts`: `untestedBelow` rule addition; Claude policy = exactly 2.1.276 supported, newer untested, older untested (upstream `minimumSupportedVersion` is null in the prebuilt provider artifact — no invented minimum)
+- Manifest: **no schema change** — Claude lives at the derived runtime path, v1 semantics suffice (ADR-031); renderer can never supply executable paths
+
+### Provider integration
+
+Prebuilt provider-claude-code artifact: `claudeExecutable() = process.env.BB_CLAUDE_CODE_EXECUTABLE?.trim() || "claude"` — the env var beats PATH absolutely and feeds `--version`, `doctor`, health, and launch. No provider source ported (Phase 0 situation unchanged). End-to-end proof with `PATH=/usr/bin:/bin` and fake globals: `BB_CLAUDE_CODE_EXECUTABLE` resolved the managed binary; managed `claude --version` returned `2.1.276 (Claude Code)` while fake globals existed for all three engines.
+
+### Three-engine milestone (single Arc child environment, `PATH=/usr/bin:/bin`)
+
+```text
+codex       0.155.1   arc-managed (bundled seed)     ✓
+omp         18.2.6    arc-managed (bundled seed)     ✓ + PI_CODING_AGENT_DIR isolation
+claude-code 2.1.276   official-managed-install       ✓ + BB_CLAUDE_CODE_EXECUTABLE + DISABLE_UPDATES
+```
+
+### Files changed
+
+- Application source: `arc-runtime/releases.ts` (kind + origin generalization), `arc-runtime/claude-discovery.ts` (new), `arc-runtime/claude-setup.ts` (new), `arc-runtime/environment.ts` (auto-update env), `arc-runtime/compatibility.ts` (`untestedBelow` + Claude rule), `main.ts` (setup wiring)
+- Manifest/schema: none (v1 sufficient, ADR-031)
+- Build configuration: none (Claude intentionally absent from prepare script, electron-builder config, and notices)
+- Tests: `arc-runtime-claude-discovery.test.ts` (8), `arc-runtime-claude-setup.test.ts` (13, covering A–H + backoff + future-schema + no-secrets), `arc-runtime-claude-environment` additions inside `arc-runtime-environment.test.ts` (3), releases pin tests (+8), compatibility matrix (+4), `arc-runtime-no-claude-bundle.test.ts` (new, 3)
+- Provider source: none
+
+### Packaging verification
+
+`release/mac-arm64/Arc Agent.app/Contents/Resources/arc-runtimes/` contains exactly `codex/0.155.1/codex` (digest 8eaf1ad1…a9e), `omp/18.2.6/omp` (digest d498da40…513a), and `THIRD_PARTY_NOTICES.md`. No `claude-code` directory; no file matching `claude*` anywhere under the resource tree. `/Applications` untouched.
+
+### Tests
+
+- `pnpm --filter @bb/desktop typecheck` → PASS
+- Phase 5 focused suites → 81/81 PASS
+- `pnpm --filter @bb/desktop test` → **544 passed / 3 failed** — failures identical to the Phase 0–4 baseline. +38 tests, zero regressions.
+
+### Live end-to-end evidence (real binary, real codesign, real doctor)
+
+- Clean userData → setup → ready, manifest `official-managed-install` with pinned digest; doctor reported `Auto-updates: disabled (set by env: DISABLE_UPDATES)`; second run idempotent and offline.
+
+### Decisions
+
+ADR-029 through ADR-033 added.
+
+### Unresolved items
+
+- First real Claude turn needs authentication (Phase 7+); runtime readiness and `doctor` are proven pre-auth by design
+- Claude updates/rollback UI — Phase 11; Arc update feed — Phase 12
+- Native installer's interactive TUI (`claude install`) not used; if Anthropic withdraws the direct endpoint, switch to Option C per ADR-029
+
+### Gate
+
+PASS.
+
+---
+
+## Phase 6 — Arc Agent Manager
+
+Date: 2026-09-19. Same checkout, Phase 5 state verified before editing.
+
+### What Arc gained
+
+One backend/domain abstraction (`apps/desktop/src/arc-agent/`) representing Arc's three coding agents consistently, orchestrating the existing Phase 1–5 runtime services instead of duplicating them:
+
+- `types.ts` — `ArcAgentId` (`codex` | `claude-code` | `omp`), separated runtime/provider/account states, overall-state model, typed `ArcAgentError` (`unsupported-agent`, `runtime-prepare-failed`, `runtime-repair-failed`, `provider-unavailable`).
+- `catalog.ts` — the CLOSED Arc product catalog: exactly OMP, Codex, Claude Code (fixed order), each mapping Arc agent ID → runtime ID → BB provider ID (`omp` → `acp-omp`). Upstream BB providers (pi, acp-opencode, acp-cursor, acp-grok, acp-hermes-agent) can never leak in via upstream drift; their sources remain untouched and persisted BB provider IDs are unchanged.
+- `manager.ts` — `ArcAgentManager` (`listArcAgents`, `getArcAgent`, `prepareAgent`, `repairAgent`), pure backend logic: no React, no IPC, no `window` globals. Ready to be exposed to Mission Control/server later.
+
+### Status model
+
+`ArcAgentStatus`: descriptor fields + `runtime` (state/version/compatibility/source) + `provider.state` + `account.state` + `overallState` + `actions[]` + `observedAt`.
+
+Runtime states: `not-prepared`, `preparing` (in-flight op, single-flight tracked), `ready`, `ready-with-warning` (compatibility untested), `broken` (manifest records intent, filesystem doesn't fulfill it), `unsupported` (compatibility blocked), `unavailable` (manifest corrupt/future-schema). Version and source come from the manifest — status never probes binaries and never shells out to `--version`.
+
+Account state is a placeholder (`unknown`) with the full shape (`not-connected`/`connected`/`expired`/`error`) reserved for Phase 7–8 — no credential inspection, no login.
+
+Overall-state rules (deterministic): `unavailable`/`broken`/`unsupported`/`not-prepared`/`preparing` mirror the runtime state; `ready` or `ready-with-warning` becomes `ready` only when account is `connected`, otherwise `runtime-ready` — Arc never claims "ready" when a real coding turn could not run.
+
+### Actions
+
+Advertised per runtime state, with explicit unavailable reasons: `prepare` (not-prepared only), `repair` (broken only). `update`, `rollback` (Phase 11), `connect-account` (Phase 7–8), `open-settings` (Phase 10) are reserved IDs marked unavailable — the UI never has to guess.
+
+- `prepareAgent("codex" | "omp")` → existing `prepareArcManagedRuntimes` with the single pinned release (idempotent: healthy → `already-active`, no reinstall).
+- `prepareAgent("claude-code")` → existing `prepareManagedClaudeCode` (backoff, checksum, codesign, probe all inherited).
+- `repairAgent` → same services with repair semantics: same-version seed restoration or same-pin official reinstall; repair on a healthy runtime is a safe no-op; repair on `not-prepared` fails typed pointing to prepare; a valid newer/different active version is never touched (repair ≠ update, no version changes, no credential access).
+
+### Concurrency
+
+- Single-flight per agent: duplicate same-agent prepare/repair joins the in-flight operation (two Claude setup clicks cannot start two downloads). Different agents run concurrently; the serialized manifest mutation is the only shared critical section.
+- `prepareAgent`/`repairAgent` return the refreshed status observed AFTER the operation completes (in-flight agents report `preparing` to concurrent status readers).
+
+### Manifest mutation safety (race found and fixed)
+
+The Phase 3–5 race was real the moment concurrent operations became reachable: bootstrap (Codex/OMP) and Claude setup each did an independent read→modify→write of the same `runtime-manifest.json`; concurrent prepare-Claude + repair-Codex would each read, then write disjoint entries, losing one update (atomic tmp+rename only prevents torn writes, not lost updates).
+
+Fix: `mutateArcRuntimeManifest` in `manifest.ts` — an in-process serialized mutation chain per manifest path; every read-modify-write (bootstrap, Claude activation commit, digest backfill) now routes through it. The Claude commit re-checks manifest state inside the lock after its download and never clobbers a concurrent activation. No-op decisions skip the write entirely (a missing manifest is not created by `kept-existing`). Proven by a deterministic interlock test: concurrent Codex + Claude activations both persist.
+
+### Provider health
+
+Real BB provider health is not cleanly queryable from the desktop layer without a cross-layer hack, so `ArcProviderStatusSource` is an injectable interface whose default implementation honestly reports `unknown` — never fabricated as ready. A server-RPC implementation can be injected later without touching the manager.
+
+### Side-effect-free status (permanent protection)
+
+`listArcAgents()`/`getArcAgent()` never download, copy, repair, or write: test-asserted that a status sweep over fresh userData leaves the filesystem byte-identical (no manifest creation, no runtime dirs).
+
+### Files changed
+
+- Application source: `src/arc-agent/{types,catalog,manager}.ts` (new); `src/arc-runtime/manifest.ts` (+serialized mutation); `src/arc-runtime/bootstrap.ts` and `src/arc-runtime/claude-setup.ts` (routed onto the mutation API, behavior preserved)
+- Tests: `test/arc-agent-catalog.test.ts` (6), `test/arc-agent-manager-status.test.ts` (13), `test/arc-agent-manager-actions.test.ts` (13), `test/arc-runtime-manifest-mutation.test.ts` (5)
+- Provider source: none. UI: none (no `components/*`/`app.tsx` edits). No IPC surface exposed yet (fixed-action `agents.list/prepare/repair` reserved for a later phase).
+
+### Tests
+
+- `pnpm --filter @bb/desktop typecheck` → PASS
+- Phase 6 focused suites → 38/38 PASS
+- `pnpm --filter @bb/desktop test` → **582 passed / 3 failed** — failures identical to the Phase 0–5 baseline (nightly publish-feed, server-moved notice, browser-view popup). +38 tests, zero regressions.
+
+### Known unknowns
+
+- Provider health remains `unknown` until a real `ArcProviderStatusSource` lands (server RPC or host maintenance API).
+- `preparing` is only observable while the in-process operation runs; cross-process operation tracking is out of scope for desktop v1.
+- No service-registration/IPC exposure yet — Mission Control wiring arrives with Phase 10.
+
+### Gate
+
+PASS.
